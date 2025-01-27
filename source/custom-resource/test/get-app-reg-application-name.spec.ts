@@ -1,11 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  mockCloudFormation,
-  mockServiceCatalogAppRegistry,
-  mockContext,
-} from "./mock";
+import { mockCloudFormation, mockServiceCatalogAppRegistry, mockContext } from "./mock";
 import { CustomResourceActions, CustomResourceRequestTypes, CustomResourceRequest } from "../lib";
 import { handler } from "../index";
 

@@ -19,7 +19,7 @@ if (DIST_OUTPUT_BUCKET && SOLUTION_NAME && VERSION)
   });
 
 const app = new App();
-const solutionDisplayName = "Serverless Image Handler";
+const solutionDisplayName = "Dynamic Image Transformation for Amazon CloudFront";
 const solutionVersion = VERSION ?? app.node.tryGetContext("solutionVersion");
 const description = `(${app.node.tryGetContext("solutionId")}) - ${solutionDisplayName}. Version ${solutionVersion}`;
 // eslint-disable-next-line no-new

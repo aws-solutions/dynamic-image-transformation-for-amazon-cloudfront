@@ -21,7 +21,7 @@ describe("rotate", () => {
       bucket: "sample-bucket",
       key: "test.jpg",
       edits: { rotate: null },
-      originalImage: originalImage,
+      originalImage,
     };
 
     // Act
@@ -29,7 +29,7 @@ describe("rotate", () => {
     const result = await imageHandler.process(request);
 
     // Assert
-    const metadata = await sharp(Buffer.from(result, "base64")).metadata();
+    const metadata = await sharp(result).metadata();
     expect(metadata).not.toHaveProperty("exif");
     expect(metadata).not.toHaveProperty("icc");
     expect(metadata).not.toHaveProperty("orientation");
@@ -43,7 +43,7 @@ describe("rotate", () => {
       bucket: "sample-bucket",
       key: "test.jpg",
       edits: {},
-      originalImage: originalImage,
+      originalImage,
     };
 
     // Act
@@ -51,7 +51,7 @@ describe("rotate", () => {
     const result = await imageHandler.process(request);
 
     // Assert
-    const metadata = await sharp(Buffer.from(result, "base64")).metadata();
+    const metadata = await sharp(result).metadata();
     expect(metadata).toHaveProperty("icc");
     expect(metadata).toHaveProperty("exif");
     expect(metadata.orientation).toEqual(3);
@@ -75,7 +75,7 @@ describe("rotate", () => {
     const result = await imageHandler.process(request);
 
     // Assert
-    const metadata = await sharp(Buffer.from(result, "base64")).metadata();
+    const metadata = await sharp(result).metadata();
     expect(metadata).not.toHaveProperty("orientation");
   });
 });

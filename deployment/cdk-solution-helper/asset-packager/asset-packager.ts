@@ -12,7 +12,7 @@ import AdmZip from "adm-zip";
  * on solution internal pipelines
  */
 export class CDKAssetPackager {
-  constructor(private readonly assetFolderPath: string) {}
+  constructor(private readonly assetFolderPath: string) { }
 
   /**
    * @description get cdk asset paths

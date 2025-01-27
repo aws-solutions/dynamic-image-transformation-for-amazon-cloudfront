@@ -16,4 +16,11 @@ export class ImageHandlerError extends Error {
   }
 }
 
+export interface ErrorMapping {
+  pattern: string;
+  statusCode: number;
+  errorType: string;
+  message: string | Function;
+}
+
 type AllowlistedEdit = (typeof SHARP_EDIT_ALLOWLIST_ARRAY)[number] | (typeof ALTERNATE_EDIT_ALLOWLIST_ARRAY)[number];

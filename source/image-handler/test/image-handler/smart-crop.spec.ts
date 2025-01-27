@@ -57,7 +57,7 @@ describe("smartCrop", () => {
     const image = sharp(originalImage, { failOnError: false }).withMetadata();
     const edits: ImageEdits = {
       toFormat: "webp",
-      smartCrop: { padding: 60 }
+      smartCrop: { padding: 60 },
     };
 
     // Mock
@@ -289,7 +289,11 @@ describe("smartCrop", () => {
     mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
       promise() {
         return Promise.reject(
-          new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "InternalServerError", "SimulatedError")
+          new ImageHandlerError(
+            StatusCodes.INTERNAL_SERVER_ERROR,
+            "SmartCrop::Error",
+            "Smart Crop could not be applied. Please contact the system administrator."
+          )
         );
       },
     }));
@@ -305,8 +309,8 @@ describe("smartCrop", () => {
       });
       expect(error).toMatchObject({
         status: StatusCodes.INTERNAL_SERVER_ERROR,
-        code: "InternalServerError",
-        message: "SimulatedError",
+        code: "SmartCrop::Error",
+        message: "Smart Crop could not be applied. Please contact the system administrator.",
       });
     }
   });
@@ -456,7 +460,7 @@ describe("handleBounds", () => {
           BoundingBox: {
             Height: 0.6968063116073608,
             Left: 0.26937249302864075,
-            Top: 0.51424895375967026,
+            Top: 0.5142489537596702,
             Width: 0.42325547337532043,
           },
         },
@@ -469,9 +473,9 @@ describe("handleBounds", () => {
 
     // Assert
     expect(boundingBox).toEqual({
-      Height: 1 - 0.51424895375967026,
+      Height: 1 - 0.5142489537596702,
       Left: 0.26937249302864075,
-      Top: 0.51424895375967026,
+      Top: 0.5142489537596702,
       Width: 0.42325547337532043,
     });
   });

@@ -20,7 +20,7 @@ export function addLambdaInvocationCount(this: SolutionsMetrics, functionName: s
       Stat: "Sum",
       Period: period,
     },
-    Id: undefined
+    Id: undefined,
   });
 }
 
@@ -50,7 +50,7 @@ export function addCloudFrontMetric(
       Period: period,
     },
     region: "us-east-1",
-    Id: undefined
+    Id: undefined,
   });
 }
 

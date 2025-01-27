@@ -6,7 +6,7 @@ import S3 from "aws-sdk/clients/s3";
 import sharp from "sharp";
 
 import { ImageHandler } from "../../image-handler";
-import { ImageEdits } from "../../lib";
+import { ImageEdits, ImageHandlerError } from "../../lib";
 
 const s3Client = new S3();
 const rekognitionClient = new Rekognition();
@@ -30,6 +30,44 @@ describe("resize", () => {
     const convertedImage = await sharp(originalImage, { failOnError: false })
       .withMetadata()
       .resize({ width: 99, height: 100 })
+      .toBuffer();
+    expect(resultBuffer).toEqual(convertedImage);
+  });
+
+  it("Should throw an error if image edits dimensions are invalid", async () => {
+    // Arrange
+    const originalImage = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const edits: ImageEdits = { resize: { width: 0, height: 0 } };
+
+    // Act
+    const imageHandler = new ImageHandler(s3Client, rekognitionClient);
+
+    // Assert
+    await expect(imageHandler.applyEdits(image, edits, false)).rejects.toThrow(ImageHandlerError);
+  });
+
+  it("Should not throw an error if image edits dimensions contain null", async () => {
+    // Arrange
+    const originalImage = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const edits: ImageEdits = { resize: { width: 100, height: null } };
+
+    // Act
+    const imageHandler = new ImageHandler(s3Client, rekognitionClient);
+
+    // Assert
+    const result = await imageHandler.applyEdits(image, edits, false);
+    const resultBuffer = await result.toBuffer();
+    const convertedImage = await sharp(originalImage, { failOnError: false })
+      .withMetadata()
+      .resize({ width: 100, height: null })
       .toBuffer();
     expect(resultBuffer).toEqual(convertedImage);
   });

@@ -80,7 +80,6 @@ describe("parseRequestType", () => {
     { value: ".tiff" },
     { value: ".tif" },
     { value: ".svg" },
-    { value: ".gif" },
     { value: ".avif" },
   ])("Should pass if get a request with supported image extension: $value", ({ value }) => {
     process.env = {};

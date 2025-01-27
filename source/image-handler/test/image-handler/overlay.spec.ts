@@ -9,7 +9,7 @@ import fs from "fs";
 import sharp from "sharp";
 
 import { ImageHandler } from "../../image-handler";
-import { ImageEdits, ImageHandlerError, StatusCodes, ImageRequestInfo, RequestTypes } from "../../lib";
+import { ImageEdits, StatusCodes, ImageRequestInfo, RequestTypes } from "../../lib";
 
 const s3Client = new S3();
 const rekognitionClient = new Rekognition();
@@ -310,13 +310,7 @@ describe("overlay", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.reject(
-          new ImageHandlerError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "InternalServerError",
-            "SimulatedInvalidParameterException"
-          )
-        );
+        return Promise.reject(new Error());
       },
     }));
 
@@ -337,9 +331,9 @@ describe("overlay", () => {
         Key: "invalidKey",
       });
       expect(error).toMatchObject({
-        status: StatusCodes.INTERNAL_SERVER_ERROR,
-        code: "InternalServerError",
-        message: "SimulatedInvalidParameterException",
+        status: StatusCodes.BAD_REQUEST,
+        code: "OverlayImageException",
+        message: "The overlay image could not be applied. Please contact the system administrator.",
       });
     }
   });
@@ -359,7 +353,8 @@ describe("overlay", () => {
       expect(error).toMatchObject({
         status: StatusCodes.FORBIDDEN,
         code: "ImageBucket::CannotAccessBucket",
-        message: "The overlay image bucket you specified could not be accessed. Please check that the bucket is specified in your SOURCE_BUCKETS.",
+        message:
+          "The overlay image bucket you specified could not be accessed. Please check that the bucket is specified in your SOURCE_BUCKETS.",
       });
     }
   });
@@ -474,7 +469,7 @@ describe("calcOverlaySizeOption", () => {
  * - height is greater
  */
 describe("overlay-dimensions", () => {
-  const SHARP_ERROR = "Image to composite must have same dimensions or smaller";
+  const SHARP_ERROR = "Image to overlay must have same dimensions or smaller";
   it("Should pass and not throw an exception when the overlay image dimensions are both equal - png", async () => {
     // Mock
     const originalImage = fs.readFileSync("./test/image/25x15.png");

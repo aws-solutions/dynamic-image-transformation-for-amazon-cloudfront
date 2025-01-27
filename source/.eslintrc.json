@@ -40,6 +40,7 @@
     "jsdoc/require-returns-type": ["off"],
     "jsdoc/newline-after-description": ["off"],
 
-    "import/no-unresolved": 1 // warn only on Unable to resolve path import/no-unresolved
+    "import/no-unresolved": 1, // warn only on Unable to resolve path import/no-unresolved
+    "dot-notation": "off"
   }
 }

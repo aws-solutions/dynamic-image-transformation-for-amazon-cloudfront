@@ -19,6 +19,7 @@ export const mockAwsS3 = {
   putBucketEncryption: jest.fn(),
   putBucketPolicy: jest.fn(),
   putBucketTagging: jest.fn(),
+  putBucketVersioning: jest.fn(),
 };
 
 jest.mock("aws-sdk/clients/s3", () => jest.fn(() => ({ ...mockAwsS3 })));
@@ -34,6 +35,12 @@ export const mockCloudFormation = {
 };
 
 jest.mock("aws-sdk/clients/cloudformation", () => jest.fn(() => ({ ...mockCloudFormation })));
+
+export const mockCloudFront = {
+  getDistribution: jest.fn(),
+};
+
+jest.mock("aws-sdk/clients/cloudfront", () => jest.fn(() => ({ ...mockCloudFront })));
 
 export const mockServiceCatalogAppRegistry = {
   getApplication: jest.fn(),

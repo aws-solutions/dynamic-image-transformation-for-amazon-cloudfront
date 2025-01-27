@@ -28,7 +28,7 @@ export class FrontEndConstruct extends Construct {
     const cloudFrontToS3 = new CloudFrontToS3(this, "DistributionToS3", {
       bucketProps: { serverAccessLogsBucket: undefined },
       cloudFrontDistributionProps: {
-        comment: "Demo UI Distribution for Serverless Image Handler",
+        comment: "Demo UI Distribution for Dynamic Image Transformation for Amazon CloudFront",
         enableLogging: true,
         logBucket: props.logsBucket,
         logFilePrefix: "ui-cloudfront/",

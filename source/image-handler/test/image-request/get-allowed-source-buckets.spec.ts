@@ -5,7 +5,6 @@ import { getAllowedSourceBuckets } from "../../image-request";
 import { StatusCodes } from "../../lib";
 
 describe("getAllowedSourceBuckets", () => {
-
   it("Should pass if the SOURCE_BUCKETS environment variable is not empty and contains valid inputs", () => {
     // Arrange
     process.env.SOURCE_BUCKETS = "allowedBucket001, allowedBucket002";

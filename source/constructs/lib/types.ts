@@ -8,12 +8,16 @@ export interface SolutionConstructProps {
   readonly corsOrigin: string;
   readonly sourceBuckets: string;
   readonly deployUI: YesNo;
-  readonly logRetentionPeriod: number;
+  readonly logRetentionPeriod: string;
   readonly autoWebP: string;
   readonly enableSignature: YesNo;
+  readonly originShieldRegion: string;
   readonly secretsManager: string;
   readonly secretsManagerKey: string;
   readonly enableDefaultFallbackImage: YesNo;
   readonly fallbackImageS3Bucket: string;
   readonly fallbackImageS3KeyBucket: string;
+  readonly enableS3ObjectLambda: string;
+  readonly useExistingCloudFrontDistribution: YesNo;
+  readonly existingCloudFrontDistributionId: string;
 }

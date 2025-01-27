@@ -23,8 +23,8 @@ describe("CREATE_LOGGING_BUCKET", () => {
   };
 
   beforeEach(() => {
-    consoleInfoSpy.mockReset()
-    consoleErrorSpy.mockReset()
+    consoleInfoSpy.mockReset();
+    consoleErrorSpy.mockReset();
   });
 
   it("Should return success and bucket name", async () => {
@@ -34,6 +34,11 @@ describe("CREATE_LOGGING_BUCKET", () => {
       },
     }));
     mockAwsS3.createBucket.mockImplementation(() => ({
+      promise() {
+        return Promise.resolve();
+      },
+    }));
+    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
       promise() {
         return Promise.resolve();
       },
@@ -137,6 +142,11 @@ describe("CREATE_LOGGING_BUCKET", () => {
         return Promise.resolve();
       },
     }));
+    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
+      promise() {
+        return Promise.resolve();
+      },
+    }));
     mockAwsS3.putBucketEncryption.mockImplementation(() => ({
       promise() {
         return Promise.reject(new CustomResourceError(null, "putBucketEncryption failed"));
@@ -173,6 +183,11 @@ describe("CREATE_LOGGING_BUCKET", () => {
       },
     }));
     mockAwsS3.createBucket.mockImplementation(() => ({
+      promise() {
+        return Promise.resolve();
+      },
+    }));
+    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
       promise() {
         return Promise.resolve();
       },
@@ -221,6 +236,11 @@ describe("CREATE_LOGGING_BUCKET", () => {
       },
     }));
     mockAwsS3.createBucket.mockImplementation(() => ({
+      promise() {
+        return Promise.resolve();
+      },
+    }));
+    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
       promise() {
         return Promise.resolve();
       },

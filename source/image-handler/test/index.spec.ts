@@ -3,18 +3,38 @@
 
 import fs from "fs";
 
-import { mockAwsS3 } from "./mock";
+import { mockAwsS3, mockContext } from "./mock";
 
 import { handler } from "../index";
-import { ImageHandlerError, ImageHandlerEvent, StatusCodes } from "../lib";
+import { ImageHandlerError, ImageHandlerEvent, S3GetObjectEvent, StatusCodes } from "../lib";
+// eslint-disable-next-line import/no-unresolved
+import { Context } from "aws-lambda";
 
 describe("index", () => {
   // Arrange
   process.env.SOURCE_BUCKETS = "source-bucket";
+  const OLD_ENV = process.env;
   const mockImage = Buffer.from("SampleImageContent\n");
   const mockFallbackImage = Buffer.from("SampleFallbackImageContent\n");
 
-  it("should return the image when there is no error", async () => {
+  const commonMetadata = {
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET",
+    "Content-Type": "image/jpeg",
+    StatusCode: "200",
+  };
+
+  beforeEach(() => {
+    process.env = { ...OLD_ENV };
+    jest.resetAllMocks();
+  });
+
+  afterAll(() => {
+    process.env = OLD_ENV;
+  });
+
+  it("should return the image when there is no error using RestAPI handler", async () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
@@ -32,7 +52,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Content-Type": "image/jpeg",
         Expires: undefined,
         "Cache-Control": "max-age=31536000,public",
@@ -47,6 +67,110 @@ describe("index", () => {
       Key: "test.jpg",
     });
     expect(result).toEqual(expectedResult);
+  });
+
+  it("should return the image when there is no error using S3 Object Lambda handler", async () => {
+    process.env.ENABLE_S3_OBJECT_LAMBDA = "Yes";
+    // Mock
+    mockAwsS3.getObject.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ Body: mockImage, ContentType: "image/jpeg" });
+      },
+    }));
+    mockAwsS3.writeGetObjectResponse.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ status: 200, Body: undefined });
+      },
+    }));
+    mockContext.getRemainingTimeInMillis.mockImplementationOnce(() => 60000);
+    // Arrange
+    const event: S3GetObjectEvent = {
+      getObjectContext: {
+        outputRoute: "testOutputRoute",
+        outputToken: "testOutputToken",
+      },
+      userRequest: {
+        url: "example.com/image/test.jpg",
+        headers: { Host: "example.com" },
+      },
+    };
+
+    // Act
+    const result = await handler(event, mockContext as unknown as Context);
+
+    // Assert
+    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      Bucket: "source-bucket",
+      Key: "test.jpg",
+    });
+    expect(result).toEqual(undefined);
+    expect(mockAwsS3.writeGetObjectResponse).toHaveBeenCalledWith({
+      Body: mockImage,
+      RequestRoute: event.getObjectContext.outputRoute,
+      RequestToken: event.getObjectContext.outputToken,
+      CacheControl: "max-age=31536000,public",
+      Metadata: {
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET",
+        "Content-Type": "image/jpeg",
+        StatusCode: "200",
+      },
+    });
+  });
+
+  it("should return timeout error when s3 object lambda duration is exceeded", async () => {
+    process.env.ENABLE_S3_OBJECT_LAMBDA = "Yes";
+    // Mock
+    mockAwsS3.getObject.mockImplementationOnce(() => ({
+      promise() {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({ Body: mockImage, ContentType: "image/jpeg" });
+          }, 100);
+        });
+      },
+    }));
+    mockAwsS3.writeGetObjectResponse.mockImplementation(() => ({
+      promise() {
+        return Promise.resolve({ status: 200, Body: undefined });
+      },
+    }));
+    mockContext.getRemainingTimeInMillis.mockImplementationOnce(() => 1000);
+    // Arrange
+    const event: S3GetObjectEvent = {
+      getObjectContext: {
+        outputRoute: "testOutputRoute",
+        outputToken: "testOutputToken",
+      },
+      userRequest: {
+        url: "example.com/image/test.jpg",
+        headers: { Host: "example.com" },
+      },
+    };
+
+    // Act
+    const result = await handler(event, mockContext as unknown as Context);
+
+    // Assert
+    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      Bucket: "source-bucket",
+      Key: "test.jpg",
+    });
+    expect(result).toEqual(undefined);
+    expect(mockAwsS3.writeGetObjectResponse).toHaveBeenCalledWith({
+      Body: '{"status":503,"code":"TimeoutException","message":"Image processing timed out."}',
+      RequestRoute: event.getObjectContext.outputRoute,
+      RequestToken: event.getObjectContext.outputToken,
+      CacheControl: "max-age=600,public",
+      Metadata: {
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET",
+        "Content-Type": "application/json",
+        StatusCode: "503",
+      },
+    });
   });
 
   it("should return the image with custom headers when custom headers are provided", async () => {
@@ -68,7 +192,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Content-Type": "image/jpeg",
         Expires: undefined,
         "Cache-Control": "max-age=31536000,public",
@@ -144,7 +268,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -162,7 +286,7 @@ describe("index", () => {
     expect(result).toEqual(expectedResult);
   });
 
-  it("should return 500 error when there is no error status in the error", async () => {
+  it("should return 400 error when sharp is passed invalid image format", async () => {
     // Arrange
     const event: ImageHandlerEvent = {
       path: "eyJidWNrZXQiOiJzb3VyY2UtYnVja2V0Iiwia2V5IjoidGVzdC5qcGciLCJlZGl0cyI6eyJ3cm9uZ0ZpbHRlciI6dHJ1ZX19",
@@ -178,18 +302,18 @@ describe("index", () => {
     // Act
     const result = await handler(event);
     const expectedResult = {
-      statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
+      statusCode: StatusCodes.BAD_REQUEST,
       isBase64Encoded: false,
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message: "Internal error. Please contact the system administrator.",
-        code: "InternalError",
-        status: StatusCodes.INTERNAL_SERVER_ERROR,
+        status: StatusCodes.BAD_REQUEST,
+        code: "InstantiationError",
+        message: "Input image could not be instantiated. Please choose a valid image.",
       }),
     };
 
@@ -235,11 +359,10 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "image/png",
         "Cache-Control": "max-age=31536000,public",
-        "Last-Modified": undefined,
       },
       body: mockFallbackImage.toString("base64"),
     };
@@ -295,7 +418,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "image/png",
         "Cache-Control": "max-age=12,public",
@@ -353,7 +476,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "image/png",
         "Cache-Control": "max-age=11,public",
@@ -376,6 +499,12 @@ describe("index", () => {
 
   it("should return an error JSON when getting the default fallback image fails if the default fallback image is enabled", async () => {
     // Arrange
+    process.env.ENABLE_DEFAULT_FALLBACK_IMAGE = "Yes";
+    process.env.DEFAULT_FALLBACK_IMAGE_BUCKET = "fallback-image-bucket";
+    process.env.DEFAULT_FALLBACK_IMAGE_KEY = "fallback-image.png";
+    process.env.CORS_ENABLED = "Yes";
+    process.env.CORS_ORIGIN = "*";
+
     const event: ImageHandlerEvent = {
       path: "/test.jpg",
     };
@@ -396,7 +525,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
       },
@@ -422,6 +551,8 @@ describe("index", () => {
   it("should return an error JSON when the default fallback image key is not provided if the default fallback image is enabled", async () => {
     // Arrange
     process.env.DEFAULT_FALLBACK_IMAGE_KEY = "";
+    process.env.CORS_ENABLED = "Yes";
+    process.env.CORS_ORIGIN = "*";
     const event: ImageHandlerEvent = { path: "/test.jpg" };
 
     // Mock
@@ -439,7 +570,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
       },
@@ -461,6 +592,8 @@ describe("index", () => {
   it("should return an error JSON when the default fallback image bucket is not provided if the default fallback image is enabled", async () => {
     // Arrange
     process.env.DEFAULT_FALLBACK_IMAGE_BUCKET = "";
+    process.env.CORS_ENABLED = "Yes";
+    process.env.CORS_ORIGIN = "*";
     const event: ImageHandlerEvent = { path: "/test.jpg" };
 
     // Mock
@@ -478,7 +611,7 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
       },
@@ -499,6 +632,8 @@ describe("index", () => {
 
   it("Should return an error JSON when ALB request is failed", async () => {
     // Arrange
+    process.env.CORS_ENABLED = "Yes";
+    process.env.CORS_ORIGIN = "*";
     const event: ImageHandlerEvent = {
       path: "/test.jpg",
       requestContext: {
@@ -540,14 +675,20 @@ describe("index", () => {
   });
 
   it("should return an error JSON with the expected message when one or both overlay image dimensions are greater than the base image dimensions", async () => {
-    // Arrange
-    // {"bucket":"source-bucket","key":"transparent-10x10.png","edits":{"overlayWith":{"bucket":"source-bucket","key":"transparent-5x5.png"}},"headers":{"Custom-Header":"Custom header test","Cache-Control":"max-age:1,public"}}
-    const event: ImageHandlerEvent = {
-      path: "eyJidWNrZXQiOiJzb3VyY2UtYnVja2V0Iiwia2V5IjoidHJhbnNwYXJlbnQtMTB4MTAucG5nIiwiZWRpdHMiOnsib3ZlcmxheVdpdGgiOnsiYnVja2V0Ijoic291cmNlLWJ1Y2tldCIsImtleSI6InRyYW5zcGFyZW50LTV4NS5wbmcifX0sImhlYWRlcnMiOnsiQ3VzdG9tLUhlYWRlciI6IkN1c3RvbSBoZWFkZXIgdGVzdCIsIkNhY2hlLUNvbnRyb2wiOiJtYXgtYWdlOjEscHVibGljIn19",
+    process.env.CORS_ENABLED = "Yes";
+    process.env.CORS_ORIGIN = "*";
+    const imageRequest = {
+      bucket: "source-bucket",
+      key: "transparent-5x5.png",
+      edits: { overlayWith: { bucket: "source-bucket", key: "transparent-10x10.png" } },
+      headers: { "Custom-Header": "Custom header test", "Cache-Control": "max-age:1,public" },
     };
-    // Mock
-    const overlayImage = fs.readFileSync("./test/image/transparent-5x5.jpeg");
-    const baseImage = fs.readFileSync("./test/image/transparent-10x10.jpeg");
+    const encStr = Buffer.from(JSON.stringify(imageRequest)).toString("base64");
+    const event: ImageHandlerEvent = {
+      path: `${encStr}`,
+    };
+    const overlayImage = fs.readFileSync("./test/image/transparent-10x10.jpeg");
+    const baseImage = fs.readFileSync("./test/image/transparent-5x5.jpeg");
 
     // Mock
     mockAwsS3.getObject.mockImplementation((data) => ({
@@ -566,16 +707,106 @@ describe("index", () => {
       headers: {
         "Access-Control-Allow-Methods": "GET",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message: `Image to overlay must have same dimensions or smaller`,
-        code: "BadRequest",
         status: StatusCodes.BAD_REQUEST,
+        code: "BadRequest",
+        message: `Image to overlay must have same dimensions or smaller`,
       }),
     };
     expect(result).toEqual(expectedResult);
   });
+
+  const writeGetObjectAssertion = (
+    event: S3GetObjectEvent,
+    cacheControl: string | RegExp,
+    additionalMetadata: {} = {}
+  ) => {
+    expect(mockAwsS3.writeGetObjectResponse).toHaveBeenCalledWith({
+      Body: mockImage,
+      RequestRoute: event.getObjectContext.outputRoute,
+      RequestToken: event.getObjectContext.outputToken,
+      CacheControl: cacheControl,
+      Metadata: { ...commonMetadata, ...additionalMetadata },
+    });
+  };
+
+  it("should return the image with properly encoded headers when custom headers are provided to S3 OL implementation", async () => {
+    // Mock
+    const imageRequest = { bucket: "source-bucket", key: "test.jpg", headers: { "Custom-Header": "CustomValue\n" } };
+    const event = setupObjectLambdaB64EncodedTest(imageRequest);
+
+    // Act
+    await handler(event, mockContext as unknown as Context);
+
+    // Assert
+    writeGetObjectAssertion(event, "max-age=31536000,public", { "Custom-Header": "CustomValue%0A" });
+  });
+
+  it("should allow overwriting of CacheControl header when expires is not provided", async () => {
+    // Mock
+    const imageRequest = {
+      bucket: "source-bucket",
+      key: "test.jpg",
+      headers: { "Cache-Control": "max-age=50,public" },
+    };
+    const event = setupObjectLambdaB64EncodedTest(imageRequest);
+
+    // Act
+    await handler(event, mockContext as unknown as Context);
+
+    // Assert
+    writeGetObjectAssertion(event, "max-age=50,public");
+  });
+
+  it("should disallow overwriting of CacheControl header when expires is provided", async () => {
+    // Mock
+    const imageRequest = {
+      bucket: "source-bucket",
+      key: "test.jpg",
+      headers: { "Cache-Control": "max-age=50,public" },
+    };
+    const event = setupObjectLambdaB64EncodedTest(imageRequest);
+    const validDate = new Date();
+    validDate.setSeconds(validDate.getSeconds() + 5);
+    const validDateString = validDate.toISOString().replace(/-/g, "").replace(/:/g, "").slice(0, 15) + "Z";
+    event.userRequest.url = `${event.userRequest.url}?expires=${validDateString}`;
+
+    // Act
+    await handler(event, mockContext as unknown as Context);
+
+    // Assert
+    writeGetObjectAssertion(event, expect.stringMatching(/^max-age=[0-5],public$/));
+  });
+
+  function setupObjectLambdaB64EncodedTest(eventObject: Object, image: Buffer = mockImage): S3GetObjectEvent {
+    process.env.ENABLE_S3_OBJECT_LAMBDA = "Yes";
+    mockAwsS3.getObject.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ Body: image, ContentType: "image/jpeg" });
+      },
+    }));
+
+    const encStr = Buffer.from(JSON.stringify(eventObject)).toString("base64");
+
+    mockAwsS3.writeGetObjectResponse.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ status: 200, Body: undefined });
+      },
+    }));
+    mockContext.getRemainingTimeInMillis.mockImplementationOnce(() => 60000);
+    return {
+      getObjectContext: {
+        outputRoute: "testOutputRoute",
+        outputToken: "testOutputToken",
+      },
+      userRequest: {
+        url: `example.com/image/${encStr}`,
+        headers: { Host: "example.com" },
+      },
+    };
+  }
 });

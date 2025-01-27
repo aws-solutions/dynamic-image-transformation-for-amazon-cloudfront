@@ -1,6 +1,6 @@
 {
   "name": "image-handler",
-  "version": "6.3.3",
+  "version": "7.0.0",
   "private": true,
   "description": "A Lambda function for performing on-demand image edits and manipulations.",
   "license": "Apache-2.0",
@@ -16,9 +16,11 @@
     "bump-version": "npm version $(cat ../../VERSION.txt) --allow-same-version"
   },
   "dependencies": {
+    "@types/aws-lambda": "^8.10.136",
     "aws-sdk": "^2.1529.0",
     "color": "4.2.3",
     "color-name": "1.1.4",
+    "dayjs": "1.11.10",
     "sharp": "^0.32.6"
   },
   "devDependencies": {

@@ -32,6 +32,8 @@ describe("SEND_ANONYMOUS_METRIC", () => {
       EnableSignature: "Yes",
       LogRetentionPeriod: 5,
       SourceBuckets: "bucket-1, bucket-2, bucket-3",
+      EnableS3ObjectLambda: "Yes",
+      OriginShieldRegion: "Disabled",
     },
   };
 
@@ -79,6 +81,8 @@ describe("SEND_ANONYMOUS_METRIC", () => {
             EnableSignature: "Yes",
             LogRetentionPeriod: 5,
             NumberOfSourceBuckets: 3,
+            EnableS3ObjectLambda: "Yes",
+            OriginShieldRegion: "Disabled",
           },
         },
       },
@@ -122,6 +126,8 @@ describe("SEND_ANONYMOUS_METRIC", () => {
             EnableSignature: "Yes",
             LogRetentionPeriod: 5,
             NumberOfSourceBuckets: 3,
+            EnableS3ObjectLambda: "Yes",
+            OriginShieldRegion: "Disabled",
           },
         },
       },

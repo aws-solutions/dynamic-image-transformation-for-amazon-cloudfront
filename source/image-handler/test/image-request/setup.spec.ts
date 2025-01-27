@@ -7,7 +7,7 @@ import S3 from "aws-sdk/clients/s3";
 import SecretsManager from "aws-sdk/clients/secretsmanager";
 
 import { ImageRequest } from "../../image-request";
-import { ImageHandlerError, RequestTypes, StatusCodes } from "../../lib";
+import { ImageHandlerError, ImageHandlerEvent, RequestTypes, StatusCodes } from "../../lib";
 import { SecretProvider } from "../../secret-provider";
 
 describe("setup", () => {
@@ -326,7 +326,7 @@ describe("setup", () => {
   describe("enableSignature", () => {
     beforeAll(() => {
       process.env.ENABLE_SIGNATURE = "Yes";
-      process.env.SECRETS_MANAGER = "serverless-image-handler";
+      process.env.SECRETS_MANAGER = "dynamic-image-transformation-for-amazon-cloudfront";
       process.env.SECRET_KEY = "signatureKey";
       process.env.SOURCE_BUCKETS = "validBucket";
     });
@@ -472,7 +472,11 @@ describe("setup", () => {
       mockAwsSecretManager.getSecretValue.mockImplementationOnce(() => ({
         promise() {
           return Promise.reject(
-            new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "InternalServerError", "SimulatedError")
+            new ImageHandlerError(
+              StatusCodes.INTERNAL_SERVER_ERROR,
+              "SmartCrop::Error",
+              "Smart Crop could not be applied. Please contact the system administrator."
+            )
           );
         },
       }));
@@ -795,38 +799,157 @@ describe("setup", () => {
     expect(imageRequestInfo).toEqual(expectedResult);
   });
 
-  it('Should pass when a default image request is provided and populate the ImageRequest object with the proper values and a utf-8 key', async function () {
-    // Arrange
-    const event = {
-      path: 'eyJidWNrZXQiOiJ0ZXN0Iiwia2V5Ijoi5Lit5paHIiwiZWRpdHMiOnsiZ3JheXNjYWxlIjp0cnVlfSwib3V0cHV0Rm9ybWF0IjoianBlZyJ9'
-    }
-    process.env = {
-      SOURCE_BUCKETS: "test, test2"
-    }
+  it("Should pass and use query param edit on default requests", async () => {
+    const event: ImageHandlerEvent = {
+      path: "/eyJidWNrZXQiOiJ0ZXN0Iiwia2V5IjoidGVzdC5wbmciLCJvdXRwdXRGb3JtYXQiOiJ3ZWJwIn0=",
+      queryStringParameters: {
+        format: "png",
+      },
+    };
+    process.env.SOURCE_BUCKETS = "test, validBucket, validBucket2";
+
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => {
-      return {
-        promise() {
-          return Promise.resolve({ Body: Buffer.from('SampleImageContent\n') });
-        }
-      };
-    });
+    mockAwsS3.getObject.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+      },
+    }));
+
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
     const imageRequestInfo = await imageRequest.setup(event);
     const expectedResult = {
-      requestType: 'Default',
-      bucket: 'test',
-      key: '中文',
+      requestType: "Default",
+      bucket: "test",
+      key: "test.png",
+      edits: { toFormat: "png" },
+      headers: undefined,
+      outputFormat: "png",
+      originalImage: Buffer.from("SampleImageContent\n"),
+      cacheControl: "max-age=31536000,public",
+      contentType: "image/png",
+    };
+
+    // Assert
+    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      Bucket: "test",
+      Key: "test.png",
+    });
+    expect(imageRequestInfo).toEqual(expectedResult);
+  });
+
+  it("Should pass when a default image request is provided and populate the ImageRequest object with the proper values and a utf-8 key", async () => {
+    // Arrange
+    const event = {
+      path: "eyJidWNrZXQiOiJ0ZXN0Iiwia2V5Ijoi5Lit5paHIiwiZWRpdHMiOnsiZ3JheXNjYWxlIjp0cnVlfSwib3V0cHV0Rm9ybWF0IjoianBlZyJ9",
+    };
+    process.env = {
+      SOURCE_BUCKETS: "test, test2",
+    };
+    // Mock
+    mockAwsS3.getObject.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+      },
+    }));
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const imageRequestInfo = await imageRequest.setup(event);
+    const expectedResult = {
+      requestType: "Default",
+      bucket: "test",
+      key: "中文",
       edits: { grayscale: true },
       headers: undefined,
-      outputFormat: 'jpeg',
-      originalImage: Buffer.from('SampleImageContent\n'),
-      cacheControl: 'max-age=31536000,public',
-      contentType: 'image/jpeg'
+      outputFormat: "jpeg",
+      originalImage: Buffer.from("SampleImageContent\n"),
+      cacheControl: "max-age=31536000,public",
+      contentType: "image/jpeg",
     };
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: 'test', Key: '中文' });
+    expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: "test", Key: "中文" });
+    expect(imageRequestInfo).toEqual(expectedResult);
+  });
+
+  it("Should pass when a query-param image request is provided and populate the ImageRequest object with the proper values", async () => {
+    // Arrange
+    const event: ImageHandlerEvent = {
+      path: "/test-image-001.jpg",
+      queryStringParameters: {
+        format: "png",
+      },
+    };
+    process.env.SOURCE_BUCKETS = "allowedBucket001, allowedBucket002";
+
+    // Mock
+    mockAwsS3.getObject.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+      },
+    }));
+
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const imageRequestInfo = await imageRequest.setup(event);
+    const expectedResult = {
+      requestType: "Thumbor",
+      bucket: "allowedBucket001",
+      key: "test-image-001.jpg",
+      edits: {
+        toFormat: "png",
+      },
+      originalImage: Buffer.from("SampleImageContent\n"),
+      cacheControl: "max-age=31536000,public",
+      outputFormat: "png",
+      contentType: "image/png",
+    };
+
+    // Assert
+    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      Bucket: "allowedBucket001",
+      Key: "test-image-001.jpg",
+    });
+    expect(imageRequestInfo).toEqual(expectedResult);
+  });
+
+  it("Should pass when a query-param/thumbor request is provided and have query overwrite existing values", async () => {
+    // Arrange
+    const event: ImageHandlerEvent = {
+      path: "/filters:format(jpg)/test-image-001.jpg",
+      queryStringParameters: {
+        format: "png",
+      },
+    };
+    process.env.SOURCE_BUCKETS = "allowedBucket001, allowedBucket002";
+
+    // Mock
+    mockAwsS3.getObject.mockImplementationOnce(() => ({
+      promise() {
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+      },
+    }));
+
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const imageRequestInfo = await imageRequest.setup(event);
+    const expectedResult = {
+      requestType: "Thumbor",
+      bucket: "allowedBucket001",
+      key: "test-image-001.jpg",
+      edits: {
+        toFormat: "png",
+      },
+      originalImage: Buffer.from("SampleImageContent\n"),
+      cacheControl: "max-age=31536000,public",
+      outputFormat: "png",
+      contentType: "image/png",
+    };
+
+    // Assert
+    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      Bucket: "allowedBucket001",
+      Key: "test-image-001.jpg",
+    });
     expect(imageRequestInfo).toEqual(expectedResult);
   });
 });

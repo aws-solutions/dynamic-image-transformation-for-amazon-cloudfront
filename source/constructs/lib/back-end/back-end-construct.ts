@@ -2,49 +2,53 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as path from "path";
-import { LambdaRestApiProps, RestApi } from "aws-cdk-lib/aws-apigateway";
 import {
-  AllowedMethods,
   CacheHeaderBehavior,
   CachePolicy,
   CacheQueryStringBehavior,
-  DistributionProps,
-  IOrigin,
+  Distribution,
+  OriginRequestHeaderBehavior,
   OriginRequestPolicy,
-  OriginSslPolicy,
-  PriceClass,
-  ViewerProtocolPolicy,
+  OriginRequestQueryStringBehavior,
 } from "aws-cdk-lib/aws-cloudfront";
-import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { Conditions } from "../common-resources/common-resources-construct";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { CfnLogGroup, LogGroup, QueryString } from "aws-cdk-lib/aws-logs";
 import { IBucket } from "aws-cdk-lib/aws-s3";
-import { ArnFormat, Aspects, Aws, CfnCondition, Duration, Fn, Lazy, Stack } from "aws-cdk-lib";
+import { ArnFormat, Aspects, Aws, CfnCondition, CfnResource, Duration, Fn, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { CloudFrontToApiGatewayToLambda } from "@aws-solutions-constructs/aws-cloudfront-apigateway-lambda";
-
 import { addCfnSuppressRules } from "../../utils/utils";
 import { SolutionConstructProps } from "../types";
-import * as api from "aws-cdk-lib/aws-apigateway";
+import { ApiGatewayArchitecture } from "./api-gateway-architecture";
+import { S3ObjectLambdaArchitecture } from "./s3-object-lambda-architecture";
 import { SolutionsMetrics, ExecutionDay } from "metrics-utils";
 import { ConditionAspect } from "../../utils/aspects";
+import { OperationalInsightsDashboard } from "../dashboard/ops-insights-dashboard";
+import { Dashboard } from "aws-cdk-lib/aws-cloudwatch";
 
 export interface BackEndProps extends SolutionConstructProps {
   readonly solutionVersion: string;
   readonly solutionId: string;
   readonly solutionName: string;
   readonly sendAnonymousStatistics: CfnCondition;
+  readonly deployCloudWatchDashboard: CfnCondition;
   readonly secretsManagerPolicy: Policy;
   readonly logsBucket: IBucket;
   readonly uuid: string;
+  readonly regionedBucketName: string;
+  readonly regionedBucketHash: string;
   readonly cloudFrontPriceClass: string;
+  readonly conditions: Conditions;
+  readonly sharpSizeLimit: string;
   readonly createSourceBucketsResource: (key?: string) => string[];
 }
 
 export class BackEnd extends Construct {
   public domainName: string;
+  public olDomainName: string;
+  public operationalDashboard: Dashboard;
 
   constructor(scope: Construct, id: string, props: BackEndProps) {
     super(scope, id);
@@ -112,8 +116,10 @@ export class BackEnd extends Construct {
         ENABLE_DEFAULT_FALLBACK_IMAGE: props.enableDefaultFallbackImage,
         DEFAULT_FALLBACK_IMAGE_BUCKET: props.fallbackImageS3Bucket,
         DEFAULT_FALLBACK_IMAGE_KEY: props.fallbackImageS3KeyBucket,
+        ENABLE_S3_OBJECT_LAMBDA: props.enableS3ObjectLambda,
         SOLUTION_VERSION: props.solutionVersion,
         SOLUTION_ID: props.solutionId,
+        SHARP_SIZE_LIMIT: props.sharpSizeLimit,
       },
       bundling: {
         externalModules: ["sharp"],
@@ -134,8 +140,15 @@ export class BackEnd extends Construct {
 
     const imageHandlerLogGroup = new LogGroup(this, "ImageHandlerLogGroup", {
       logGroupName: `/aws/lambda/${imageHandlerLambdaFunction.functionName}`,
-      retention: props.logRetentionPeriod as RetentionDays,
     });
+
+    // Access the underlying CfnLogGroup to add conditions
+    const cfnLogGroup = imageHandlerLogGroup.node.defaultChild as CfnLogGroup;
+
+    cfnLogGroup.addOverride(
+      "Properties.RetentionInDays",
+      Fn.conditionIf(props.conditions.isLogRetentionPeriodInfinite.logicalId, Aws.NO_VALUE, props.logRetentionPeriod)
+    );
 
     addCfnSuppressRules(imageHandlerLogGroup, [
       {
@@ -151,88 +164,43 @@ export class BackEnd extends Construct {
       maxTtl: Duration.days(365),
       enableAcceptEncodingGzip: false,
       headerBehavior: CacheHeaderBehavior.allowList("origin", "accept"),
-      queryStringBehavior: CacheQueryStringBehavior.allowList("signature"),
+      queryStringBehavior: CacheQueryStringBehavior.all(),
     });
 
-    const originRequestPolicy = new OriginRequestPolicy(this, "OriginRequestPolicy", {
-      originRequestPolicyName: `ServerlessImageHandler-${props.uuid}`,
-      headerBehavior: CacheHeaderBehavior.allowList("origin", "accept"),
-      queryStringBehavior: CacheQueryStringBehavior.allowList("signature"),
-    });
-
-    const apiGatewayRestApi = RestApi.fromRestApiId(
-      this,
-      "ApiGatewayRestApi",
-      Lazy.string({
-        produce: () => imageHandlerCloudFrontApiGatewayLambda.apiGateway.restApiId,
-      })
-    );
-
-    const origin: IOrigin = new HttpOrigin(`${apiGatewayRestApi.restApiId}.execute-api.${Aws.REGION}.amazonaws.com`, {
-      originPath: "/image",
-      originSslProtocols: [OriginSslPolicy.TLS_V1_1, OriginSslPolicy.TLS_V1_2],
-    });
-
-    const cloudFrontDistributionProps: DistributionProps = {
-      comment: "Image Handler Distribution for Serverless Image Handler",
-      defaultBehavior: {
-        origin,
-        allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
-        viewerProtocolPolicy: ViewerProtocolPolicy.HTTPS_ONLY,
-        originRequestPolicy,
-        cachePolicy,
-      },
-      priceClass: props.cloudFrontPriceClass as PriceClass,
-      enableLogging: true,
-      logBucket: props.logsBucket,
-      logFilePrefix: "api-cloudfront/",
-      errorResponses: [
-        { httpStatus: 500, ttl: Duration.minutes(10) },
-        { httpStatus: 501, ttl: Duration.minutes(10) },
-        { httpStatus: 502, ttl: Duration.minutes(10) },
-        { httpStatus: 503, ttl: Duration.minutes(10) },
-        { httpStatus: 504, ttl: Duration.minutes(10) },
-      ],
-    };
-
-    const logGroupProps = {
-      retention: props.logRetentionPeriod as RetentionDays,
-    };
-
-    const apiGatewayProps: LambdaRestApiProps = {
-      handler: imageHandlerLambdaFunction,
-      deployOptions: {
-        stageName: "image",
-      },
-      binaryMediaTypes: ["*/*"],
-      defaultMethodOptions: {
-        authorizationType: api.AuthorizationType.NONE,
-      },
-    };
-
-    const imageHandlerCloudFrontApiGatewayLambda = new CloudFrontToApiGatewayToLambda(
-      this,
-      "ImageHandlerCloudFrontApiGatewayLambda",
+    const cachePolicyResource = this.node.findChild("CachePolicy").node.defaultChild as CfnResource;
+    cachePolicyResource.addOverride(
+      "Properties.CachePolicyConfig.ParametersInCacheKeyAndForwardedToOrigin.HeadersConfig.Headers",
       {
-        existingLambdaObj: imageHandlerLambdaFunction,
-        insertHttpSecurityHeaders: false,
-        logGroupProps,
-        cloudFrontDistributionProps,
-        apiGatewayProps,
+        "Fn::If": [props.conditions.autoWebPCondition.logicalId, ["origin", "accept"], ["origin"]],
       }
     );
 
-    addCfnSuppressRules(imageHandlerCloudFrontApiGatewayLambda.apiGateway, [
-      {
-        id: "W59",
-        reason:
-          "AWS::ApiGateway::Method AuthorizationType is set to 'NONE' because API Gateway behind CloudFront does not support AWS_IAM authentication",
-      },
-    ]);
+    const originRequestPolicy = new OriginRequestPolicy(this, "OriginRequestPolicy", {
+      originRequestPolicyName: `ServerlessImageHandler-${props.uuid}`,
+      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept"),
+      queryStringBehavior: OriginRequestQueryStringBehavior.all(),
+    });
 
-    imageHandlerCloudFrontApiGatewayLambda.apiGateway.node.tryRemoveChild("Endpoint"); // we don't need the RestApi endpoint in the outputs
+    const existingDistribution = Distribution.fromDistributionAttributes(this, "ExistingDistribution", {
+      domainName: "",
+      distributionId: props.existingCloudFrontDistributionId,
+    });
 
-    this.domainName = imageHandlerCloudFrontApiGatewayLambda.cloudFrontWebDistribution.distributionDomainName;
+    const apiGatewayArchitecture = new ApiGatewayArchitecture(this, {
+      imageHandlerLambdaFunction,
+      originRequestPolicy,
+      cachePolicy,
+      existingDistribution,
+      ...props,
+    });
+
+    const s3ObjectLambdaArchitecture = new S3ObjectLambdaArchitecture(this, {
+      imageHandlerLambdaFunction,
+      originRequestPolicy,
+      cachePolicy,
+      existingDistribution,
+      ...props,
+    });
 
     const shortLogRetentionCondition: CfnCondition = new CfnCondition(this, "ShortLogRetentionCondition", {
       expression: Fn.conditionOr(
@@ -249,18 +217,52 @@ export class BackEnd extends Construct {
         ExecutionDay.MONDAY
       ).toString(),
     });
+
+    const conditionalCloudFrontDistributionId = Fn.conditionIf(
+      props.conditions.useExistingCloudFrontDistributionCondition.logicalId,
+      existingDistribution.distributionId,
+      Fn.conditionIf(
+        props.conditions.enableS3ObjectLambdaCondition.logicalId,
+        s3ObjectLambdaArchitecture.imageHandlerCloudFrontDistribution.distributionId,
+        apiGatewayArchitecture.imageHandlerCloudFrontDistribution.distributionId
+      ).toString()
+    ).toString();
+
     solutionsMetrics.addLambdaInvocationCount(imageHandlerLambdaFunction.functionName);
     solutionsMetrics.addLambdaBilledDurationMemorySize([imageHandlerLogGroup], "BilledDurationMemorySizeQuery");
-    solutionsMetrics.addCloudFrontMetric(
-      imageHandlerCloudFrontApiGatewayLambda.cloudFrontWebDistribution.distributionId,
-      "Requests"
-    );
+    solutionsMetrics.addQueryDefinition({
+      logGroups: [imageHandlerLogGroup],
+      queryString: new QueryString({
+        parseStatements: [
+          `@message "requestType: 'Default'" as DefaultRequests`,
+          `@message "requestType: 'Thumbor'" as ThumborRequests`,
+          `@message "requestType: 'Custom'" as CustomRequests`,
+          `@message "Query param edits:" as QueryParamRequests`,
+          `@message "expires" as ExpiresRequests`,
+        ],
+        stats:
+          "count(DefaultRequests) as DefaultRequestsCount, count(ThumborRequests) as ThumborRequestsCount, count(CustomRequests) as CustomRequestsCount, count(QueryParamRequests) as QueryParamRequestsCount, count(ExpiresRequests) as ExpiresRequestsCount",
+      }),
+      queryDefinitionName: "RequestInfoQuery",
+    });
 
-    solutionsMetrics.addCloudFrontMetric(
-      imageHandlerCloudFrontApiGatewayLambda.cloudFrontWebDistribution.distributionId,
-      "BytesDownloaded"
-    );
+    solutionsMetrics.addCloudFrontMetric(conditionalCloudFrontDistributionId, "Requests");
+    solutionsMetrics.addCloudFrontMetric(conditionalCloudFrontDistributionId, "BytesDownloaded");
 
     Aspects.of(solutionsMetrics).add(new ConditionAspect(props.sendAnonymousStatistics));
+
+    const operationalInsightsDashboard = new OperationalInsightsDashboard(
+      Stack.of(this),
+      "OperationalInsightsDashboard",
+      {
+        enabled: props.conditions.deployUICondition,
+        backendLambdaFunctionName: imageHandlerLambdaFunction.functionName,
+        cloudFrontDistributionId: conditionalCloudFrontDistributionId,
+        namespace: Aws.REGION,
+      }
+    );
+    this.operationalDashboard = operationalInsightsDashboard.dashboard;
+
+    Aspects.of(operationalInsightsDashboard).add(new ConditionAspect(props.deployCloudWatchDashboard));
   }
 }

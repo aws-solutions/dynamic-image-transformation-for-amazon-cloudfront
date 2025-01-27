@@ -148,7 +148,7 @@ test("Test that multiple query definitions are defined correctly", () => {
           "",
           [
             {
-              "Ref": "AWS::StackName",
+              Ref: "AWS::StackName",
             },
             "-ExampleQuery",
           ],
@@ -166,7 +166,7 @@ test("Test that multiple query definitions are defined correctly", () => {
           "",
           [
             {
-              "Ref": "AWS::StackName",
+              Ref: "AWS::StackName",
             },
             "-ExampleQuery2",
           ],

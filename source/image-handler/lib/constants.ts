@@ -66,6 +66,7 @@ export const HEADER_DENY_LIST = [
   /^www-authenticate$/i,
   /^proxy-authenticate$/i,
   /^x-api-key$/i,
+  /^set-cookie$/i,
 
   // Security Header Patterns
   /^x-frame-.*$/i,

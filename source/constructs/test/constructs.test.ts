@@ -6,19 +6,19 @@ import { App } from "aws-cdk-lib";
 
 import { ServerlessImageHandlerStack } from "../lib/serverless-image-stack";
 
-test("Serverless Image Handler Stack Snapshot", () => {
+test("Dynamic Image Transformation for Amazon CloudFront Stack Snapshot", () => {
   const app = new App({
     context: {
       solutionId: "SO0023",
-      solutionName: "serverless-image-handler",
-      solutionVersion: "v6.3.3",
+      solutionName: "dynamic-image-transformation-for-amazon-cloudfront",
+      solutionVersion: "v7.0.0",
     },
   });
 
   const stack = new ServerlessImageHandlerStack(app, "TestStack", {
     solutionId: "S0ABC",
-    solutionName: "sih",
-    solutionVersion: "v6.3.3",
+    solutionName: "dit",
+    solutionVersion: "v7.0.0",
   });
 
   const template = Template.fromStack(stack);

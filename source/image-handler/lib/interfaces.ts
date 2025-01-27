@@ -8,13 +8,45 @@ import { Headers, ImageEdits } from "./types";
 
 export interface ImageHandlerEvent {
   path?: string;
-  queryStringParameters?: {
-    signature: string;
-  };
+  queryStringParameters?: QueryStringParameters;
   requestContext?: {
     elb?: unknown;
   };
   headers?: Headers;
+}
+
+export interface QueryStringParameters {
+  signature?: string;
+  expires?: string;
+  format?: string;
+  fit?: string;
+  width?: string;
+  height?: string;
+  rotate?: string;
+  flip?: string;
+  flop?: string;
+  grayscale?: string;
+}
+
+export interface S3UserRequest {
+  url: string;
+  headers: Headers;
+}
+
+export interface S3Event {
+  userRequest: S3UserRequest;
+}
+
+export interface S3GetObjectEvent extends S3Event {
+  getObjectContext: {
+    outputRoute: string;
+    outputToken: string;
+  };
+}
+
+export interface S3HeadObjectResult {
+  statusCode: number;
+  headers: Headers;
 }
 
 export interface DefaultImageRequest {
@@ -51,6 +83,7 @@ export interface ImageRequestInfo {
   cacheControl?: string;
   outputFormat?: ImageFormatTypes;
   effort?: number;
+  secondsToExpiry?: number;
 }
 
 export interface RekognitionCompatibleImage {
@@ -65,5 +98,5 @@ export interface ImageHandlerExecutionResult {
   statusCode: StatusCodes;
   isBase64Encoded: boolean;
   headers: Headers;
-  body: string;
+  body: Buffer | string;
 }

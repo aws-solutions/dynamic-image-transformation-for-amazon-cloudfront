@@ -1,7 +1,7 @@
 {
   "name": "constructs",
-  "version": "6.3.3",
-  "description": "Serverless Image Handler Constructs",
+  "version": "7.0.0",
+  "description": "Dynamic Image Transformation for Amazon CloudFront Constructs",
   "license": "Apache-2.0",
   "author": {
     "name": "Amazon Web Services",

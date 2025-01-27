@@ -249,8 +249,8 @@ describe("contentModeration", () => {
         return Promise.reject(
           new ImageHandlerError(
             StatusCodes.INTERNAL_SERVER_ERROR,
-            "InternalServerError",
-            "Amazon Rekognition experienced a service issue. Try your call again."
+            "Rekognition::DetectModerationLabelsError",
+            "Rekognition call failed. Please contact the system administrator."
           )
         );
       },
@@ -268,8 +268,8 @@ describe("contentModeration", () => {
       });
       expect(error).toMatchObject({
         status: StatusCodes.INTERNAL_SERVER_ERROR,
-        code: "InternalServerError",
-        message: "Amazon Rekognition experienced a service issue. Try your call again.",
+        code: "Rekognition::DetectModerationLabelsError",
+        message: "Rekognition call failed. Please contact the system administrator.",
       });
     }
   });

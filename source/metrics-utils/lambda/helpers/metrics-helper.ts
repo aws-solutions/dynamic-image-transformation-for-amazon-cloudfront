@@ -18,7 +18,15 @@ import {
   StartQueryCommandInput,
   QueryDefinition,
 } from "@aws-sdk/client-cloudwatch-logs";
-import { EventBridgeQueryEvent, MetricPayload, MetricData, QueryProps, SQSEventBody, ExecutionDay, MetricDataProps } from "./types";
+import {
+  EventBridgeQueryEvent,
+  MetricPayload,
+  MetricData,
+  QueryProps,
+  SQSEventBody,
+  ExecutionDay,
+  MetricDataProps,
+} from "./types";
 import { SQSEvent } from "aws-lambda";
 import { ClientHelper } from "./client-helper";
 import axios, { RawAxiosRequestConfig } from "axios";
@@ -40,20 +48,20 @@ export class MetricsHelper {
     const regionedMetricProps = {};
     for (const metric of metricsDataProps) {
       const region = metric.region ?? "default";
-      if (!regionedMetricProps[region]) regionedMetricProps[region] = []; 
+      if (!regionedMetricProps[region]) regionedMetricProps[region] = [];
       regionedMetricProps[region].push(metric);
     }
-    let results: MetricData = {}
+    let results: MetricData = {};
     for (const region in regionedMetricProps) {
       const metricProps = regionedMetricProps[region];
       const cloudFrontInput: GetMetricDataCommandInput = {
         MetricDataQueries: metricProps,
-        StartTime: new Date(endTime.getTime() - ((EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000)), // 7 or 1 day(s) previous
+        StartTime: new Date(endTime.getTime() - (EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000), // 7 or 1 day(s) previous
         EndTime: endTime,
       };
-      results = {...results, ...await this.fetchMetricsData(cloudFrontInput, region)};
+      results = { ...results, ...(await this.fetchMetricsData(cloudFrontInput, region)) };
     }
-    
+
     return results;
   }
 
@@ -64,7 +72,6 @@ export class MetricsHelper {
     const results: MetricData = {};
     do {
       response = await this.clientHelper.getCwClient(region).send(command);
-      console.info(response);
 
       input.MetricDataQueries?.forEach((item, index) => {
         const key = `${item.MetricStat?.Metric?.Namespace}/${item.MetricStat?.Metric?.MetricName}`;
@@ -138,7 +145,7 @@ export class MetricsHelper {
 
   async startQuery(queryProp: QueryProps, endTime: Date): Promise<string> {
     const input: StartQueryCommandInput = {
-      startTime: endTime.getTime() - ((EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000),
+      startTime: endTime.getTime() - (EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000,
       endTime: endTime.getTime(),
       ...queryProp,
     };

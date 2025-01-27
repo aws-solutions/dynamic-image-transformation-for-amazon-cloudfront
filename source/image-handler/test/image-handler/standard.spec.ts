@@ -53,7 +53,7 @@ describe("standard", () => {
     const result = await imageHandler.process(request);
 
     // Assert
-    expect(result).toEqual(request.originalImage.toString("base64"));
+    expect(result).toEqual(request.originalImage);
   });
 });
 
@@ -73,7 +73,7 @@ describe("instantiateSharpImage", () => {
     // Act
     await imageHandler["instantiateSharpImage"](image, edits, options);
 
-    //Assert
+    // Assert
     expect(withMetatdataSpy).not.toHaveBeenCalled();
   });
 
@@ -88,7 +88,7 @@ describe("instantiateSharpImage", () => {
     // Act
     await imageHandler["instantiateSharpImage"](image, edits, options);
 
-    //Assert
+    // Assert
     expect(withMetatdataSpy).toHaveBeenCalled();
     expect(withMetatdataSpy).not.toHaveBeenCalledWith(expect.objectContaining({ orientation: expect.anything }));
   });
@@ -105,7 +105,7 @@ describe("instantiateSharpImage", () => {
     // Act
     await imageHandler["instantiateSharpImage"](modifiedImage, edits, options);
 
-    //Assert
+    // Assert
     expect(withMetatdataSpy).toHaveBeenCalledWith({ orientation: 1 });
   });
 });

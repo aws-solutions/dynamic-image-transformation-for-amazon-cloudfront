@@ -12,8 +12,8 @@ export interface EventBridgeQueryEvent extends Pick<EventBridgeEvent<"Scheduled 
 
 export interface MetricDataProps
   extends Pick<MetricDataQuery, "MetricStat" | "Expression" | "Label" | "ReturnData" | "Period" | "Id"> {
-    region?: string
-  }
+  region?: string;
+}
 
 export enum ExecutionDay {
   DAILY = "*",

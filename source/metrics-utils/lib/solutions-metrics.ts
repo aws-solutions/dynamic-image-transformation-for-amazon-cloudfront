@@ -33,16 +33,19 @@ export class SolutionsMetrics extends Construct {
       environment: {
         QUERY_PREFIX: `${Aws.STACK_NAME}-`,
         SOLUTION_ID: SOLUTION_ID ?? scope.node.tryGetContext("solutionId"),
-        SOLUTION_NAME: SOLUTION_NAME ?? scope.node.tryGetContext("solutionName"),
         SOLUTION_VERSION: VERSION ?? scope.node.tryGetContext("solutionVersion"),
         UUID: props.uuid ?? "",
-        EXECUTION_DAY: props.executionDay ? props.executionDay : ExecutionDay.MONDAY
+        EXECUTION_DAY: props.executionDay ? props.executionDay : ExecutionDay.MONDAY,
       },
     });
 
     const ruleToLambda = new EventbridgeToLambda(this, "EventbridgeRuleToLambda", {
       eventRuleProps: {
-      schedule: Schedule.cron({ minute: "0", hour: "23", weekDay: props.executionDay ? props.executionDay : ExecutionDay.MONDAY }),
+        schedule: Schedule.cron({
+          minute: "0",
+          hour: "23",
+          weekDay: props.executionDay ? props.executionDay : ExecutionDay.MONDAY,
+        }),
       },
       existingLambdaObj: this.metricsLambdaFunction,
     });
@@ -94,7 +97,7 @@ export class SolutionsMetrics extends Construct {
     }
     this.metricDataQueries.push({
       ...metricDataProp,
-      Id: `id_${Fn.join('_', Fn.split('-', Aws.STACK_NAME))}_${this.metricDataQueries.length}`,
+      Id: `id_${Fn.join("_", Fn.split("-", Aws.STACK_NAME))}_${this.metricDataQueries.length}`,
     });
     this.eventBridgeRule.addOverride("Properties.Targets.0.InputTransformer", {
       InputPathsMap: {

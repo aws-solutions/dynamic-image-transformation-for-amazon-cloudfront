@@ -370,7 +370,15 @@ export class ThumborMapper {
         break;
       }
       case "animated": {
-        currentEdits.animated = filterValue.toLowerCase() != "false";
+        currentEdits.animated = filterValue.toLowerCase() !== "false";
+        break;
+      }
+      case "smart_crop": {
+        const [faceIndex, padding] = filterValue.split(",");
+        currentEdits.smartCrop = {
+          faceIndex: faceIndex ? parseInt(faceIndex) : undefined,
+          padding: padding ? parseInt(padding) : undefined,
+        };
         break;
       }
     }

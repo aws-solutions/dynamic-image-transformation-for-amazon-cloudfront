@@ -1,6 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+
 // Spy on the console messages
 const consoleLogSpy = jest.spyOn(console, "log");
 const consoleErrorSpy = jest.spyOn(console, "error");

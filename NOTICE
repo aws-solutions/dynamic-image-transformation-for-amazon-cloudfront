@@ -1,4 +1,4 @@
-Serverless Image Handler
+Dynamic Image Transformation for Amazon CloudFront
 
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except
@@ -24,6 +24,7 @@ This software includes third party software subject to the following copyrights:
 @aws-solutions-constructs/aws-cloudfront-s3 under the Apache License 2.0
 @aws-solutions-constructs/core under the Apache License 2.0
 @popperjs/core under the Massachusetts Institute of Technology (MIT) license
+@types/aws-lambda under the Massachusetts Institute of Technology (MIT) license
 @types/color under the Massachusetts Institute of Technology (MIT) license
 @types/color-name under the Massachusetts Institute of Technology (MIT) license
 @types/jest under the Massachusetts Institute of Technology (MIT) license
@@ -55,6 +56,7 @@ ts-jest under the Massachusetts Institute of Technology (MIT) license
 ts-node under the Massachusetts Institute of Technology (MIT) license
 typescript under the Apache License 2.0
 uuid under the Massachusetts Institute of Technology (MIT) license
+dayjs under the Massachusetts Institute of Technology (MIT) license
 @aws-sdk/client-cloudwatch under the Apache License 2.0
 @aws-sdk/client-cloudwatch-logs under the Apache License 2.0
 @aws-sdk/client-sqs under the Apache License 2.0

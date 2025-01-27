@@ -1,8 +1,36 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Serverless Image Handler Stack Snapshot 1`] = `
+exports[`Dynamic Image Transformation for Amazon CloudFront Stack Snapshot 1`] = `
 {
   "Conditions": {
+    "BackEndDeployAPIGDistributionF4E75280": {
+      "Fn::And": [
+        {
+          "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+        },
+        {
+          "Fn::Not": [
+            {
+              "Condition": "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+            },
+          ],
+        },
+      ],
+    },
+    "BackEndDeployS3OLDistribution869FCC7C": {
+      "Fn::And": [
+        {
+          "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+        },
+        {
+          "Fn::Not": [
+            {
+              "Condition": "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+            },
+          ],
+        },
+      ],
+    },
     "BackEndShortLogRetentionCondition72EA1A33": {
       "Fn::Or": [
         {
@@ -31,12 +59,32 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         },
       ],
     },
+    "CommonResourcesAutoWebPCondition7119C768": {
+      "Fn::Equals": [
+        {
+          "Ref": "AutoWebPParameter",
+        },
+        "Yes",
+      ],
+    },
     "CommonResourcesDeployDemoUICondition308D3B09": {
       "Fn::Equals": [
         {
           "Ref": "DeployDemoUIParameter",
         },
         "Yes",
+      ],
+    },
+    "CommonResourcesDisableS3ObjectLambdaCondition017AC33C": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "EnableS3ObjectLambdaParameter",
+            },
+            "Yes",
+          ],
+        },
       ],
     },
     "CommonResourcesEnableCorsConditionA0615348": {
@@ -55,10 +103,58 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "Yes",
       ],
     },
+    "CommonResourcesEnableOriginShieldConditionCEE94847": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "OriginShieldRegionParameter",
+            },
+            "Disabled",
+          ],
+        },
+      ],
+    },
+    "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableS3ObjectLambdaParameter",
+        },
+        "Yes",
+      ],
+    },
     "CommonResourcesEnableSignatureCondition909DC7A1": {
       "Fn::Equals": [
         {
           "Ref": "EnableSignatureParameter",
+        },
+        "Yes",
+      ],
+    },
+    "CommonResourcesIsLogRetentionPeriodInfinite129C8A82": {
+      "Fn::Equals": [
+        {
+          "Ref": "LogRetentionPeriodParameter",
+        },
+        "Infinite",
+      ],
+    },
+    "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184": {
+      "Fn::Equals": [
+        {
+          "Ref": "UseExistingCloudFrontDistributionParameter",
+        },
+        "Yes",
+      ],
+    },
+    "DeployCloudWatchDashboard": {
+      "Fn::Equals": [
+        {
+          "Fn::FindInMap": [
+            "Solution",
+            "Config",
+            "DeployCloudWatchDashboard",
+          ],
         },
         "Yes",
       ],
@@ -80,14 +176,24 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
     "Solution": {
       "Config": {
         "AnonymousUsage": "Yes",
+        "DeployCloudWatchDashboard": "Yes",
+        "SharpSizeLimit": "",
         "SolutionId": "S0ABC",
-        "Version": "v6.3.3",
+        "Version": "v7.0.0",
       },
     },
   },
   "Metadata": {
     "AWS::CloudFormation::Interface": {
       "ParameterGroups": [
+        {
+          "Label": {
+            "default": "S3 Object Lambda",
+          },
+          "Parameters": [
+            "EnableS3ObjectLambdaParameter",
+          ],
+        },
         {
           "Label": {
             "default": "CORS Options",
@@ -123,7 +229,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         },
         {
           "Label": {
-            "default": "Image URL Signature (Note: Enabling signature is not compatible with previous image URLs, which could result in broken image links. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/considerations.html)",
+            "default": "Image URL Signature (Note: Enabling signature is not compatible with previous image URLs, which could result in broken image links. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/architecture-details.html#image-url-signature)",
           },
           "Parameters": [
             "EnableSignatureParameter",
@@ -133,7 +239,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         },
         {
           "Label": {
-            "default": "Default Fallback Image (Note: Enabling default fallback image returns the default fallback image instead of JSON object when error happens. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/considerations.html)",
+            "default": "Default Fallback Image (Note: Enabling default fallback image returns the default fallback image instead of JSON object when error happens. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/architecture-details.html#default-fallback-image)",
           },
           "Parameters": [
             "EnableDefaultFallbackImageParameter",
@@ -147,6 +253,17 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           },
           "Parameters": [
             "AutoWebPParameter",
+          ],
+        },
+        {
+          "Label": {
+            "default": "CloudFront",
+          },
+          "Parameters": [
+            "OriginShieldRegionParameter",
+            "CloudFrontPriceClassParameter",
+            "UseExistingCloudFrontDistributionParameter",
+            "ExistingCloudFrontDistributionIdParameter",
           ],
         },
       ],
@@ -169,8 +286,14 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "EnableDefaultFallbackImageParameter": {
           "default": "Enable Default Fallback Image",
         },
+        "EnableS3ObjectLambdaParameter": {
+          "default": "Enable S3 Object Lambda",
+        },
         "EnableSignatureParameter": {
           "default": "Enable Signature",
+        },
+        "ExistingCloudFrontDistributionIdParameter": {
+          "default": "Existing CloudFront Distribution Id",
         },
         "FallbackImageS3BucketParameter": {
           "default": "Fallback Image S3 Bucket",
@@ -181,6 +304,9 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "LogRetentionPeriodParameter": {
           "default": "Log Retention Period",
         },
+        "OriginShieldRegionParameter": {
+          "default": "Origin Shield Region",
+        },
         "SecretsManagerKeyParameter": {
           "default": "SecretsManager Key",
         },
@@ -190,6 +316,9 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "SourceBucketsParameter": {
           "default": "Source Buckets",
         },
+        "UseExistingCloudFrontDistributionParameter": {
+          "default": "Use Existing CloudFront Distribution",
+        },
       },
     },
   },
@@ -197,15 +326,80 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
     "ApiEndpoint": {
       "Description": "Link to API endpoint for sending image requests to.",
       "Value": {
+        "Fn::If": [
+          "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+          {
+            "Fn::Join": [
+              "",
+              [
+                "https://",
+                {
+                  "Fn::GetAtt": [
+                    "CommonResourcesCustomResourcesCustomResourceValidateExistingDistribution34A6673C",
+                    "DistributionDomainName",
+                  ],
+                },
+              ],
+            ],
+          },
+          {
+            "Fn::If": [
+              "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+              {
+                "Fn::Join": [
+                  "",
+                  [
+                    "https://",
+                    {
+                      "Fn::If": [
+                        "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                        "",
+                        {
+                          "Fn::GetAtt": [
+                            "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                            "DomainName",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                ],
+              },
+              {
+                "Fn::Join": [
+                  "",
+                  [
+                    "https://",
+                    {
+                      "Fn::If": [
+                        "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                        "",
+                        {
+                          "Fn::GetAtt": [
+                            "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                            "DomainName",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
+    "CloudFrontDashboard": {
+      "Condition": "DeployCloudWatchDashboard",
+      "Description": "CloudFront metrics dashboard for the distribution.",
+      "Value": {
         "Fn::Join": [
           "",
           [
-            "https://",
+            "https://console.aws.amazon.com/cloudwatch/home?#dashboards/dashboard/",
             {
-              "Fn::GetAtt": [
-                "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
-                "DomainName",
-              ],
+              "Ref": "OperationalInsightsDashboard00409C46",
             },
           ],
         ],
@@ -272,7 +466,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "No",
       ],
       "Default": "No",
-      "Description": "Would you like to enable automatic WebP based on accept headers? Select 'Yes' if so.",
+      "Description": "Would you like to enable automatic formatting to WebP images when accept headers include "image/webp"? Select 'Yes' if so.",
       "Type": "String",
     },
     "BootstrapVersion": {
@@ -287,7 +481,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "PriceClass_100",
       ],
       "Default": "PriceClass_All",
-      "Description": "The AWS CloudFront price class to use. For more information see: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html",
+      "Description": "The AWS CloudFront price class to use. Lower price classes will avoid high cost edge locations, reducing cost at the expense of possibly increasing request latency. For more information see: https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_cloudfront/PriceClass.html",
       "Type": "String",
     },
     "CorsEnabledParameter": {
@@ -322,6 +516,15 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Description": "Would you like to enable the default fallback image? If so, select 'Yes' and provide FallbackImageS3Bucket and FallbackImageS3Key values.",
       "Type": "String",
     },
+    "EnableS3ObjectLambdaParameter": {
+      "AllowedValues": [
+        "Yes",
+        "No",
+      ],
+      "Default": "No",
+      "Description": "Enable S3 Object Lambda to improve the maximum response size of image requests beyond 6 MB. If enabled, an S3 Object Lambda Access Point will replace the API Gateway proxying requests to your image handler function. **Important: Modifying this value after initial template deployment will delete the existing CloudFront Distribution and create a new one, providing a new domain name and clearing the cache**",
+      "Type": "String",
+    },
     "EnableSignatureParameter": {
       "AllowedValues": [
         "Yes",
@@ -329,6 +532,12 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       ],
       "Default": "No",
       "Description": "Would you like to enable the signature? If so, select 'Yes' and provide SecretsManagerSecret and SecretsManagerKey values.",
+      "Type": "String",
+    },
+    "ExistingCloudFrontDistributionIdParameter": {
+      "AllowedPattern": "^$|^E[A-Z0-9]{8,}$",
+      "Default": "",
+      "Description": "The ID of the existing CloudFront distribution. This parameter is required if 'Use Existing CloudFront Distribution' is set to 'Yes'.",
       "Type": "String",
     },
     "FallbackImageS3BucketParameter": {
@@ -360,10 +569,31 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "731",
         "1827",
         "3653",
+        "Infinite",
       ],
       "Default": "180",
       "Description": "This solution automatically logs events to Amazon CloudWatch. Select the amount of time for CloudWatch logs from this solution to be retained (in days).",
-      "Type": "Number",
+      "Type": "String",
+    },
+    "OriginShieldRegionParameter": {
+      "AllowedValues": [
+        "Disabled",
+        "us-east-1",
+        "us-east-2",
+        "us-west-2",
+        "ap-south-1",
+        "ap-northeast-1",
+        "ap-southeast-1",
+        "ap-southeast-2",
+        "ap-northeast-1",
+        "eu-central-1",
+        "eu-west-1",
+        "eu-west-2",
+        "sa-east-1",
+      ],
+      "Default": "Disabled",
+      "Description": "Enabling Origin Shield may see reduced latency and increased cache hit ratios if your requests often come from many regions. If a region is selected, Origin Shield will be enabled and the Origin Shield caching layer will be set up in that region. For information on choosing a region, see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-shield.html#choose-origin-shield-region",
+      "Type": "String",
     },
     "SecretsManagerKeyParameter": {
       "Default": "",
@@ -381,11 +611,20 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Description": "(Required) List the buckets (comma-separated) within your account that contain original image files. If you plan to use Thumbor or Custom image requests with this solution, the source bucket for those requests will default to the first bucket listed in this field.",
       "Type": "String",
     },
+    "UseExistingCloudFrontDistributionParameter": {
+      "AllowedValues": [
+        "Yes",
+        "No",
+      ],
+      "Default": "No",
+      "Description": "If you would like to use an existing CloudFront distribution, select 'Yes'. Otherwise, select 'No' to create a new CloudFront distribution. This option will require additional manual setup after deployment. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/attaching-existing-distribution.html",
+      "Type": "String",
+    },
   },
   "Resources": {
     "AppRegistry968496A3": {
       "Properties": {
-        "Description": "Service Catalog application to track and manage all your resources for the solution sih",
+        "Description": "Service Catalog application to track and manage all your resources for the solution dit",
         "Name": {
           "Fn::GetAtt": [
             "CommonResourcesCustomResourcesCustomResourceGetAppRegApplicationName62472E55",
@@ -396,8 +635,8 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           "SolutionId": "S0ABC",
           "Solutions:ApplicationType": "AWS-Solutions",
           "Solutions:SolutionID": "S0ABC",
-          "Solutions:SolutionName": "sih",
-          "Solutions:SolutionVersion": "v6.3.3",
+          "Solutions:SolutionName": "dit",
+          "Solutions:SolutionVersion": "v7.0.0",
         },
       },
       "Type": "AWS::ServiceCatalogAppRegistry::Application",
@@ -416,6 +655,187 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "ResourceType": "CFN_STACK",
       },
       "Type": "AWS::ServiceCatalogAppRegistry::ResourceAssociation",
+    },
+    "BackEndAccessPoint6DA9B104": {
+      "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+      "Properties": {
+        "Bucket": {
+          "Fn::GetAtt": [
+            "CommonResourcesCustomResourcesCustomResourceCheckFirstBucketRegionE663CC31",
+            "BucketName",
+          ],
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "sih-ap-",
+              {
+                "Fn::GetAtt": [
+                  "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                  "UUID",
+                ],
+              },
+              "-",
+              {
+                "Fn::GetAtt": [
+                  "CommonResourcesCustomResourcesCustomResourceCheckFirstBucketRegionE663CC31",
+                  "BucketHash",
+                ],
+              },
+            ],
+          ],
+        },
+        "Policy": {
+          "Statement": {
+            "Action": "s3:*",
+            "Condition": {
+              "ForAnyValue:StringEquals": {
+                "aws:CalledVia": "s3-object-lambda.amazonaws.com",
+              },
+            },
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "cloudfront.amazonaws.com",
+            },
+            "Resource": [
+              {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":accesspoint/sih-ap-",
+                    {
+                      "Fn::GetAtt": [
+                        "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                        "UUID",
+                      ],
+                    },
+                    "-",
+                    {
+                      "Fn::GetAtt": [
+                        "CommonResourcesCustomResourcesCustomResourceCheckFirstBucketRegionE663CC31",
+                        "BucketHash",
+                      ],
+                    },
+                  ],
+                ],
+              },
+              {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":accesspoint/sih-ap-",
+                    {
+                      "Fn::GetAtt": [
+                        "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                        "UUID",
+                      ],
+                    },
+                    "-",
+                    {
+                      "Fn::GetAtt": [
+                        "CommonResourcesCustomResourcesCustomResourceCheckFirstBucketRegionE663CC31",
+                        "BucketHash",
+                      ],
+                    },
+                    "/object/*",
+                  ],
+                ],
+              },
+            ],
+          },
+        },
+      },
+      "Type": "AWS::S3::AccessPoint",
+    },
+    "BackEndApigRequestModifierFunction400C4F08": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+
+function handler(event) {
+    // Normalize accept header to only include values used on the backend
+    if(event.request.headers && event.request.headers.accept && event.request.headers.accept.value) {
+        event.request.headers.accept.value = event.request.headers.accept.value.indexOf("image/webp") > -1 ? "image/webp" : ""
+    }
+    event.request.querystring = processQueryParams(event.request.querystring).join('&')
+    return event.request;
+}
+
+function processQueryParams(querystring) {
+    if (querystring == null) {
+        return [];
+    }
+
+    const ALLOWED_PARAMS = ['signature', 'expires', 'format', 'fit', 'width', 'height', 'rotate', 'flip', 'flop', 'grayscale'];
+    
+    let qs = [];
+    for (const key in querystring) {
+        if (!ALLOWED_PARAMS.includes(key)) {
+            continue;
+        }
+        const value = querystring[key];
+        qs.push(
+            value.multiValue
+                ? \`\${key}=\${value.multiValue[value.multiValue.length - 1].value}\`
+                : \`\${key}=\${value.value}\`
+        )
+    }
+
+    return qs.sort();
+}",
+        "FunctionConfig": {
+          "Comment": {
+            "Fn::Join": [
+              "",
+              [
+                "sih-apig-request-modifier-",
+                {
+                  "Fn::GetAtt": [
+                    "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                    "UUID",
+                  ],
+                },
+              ],
+            ],
+          },
+          "Runtime": "cloudfront-js-2.0",
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "sih-apig-request-modifier-",
+              {
+                "Fn::GetAtt": [
+                  "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                  "UUID",
+                ],
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Function",
     },
     "BackEndCachePolicy1DCE9B1B": {
       "Properties": {
@@ -445,16 +865,21 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "EnableAcceptEncodingGzip": false,
             "HeadersConfig": {
               "HeaderBehavior": "whitelist",
-              "Headers": [
-                "origin",
-                "accept",
-              ],
+              "Headers": {
+                "Fn::If": [
+                  "CommonResourcesAutoWebPCondition7119C768",
+                  [
+                    "origin",
+                    "accept",
+                  ],
+                  [
+                    "origin",
+                  ],
+                ],
+              },
             },
             "QueryStringsConfig": {
-              "QueryStringBehavior": "whitelist",
-              "QueryStrings": [
-                "signature",
-              ],
+              "QueryStringBehavior": "all",
             },
           },
         },
@@ -462,10 +887,15 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::CloudFront::CachePolicy",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaApiAccessLogGroup9B786692": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "DeletionPolicy": "Retain",
       "Metadata": {
         "cfn_nag": {
           "rules_to_suppress": [
+            {
+              "id": "W86",
+              "reason": "Retention period for CloudWatchLogs LogGroups are set to 'Never Expire' to preserve customer data indefinitely",
+            },
             {
               "id": "W84",
               "reason": "By default CloudWatchLogs LogGroups data is encrypted using the CloudWatch server-side encryption keys (AWS Managed Keys)",
@@ -475,7 +905,15 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Properties": {
         "RetentionInDays": {
-          "Ref": "LogRetentionPeriodParameter",
+          "Fn::If": [
+            "CommonResourcesIsLogRetentionPeriodInfinite129C8A82",
+            {
+              "Ref": "AWS::NoValue",
+            },
+            {
+              "Ref": "LogRetentionPeriodParameter",
+            },
+          ],
         },
         "Tags": [
           {
@@ -488,6 +926,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "UpdateReplacePolicy": "Retain",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2": {
+      "Condition": "BackEndDeployAPIGDistributionF4E75280",
       "Metadata": {
         "cfn_nag": {
           "rules_to_suppress": [
@@ -500,7 +939,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Properties": {
         "DistributionConfig": {
-          "Comment": "Image Handler Distribution for Serverless Image Handler",
+          "Comment": "Image Handler Distribution for Dynamic Image Transformation for Amazon CloudFront",
           "CustomErrorResponses": [
             {
               "ErrorCachingMinTTL": 600,
@@ -532,11 +971,22 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "Ref": "BackEndCachePolicy1DCE9B1B",
             },
             "Compress": true,
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "BackEndApigRequestModifierFunction400C4F08",
+                    "FunctionARN",
+                  ],
+                },
+              },
+            ],
             "OriginRequestPolicyId": {
               "Ref": "BackEndOriginRequestPolicy771345D7",
             },
             "TargetOriginId": "TestStackBackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistributionOrigin1A053AEB7",
-            "ViewerProtocolPolicy": "https-only",
+            "ViewerProtocolPolicy": "redirect-to-https",
           },
           "Enabled": true,
           "HttpVersion": "http2",
@@ -594,6 +1044,20 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               },
               "Id": "TestStackBackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistributionOrigin1A053AEB7",
               "OriginPath": "/image",
+              "OriginShield": {
+                "Fn::If": [
+                  "CommonResourcesEnableOriginShieldConditionCEE94847",
+                  {
+                    "Enabled": true,
+                    "OriginShieldRegion": {
+                      "Ref": "OriginShieldRegionParameter",
+                    },
+                  },
+                  {
+                    "Enabled": false,
+                  },
+                ],
+              },
             },
           ],
           "PriceClass": {
@@ -610,6 +1074,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::CloudFront::Distribution",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApi5A77D109": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Metadata": {
         "cfn_nag": {
           "rules_to_suppress": [
@@ -640,6 +1105,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::ApiGateway::RestApi",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiANYApiPermissionTestStackBackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApi9D692DD2ANY979F1429": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -681,6 +1147,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::Lambda::Permission",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiANYApiPermissionTestTestStackBackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApi9D692DD2ANY932D3700": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -718,6 +1185,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::Lambda::Permission",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiANYE4494B31": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "AuthorizationType": "NONE",
         "HttpMethod": "ANY",
@@ -761,6 +1229,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::ApiGateway::Method",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiAccountE5522E5D": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "DependsOn": [
         "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApi5A77D109",
       ],
@@ -775,6 +1244,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::ApiGateway::Account",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiCloudWatchRole12575C4D": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -839,7 +1309,8 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::IAM::Role",
     },
-    "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiDeployment663240D6bb2931f4d7f47b51b7b40b3fd0d7001b": {
+    "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiDeployment663240D68d2558b8e7783b0edad2e0b11793c95c": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "DependsOn": [
         "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiproxyANY8F9763E1",
         "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiproxyBDF0A131",
@@ -864,6 +1335,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::ApiGateway::Deployment",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiDeploymentStageimageB55D20E3": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "AccessLogSetting": {
           "DestinationArn": {
@@ -875,7 +1347,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
         },
         "DeploymentId": {
-          "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiDeployment663240D6bb2931f4d7f47b51b7b40b3fd0d7001b",
+          "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiDeployment663240D68d2558b8e7783b0edad2e0b11793c95c",
         },
         "MethodSettings": [
           {
@@ -900,6 +1372,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::ApiGateway::Stage",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiUsagePlan76CA1E70": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "ApiStages": [
           {
@@ -922,6 +1395,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::ApiGateway::UsagePlan",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiproxyANY8F9763E1": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "AuthorizationType": "NONE",
         "HttpMethod": "ANY",
@@ -962,6 +1436,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::ApiGateway::Method",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiproxyANYApiPermissionTestStackBackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApi9D692DD2ANYproxyB5CBD1F7": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -1003,6 +1478,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::Lambda::Permission",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiproxyANYApiPermissionTestTestStackBackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApi9D692DD2ANYproxyAEADD71A": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -1040,6 +1516,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Type": "AWS::Lambda::Permission",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiproxyBDF0A131": {
+      "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
       "Properties": {
         "ParentId": {
           "Fn::GetAtt": [
@@ -1053,6 +1530,157 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         },
       },
       "Type": "AWS::ApiGateway::Resource",
+    },
+    "BackEndImageHandlerCloudFrontDistributionB5464C90": {
+      "Condition": "BackEndDeployS3OLDistribution869FCC7C",
+      "Properties": {
+        "DistributionConfig": {
+          "Comment": "Image Handler Distribution for Dynamic Image Transformation for Amazon CloudFront",
+          "CustomErrorResponses": [
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 500,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 501,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 502,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 503,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 504,
+            },
+          ],
+          "DefaultCacheBehavior": {
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+            ],
+            "CachePolicyId": {
+              "Ref": "BackEndCachePolicy1DCE9B1B",
+            },
+            "Compress": true,
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-response",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "BackEndOlResponseModifierFunctionB47B3834",
+                    "FunctionARN",
+                  ],
+                },
+              },
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "BackEndOlRequestModifierFunction7E5192E3",
+                    "FunctionARN",
+                  ],
+                },
+              },
+            ],
+            "OriginRequestPolicyId": {
+              "Ref": "BackEndOriginRequestPolicy771345D7",
+            },
+            "TargetOriginId": "TestStackBackEndImageHandlerCloudFrontDistributionOrigin1781ABF9C",
+            "ViewerProtocolPolicy": "redirect-to-https",
+          },
+          "Enabled": true,
+          "HttpVersion": "http2",
+          "IPV6Enabled": true,
+          "Logging": {
+            "Bucket": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Fn::GetAtt": [
+                      "CommonResourcesCustomResourcesLogBucketCustomResource2445A3AB",
+                      "BucketName",
+                    ],
+                  },
+                  ".s3.",
+                  {
+                    "Fn::GetAtt": [
+                      "CommonResourcesCustomResourcesLogBucketCustomResource2445A3AB",
+                      "Region",
+                    ],
+                  },
+                  ".",
+                  {
+                    "Ref": "AWS::URLSuffix",
+                  },
+                ],
+              ],
+            },
+            "Prefix": "api-cloudfront/",
+          },
+          "Origins": [
+            {
+              "ConnectionAttempts": 1,
+              "DomainName": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "BackEndObjectLambdaAccessPointBEE6B960",
+                        "Alias.Value",
+                      ],
+                    },
+                    ".s3.",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ".amazonaws.com",
+                  ],
+                ],
+              },
+              "Id": "TestStackBackEndImageHandlerCloudFrontDistributionOrigin1781ABF9C",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "BackEndSIHoriginaccesscontrolAFC8496A",
+                  "Id",
+                ],
+              },
+              "OriginPath": "/image",
+              "OriginShield": {
+                "Fn::If": [
+                  "CommonResourcesEnableOriginShieldConditionCEE94847",
+                  {
+                    "Enabled": true,
+                    "OriginShieldRegion": {
+                      "Ref": "OriginShieldRegionParameter",
+                    },
+                  },
+                  {
+                    "Enabled": false,
+                  },
+                ],
+              },
+              "S3OriginConfig": {},
+            },
+          ],
+          "PriceClass": {
+            "Ref": "CloudFrontPriceClassParameter",
+          },
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
+      },
+      "Type": "AWS::CloudFront::Distribution",
     },
     "BackEndImageHandlerFunctionPolicy437940B5": {
       "Metadata": {
@@ -1266,7 +1894,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           },
           "S3Key": "Omitted to remove snapshot dependency on hash",
         },
-        "Description": "sih (v6.3.3): Performs image edits and manipulations",
+        "Description": "dit (v7.0.0): Performs image edits and manipulations",
         "Environment": {
           "Variables": {
             "AUTO_WEBP": {
@@ -1287,6 +1915,9 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "ENABLE_DEFAULT_FALLBACK_IMAGE": {
               "Ref": "EnableDefaultFallbackImageParameter",
             },
+            "ENABLE_S3_OBJECT_LAMBDA": {
+              "Ref": "EnableS3ObjectLambdaParameter",
+            },
             "ENABLE_SIGNATURE": {
               "Ref": "EnableSignatureParameter",
             },
@@ -1297,6 +1928,13 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             },
             "SECRET_KEY": {
               "Ref": "SecretsManagerKeyParameter",
+            },
+            "SHARP_SIZE_LIMIT": {
+              "Fn::FindInMap": [
+                "Solution",
+                "Config",
+                "SharpSizeLimit",
+              ],
             },
             "SOLUTION_ID": "S0ABC",
             "SOLUTION_VERSION": "Omitted to remove snapshot dependency on solution version",
@@ -1324,6 +1962,19 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::Lambda::Function",
     },
+    "BackEndImageHandlerLambdaFunctionInvokeOmXtXvfmnVyX0ul6SNprKOdkal6YvZiIw5QCpGsJFo09B7B011": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "BackEndImageHandlerLambdaFunctionADEF7FF2",
+            "Arn",
+          ],
+        },
+        "Principal": "cloudfront.amazonaws.com",
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "BackEndImageHandlerLogGroupA0941EEC": {
       "DeletionPolicy": "Retain",
       "Metadata": {
@@ -1349,7 +2000,15 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           ],
         },
         "RetentionInDays": {
-          "Ref": "LogRetentionPeriodParameter",
+          "Fn::If": [
+            "CommonResourcesIsLogRetentionPeriodInfinite129C8A82",
+            {
+              "Ref": "AWS::NoValue",
+            },
+            {
+              "Ref": "LogRetentionPeriodParameter",
+            },
+          ],
         },
         "Tags": [
           {
@@ -1360,6 +2019,249 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::Logs::LogGroup",
       "UpdateReplacePolicy": "Retain",
+    },
+    "BackEndObjectLambdaAccessPointBEE6B960": {
+      "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+      "Properties": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "sih-olap-",
+              {
+                "Fn::GetAtt": [
+                  "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                  "UUID",
+                ],
+              },
+            ],
+          ],
+        },
+        "ObjectLambdaConfiguration": {
+          "SupportingAccessPoint": {
+            "Fn::GetAtt": [
+              "BackEndAccessPoint6DA9B104",
+              "Arn",
+            ],
+          },
+          "TransformationConfigurations": [
+            {
+              "Actions": [
+                "GetObject",
+                "HeadObject",
+              ],
+              "ContentTransformation": {
+                "AwsLambda": {
+                  "FunctionArn": {
+                    "Fn::GetAtt": [
+                      "BackEndImageHandlerLambdaFunctionADEF7FF2",
+                      "Arn",
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      "Type": "AWS::S3ObjectLambda::AccessPoint",
+    },
+    "BackEndObjectLambdaAccessPointPolicy1FC842E3": {
+      "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+      "Properties": {
+        "ObjectLambdaAccessPoint": {
+          "Ref": "BackEndObjectLambdaAccessPointBEE6B960",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3-object-lambda:Get*",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":distribution/",
+                        {
+                          "Fn::If": [
+                            "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                            {
+                              "Ref": "ExistingCloudFrontDistributionIdParameter",
+                            },
+                            {
+                              "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                            },
+                          ],
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "BackEndObjectLambdaAccessPointBEE6B960",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3ObjectLambda::AccessPointPolicy",
+    },
+    "BackEndOlRequestModifierFunction7E5192E3": {
+      "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+function handler(event) {
+    // Normalize accept header to only include values used on the backend
+    if(event.request.headers && event.request.headers.accept && event.request.headers.accept.value) {
+        event.request.headers.accept.value = event.request.headers.accept.value.indexOf("image/webp") > -1 ? "image/webp" : ""
+    }
+    event.request.querystring = processQueryParams(event.request.querystring).join('&')
+    return event.request;
+}
+
+function processQueryParams(querystring) {
+    if (querystring == null) {
+        return [];
+    }
+
+    const ALLOWED_PARAMS = ['signature', 'expires', 'format', 'fit', 'width', 'height', 'rotate', 'flip', 'flop', 'grayscale'];
+    const OL_PARAMS = {'signature': 'ol-signature', 'expires': 'ol-expires'};
+    
+    let qs = [];
+    for (const key in querystring) {
+        if (!ALLOWED_PARAMS.includes(key)) {
+            continue;
+        }
+        const value = querystring[key];
+        const mappedKey = OL_PARAMS[key] || key;
+        qs.push(
+            value.multiValue
+                ? \`\${mappedKey}=\${value.multiValue[value.multiValue.length - 1].value}\`
+                : \`\${mappedKey}=\${value.value}\`
+        )
+    }
+
+    return qs.sort();
+}",
+        "FunctionConfig": {
+          "Comment": {
+            "Fn::Join": [
+              "",
+              [
+                "sih-ol-request-modifier-",
+                {
+                  "Fn::GetAtt": [
+                    "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                    "UUID",
+                  ],
+                },
+              ],
+            ],
+          },
+          "Runtime": "cloudfront-js-2.0",
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "sih-ol-request-modifier-",
+              {
+                "Fn::GetAtt": [
+                  "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                  "UUID",
+                ],
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Function",
+    },
+    "BackEndOlResponseModifierFunctionB47B3834": {
+      "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+
+function handler(event) {
+    const response = event.response;
+
+    try {
+        Object.keys(response.headers).forEach(key => {
+            if (key.startsWith("x-amz-meta-") && key !== "x-amz-meta-statuscode") {
+                const headerName = key.replace("x-amz-meta-", "");
+                response.headers[headerName] = response.headers[key];
+                delete response.headers[key];
+            }
+        });
+
+        const statusCodeHeader = response.headers["x-amz-meta-statuscode"];
+        if (statusCodeHeader) {
+            const status = parseInt(statusCodeHeader.value);
+            if (status >= 400 && status <= 599) {
+                response.statusCode = status;
+            }
+
+            delete response.headers["x-amz-meta-statuscode"];
+        }
+    } catch (e) {
+        console.log("Error: ", e);
+    }
+    return response;
+}
+",
+        "FunctionConfig": {
+          "Comment": {
+            "Fn::Join": [
+              "",
+              [
+                "sih-ol-response-modifier-",
+                {
+                  "Fn::GetAtt": [
+                    "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                    "UUID",
+                  ],
+                },
+              ],
+            ],
+          },
+          "Runtime": "cloudfront-js-2.0",
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "sih-ol-response-modifier-",
+              {
+                "Fn::GetAtt": [
+                  "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                  "UUID",
+                ],
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Function",
     },
     "BackEndOriginRequestPolicy771345D7": {
       "Properties": {
@@ -1389,14 +2291,36 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             ],
           },
           "QueryStringsConfig": {
-            "QueryStringBehavior": "whitelist",
-            "QueryStrings": [
-              "signature",
-            ],
+            "QueryStringBehavior": "all",
           },
         },
       },
       "Type": "AWS::CloudFront::OriginRequestPolicy",
+    },
+    "BackEndSIHoriginaccesscontrolAFC8496A": {
+      "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "SIH-origin-access-control-",
+                {
+                  "Fn::GetAtt": [
+                    "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                    "UUID",
+                  ],
+                },
+              ],
+            ],
+          },
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4",
+        },
+      },
+      "Type": "AWS::CloudFront::OriginAccessControl",
     },
     "BackEndSolutionMetricsBilledDurationMemorySizeQuery39F16D58": {
       "Condition": "SendAnonymousStatistics",
@@ -1479,7 +2403,23 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
                     },
                     "_0"},{"MetricStat":{"Metric":{"Namespace":"AWS/CloudFront","Dimensions":[{"Name":"DistributionId","Value":"",
                     {
-                      "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      "Fn::If": [
+                        "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                        {
+                          "Ref": "ExistingCloudFrontDistributionIdParameter",
+                        },
+                        {
+                          "Fn::If": [
+                            "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                            {
+                              "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                            },
+                            {
+                              "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                            },
+                          ],
+                        },
+                      ],
                     },
                     ""},{"Name":"Region","Value":"Global"}],"MetricName":"Requests"},"Stat":"Sum","Period":604800},"region":"us-east-1","Id":"id_",
                     {
@@ -1497,7 +2437,23 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
                     },
                     "_1"},{"MetricStat":{"Metric":{"Namespace":"AWS/CloudFront","Dimensions":[{"Name":"DistributionId","Value":"",
                     {
-                      "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      "Fn::If": [
+                        "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                        {
+                          "Ref": "ExistingCloudFrontDistributionIdParameter",
+                        },
+                        {
+                          "Fn::If": [
+                            "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                            {
+                              "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                            },
+                            {
+                              "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                            },
+                          ],
+                        },
+                      ],
                     },
                     ""},{"Name":"Region","Value":"Global"}],"MetricName":"BytesDownloaded"},"Stat":"Sum","Period":604800},"region":"us-east-1","Id":"id_",
                     {
@@ -1669,7 +2625,6 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               ],
             },
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_NAME": "serverless-image-handler",
             "SOLUTION_VERSION": "Omitted to remove snapshot dependency on solution version",
             "SQS_QUEUE_URL": {
               "Ref": "BackEndSolutionMetricsLambdaToSqsToLambdalambdatosqsqueue60A92083",
@@ -1824,6 +2779,61 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::Lambda::EventSourceMapping",
     },
+    "BackEndSolutionMetricsRequestInfoQueryB4BC2094": {
+      "Condition": "SendAnonymousStatistics",
+      "Properties": {
+        "LogGroupNames": [
+          {
+            "Ref": "BackEndImageHandlerLogGroupA0941EEC",
+          },
+        ],
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName",
+              },
+              "-RequestInfoQuery",
+            ],
+          ],
+        },
+        "QueryString": "parse @message "requestType: 'Default'" as DefaultRequests
+| parse @message "requestType: 'Thumbor'" as ThumborRequests
+| parse @message "requestType: 'Custom'" as CustomRequests
+| parse @message "Query param edits:" as QueryParamRequests
+| parse @message "expires" as ExpiresRequests
+| stats count(DefaultRequests) as DefaultRequestsCount, count(ThumborRequests) as ThumborRequestsCount, count(CustomRequests) as CustomRequestsCount, count(QueryParamRequests) as QueryParamRequestsCount, count(ExpiresRequests) as ExpiresRequestsCount",
+      },
+      "Type": "AWS::Logs::QueryDefinition",
+    },
+    "BackEndWriteGetObjectResponsePolicyF3008955": {
+      "Condition": "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3-object-lambda:WriteGetObjectResponse",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "BackEndObjectLambdaAccessPointBEE6B960",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "BackEndWriteGetObjectResponsePolicyF3008955",
+        "Roles": [
+          {
+            "Ref": "BackEndImageHandlerFunctionRoleABF81E5C",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "CommonResourcesCustomResourcesCustomResourceAnonymousMetric51363F57": {
       "DeletionPolicy": "Delete",
       "Properties": {
@@ -1847,11 +2857,17 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "EnableDefaultFallbackImage": {
           "Ref": "EnableDefaultFallbackImageParameter",
         },
+        "EnableS3ObjectLambda": {
+          "Ref": "EnableS3ObjectLambdaParameter",
+        },
         "EnableSignature": {
           "Ref": "EnableSignatureParameter",
         },
         "LogRetentionPeriod": {
           "Ref": "LogRetentionPeriodParameter",
+        },
+        "OriginShieldRegion": {
+          "Ref": "OriginShieldRegionParameter",
         },
         "Region": {
           "Ref": "AWS::Region",
@@ -1870,6 +2886,9 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
             "UUID",
           ],
+        },
+        "UseExistingCloudFrontDistribution": {
+          "Ref": "UseExistingCloudFrontDistributionParameter",
         },
       },
       "Type": "AWS::CloudFormation::CustomResource",
@@ -1890,6 +2909,45 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           "Fn::GetAtt": [
             "CommonResourcesCustomResourcesCustomResourceFunction0D924235",
             "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::CloudFormation::CustomResource",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "CommonResourcesCustomResourcesCustomResourceCheckFirstBucketRegionE663CC31": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "CustomAction": "checkFirstBucketRegion",
+        "Region": {
+          "Ref": "AWS::Region",
+        },
+        "S3ObjectLambda": {
+          "Ref": "EnableS3ObjectLambdaParameter",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CommonResourcesCustomResourcesCustomResourceFunction0D924235",
+            "Arn",
+          ],
+        },
+        "SourceBuckets": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::Split": [
+                ",",
+                {
+                  "Ref": "SourceBucketsParameter",
+                },
+              ],
+            },
+          ],
+        },
+        "UUID": {
+          "Fn::GetAtt": [
+            "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+            "UUID",
           ],
         },
       },
@@ -1966,7 +3024,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           },
           "S3Key": "Omitted to remove snapshot dependency on hash",
         },
-        "Description": "sih (v6.3.3): Custom resource",
+        "Description": "dit (v7.0.0): Custom resource",
         "Environment": {
           "Variables": {
             "RETRY_SECONDS": "5",
@@ -2084,8 +3142,19 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
                     ],
                   },
                 },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "CloudWatchLogsPolicy",
+          },
+          {
+            "PolicyDocument": {
+              "Statement": [
                 {
-                  "Action": "s3:ListBucket",
+                  "Action": [
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                  ],
                   "Effect": "Allow",
                   "Resource": {
                     "Fn::Split": [
@@ -2150,6 +3219,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
                     "s3:CreateBucket",
                     "s3:PutBucketOwnershipControls",
                     "s3:PutBucketTagging",
+                    "s3:PutBucketVersioning",
                   ],
                   "Effect": "Allow",
                   "Resource": {
@@ -2165,10 +3235,15 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
                     ],
                   },
                 },
+                {
+                  "Action": "s3:ListBucket",
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:s3:::sih-dummy-*",
+                },
               ],
               "Version": "2012-10-17",
             },
-            "PolicyName": "CloudWatchLogsPolicy",
+            "PolicyName": "S3AccessPolicy",
           },
           {
             "PolicyDocument": {
@@ -2243,6 +3318,37 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             },
             "PolicyName": "AppRegistryPolicy",
           },
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": "cloudfront:GetDistribution",
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":distribution/",
+                        {
+                          "Ref": "ExistingCloudFrontDistributionIdParameter",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "ExistingDistributionPolicy",
+          },
         ],
         "Tags": [
           {
@@ -2257,6 +3363,27 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "DeletionPolicy": "Delete",
       "Properties": {
         "CustomAction": "createUuid",
+        "Region": {
+          "Ref": "AWS::Region",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CommonResourcesCustomResourcesCustomResourceFunction0D924235",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::CloudFormation::CustomResource",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "CommonResourcesCustomResourcesCustomResourceValidateExistingDistribution34A6673C": {
+      "Condition": "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "CustomAction": "validateExistingDistribution",
+        "ExistingDistributionID": {
+          "Ref": "ExistingCloudFrontDistributionIdParameter",
+        },
         "Region": {
           "Ref": "AWS::Region",
         },
@@ -2350,17 +3477,67 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Properties": {
         "ConfigItem": {
           "apiEndpoint": {
-            "Fn::Join": [
-              "",
-              [
-                "https://",
-                {
-                  "Fn::GetAtt": [
-                    "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
-                    "DomainName",
+            "Fn::If": [
+              "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+              {
+                "Fn::Join": [
+                  "",
+                  [
+                    "https://",
+                    {
+                      "Fn::GetAtt": [
+                        "CommonResourcesCustomResourcesCustomResourceValidateExistingDistribution34A6673C",
+                        "DistributionDomainName",
+                      ],
+                    },
                   ],
-                },
-              ],
+                ],
+              },
+              {
+                "Fn::If": [
+                  "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+                  {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "https://",
+                        {
+                          "Fn::If": [
+                            "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                            "",
+                            {
+                              "Fn::GetAtt": [
+                                "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                                "DomainName",
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    ],
+                  },
+                  {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "https://",
+                        {
+                          "Fn::If": [
+                            "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                            "",
+                            {
+                              "Fn::GetAtt": [
+                                "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                                "DomainName",
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    ],
+                  },
+                ],
+              },
             ],
           },
         },
@@ -2665,8 +3842,8 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "Attributes": {
           "applicationType": "AWS-Solutions",
           "solutionID": "S0ABC",
-          "solutionName": "sih",
-          "version": "v6.3.3",
+          "solutionName": "dit",
+          "version": "v7.0.0",
         },
         "Description": "Attribute group for solution information",
         "Name": {
@@ -2717,7 +3894,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Properties": {
         "DistributionConfig": {
-          "Comment": "Demo UI Distribution for Serverless Image Handler",
+          "Comment": "Demo UI Distribution for Dynamic Image Transformation for Amazon CloudFront",
           "CustomErrorResponses": [
             {
               "ErrorCode": 403,
@@ -2987,6 +4164,231 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::S3::BucketPolicy",
     },
+    "OperationalInsightsDashboard00409C46": {
+      "Condition": "DeployCloudWatchDashboard",
+      "Properties": {
+        "DashboardBody": {
+          "Fn::Join": [
+            "",
+            [
+              "{"start":"-P7D","periodOverride":"inherit","widgets":[{"type":"text","width":24,"height":1,"x":0,"y":0,"properties":{"markdown":"# Lambda"}},{"type":"metric","width":8,"height":8,"x":0,"y":1,"properties":{"view":"timeSeries","title":"Lambda Errors","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["AWS/Lambda","Errors","FunctionName","",
+              {
+                "Ref": "BackEndImageHandlerLambdaFunctionADEF7FF2",
+              },
+              "",{"label":"Lambda Errors","stat":"Sum","id":"metric"}],[{"label":"Total","expression":"RUNNING_SUM(metric)","yAxis":"right"}]],"yAxis":{"left":{"label":"Count","showUnits":false,"min":0},"right":{"label":"Running-Total Count","showUnits":false,"min":0}},"legend":{"position":"bottom"},"liveData":true,"period":86400,"stat":"Sum"}},{"type":"metric","width":8,"height":8,"x":8,"y":1,"properties":{"view":"timeSeries","title":"Lambda Duration","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["AWS/Lambda","Duration","FunctionName","",
+              {
+                "Ref": "BackEndImageHandlerLambdaFunctionADEF7FF2",
+              },
+              "",{"label":"Lambda Duration","stat":"Sum","id":"metric"}],[{"label":"Total","expression":"RUNNING_SUM(metric)","yAxis":"right"}]],"yAxis":{"left":{"label":"Milliseconds","showUnits":false,"min":0},"right":{"label":"Running-Total Milliseconds","showUnits":false,"min":0}},"legend":{"position":"bottom"},"liveData":true,"period":86400,"stat":"Sum"}},{"type":"metric","width":8,"height":8,"x":16,"y":1,"properties":{"view":"timeSeries","title":"Lambda Invocations","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["AWS/Lambda","Invocations","FunctionName","",
+              {
+                "Ref": "BackEndImageHandlerLambdaFunctionADEF7FF2",
+              },
+              "",{"label":"Lambda Invocations","stat":"Sum","id":"metric"}],[{"label":"Total","expression":"RUNNING_SUM(metric)","yAxis":"right"}]],"yAxis":{"left":{"label":"Count","showUnits":false,"min":0},"right":{"label":"Running-Total Count","showUnits":false,"min":0}},"legend":{"position":"bottom"},"liveData":true,"period":86400,"stat":"Sum"}},{"type":"text","width":24,"height":1,"x":0,"y":9,"properties":{"markdown":"# CloudFront"}},{"type":"metric","width":12,"height":12,"x":0,"y":10,"properties":{"view":"timeSeries","title":"CloudFront Requests","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["AWS/CloudFront","Requests","DistributionId","",
+              {
+                "Fn::If": [
+                  "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  {
+                    "Fn::If": [
+                      "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                      },
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      },
+                    ],
+                  },
+                ],
+              },
+              "","Region","Global",{"label":"CloudFront Requests","region":"us-east-1","stat":"Sum","id":"metric"}],[{"label":"Total","expression":"RUNNING_SUM(metric)","yAxis":"right"}]],"yAxis":{"left":{"label":"Count","showUnits":false,"min":0},"right":{"label":"Running-Total Count","showUnits":false,"min":0}},"legend":{"position":"bottom"},"liveData":true,"period":86400,"stat":"Sum"}},{"type":"metric","width":12,"height":12,"x":12,"y":10,"properties":{"view":"timeSeries","title":"CloudFront Bytes Downloaded","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[["AWS/CloudFront","BytesDownloaded","DistributionId","",
+              {
+                "Fn::If": [
+                  "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  {
+                    "Fn::If": [
+                      "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                      },
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      },
+                    ],
+                  },
+                ],
+              },
+              "","Region","Global",{"label":"CloudFront Bytes Downloaded","region":"us-east-1","stat":"Sum","id":"metric"}],[{"label":"Total","expression":"RUNNING_SUM(metric)","yAxis":"right"}]],"yAxis":{"left":{"label":"Bytes","showUnits":false,"min":0},"right":{"label":"Running-Total Bytes","showUnits":false,"min":0}},"legend":{"position":"bottom"},"liveData":true,"period":86400,"stat":"Sum"}},{"type":"metric","width":12,"height":6,"x":0,"y":22,"properties":{"view":"singleValue","title":"Cache Hit Rate","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[[{"label":"Cache Hit Rate (%)","expression":"100 * (cloudFrontRequests - lambdaInvocations) / (cloudFrontRequests)"}],["AWS/CloudFront","Requests","DistributionId","",
+              {
+                "Fn::If": [
+                  "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  {
+                    "Fn::If": [
+                      "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                      },
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      },
+                    ],
+                  },
+                ],
+              },
+              "","Region","Global",{"region":"us-east-1","stat":"Sum","visible":false,"id":"cloudFrontRequests"}],["AWS/Lambda","Invocations","FunctionName","",
+              {
+                "Ref": "BackEndImageHandlerLambdaFunctionADEF7FF2",
+              },
+              "",{"stat":"Sum","visible":false,"id":"lambdaInvocations"}]],"setPeriodToTimeRange":true}},{"type":"metric","width":12,"height":6,"x":12,"y":22,"properties":{"view":"singleValue","title":"Average Image Size","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[[{"label":"Average Image Size (Bytes)","expression":"cloudFrontBytesDownloaded / cloudFrontRequests"}],["AWS/CloudFront","BytesDownloaded","DistributionId","",
+              {
+                "Fn::If": [
+                  "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  {
+                    "Fn::If": [
+                      "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                      },
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      },
+                    ],
+                  },
+                ],
+              },
+              "","Region","Global",{"region":"us-east-1","stat":"Sum","visible":false,"id":"cloudFrontBytesDownloaded"}],["AWS/CloudFront","Requests","DistributionId","",
+              {
+                "Fn::If": [
+                  "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  {
+                    "Fn::If": [
+                      "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                      },
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      },
+                    ],
+                  },
+                ],
+              },
+              "","Region","Global",{"region":"us-east-1","stat":"Sum","visible":false,"id":"cloudFrontRequests"}]],"setPeriodToTimeRange":true}},{"type":"text","width":24,"height":1,"x":0,"y":28,"properties":{"markdown":"# Overall"}},{"type":"metric","width":24,"height":6,"x":0,"y":29,"properties":{"view":"singleValue","title":"Estimated Cost","region":"",
+              {
+                "Ref": "AWS::Region",
+              },
+              "","metrics":[[{"label":"Estimated Cost($)","expression":"7.916241884231568e-11 * cloudFrontBytesDownloaded + 7.5e-7 * cloudFrontRequests + 1.66667e-8 * lambdaDuration + 2.0000000000000002e-7 * lambdaInvocations"}],["AWS/CloudFront","BytesDownloaded","DistributionId","",
+              {
+                "Fn::If": [
+                  "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  {
+                    "Fn::If": [
+                      "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                      },
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      },
+                    ],
+                  },
+                ],
+              },
+              "","Region","Global",{"region":"us-east-1","stat":"Sum","visible":false,"id":"cloudFrontBytesDownloaded"}],["AWS/CloudFront","Requests","DistributionId","",
+              {
+                "Fn::If": [
+                  "CommonResourcesUseExistingCloudFrontDistributionConditionEBC48184",
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  {
+                    "Fn::If": [
+                      "CommonResourcesEnableS3ObjectLambdaConditionF2C07DCD",
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontDistributionB5464C90",
+                      },
+                      {
+                        "Ref": "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                      },
+                    ],
+                  },
+                ],
+              },
+              "","Region","Global",{"region":"us-east-1","stat":"Sum","visible":false,"id":"cloudFrontRequests"}],["AWS/Lambda","Duration","FunctionName","",
+              {
+                "Ref": "BackEndImageHandlerLambdaFunctionADEF7FF2",
+              },
+              "",{"stat":"Sum","visible":false,"id":"lambdaDuration"}],["AWS/Lambda","Invocations","FunctionName","",
+              {
+                "Ref": "BackEndImageHandlerLambdaFunctionADEF7FF2",
+              },
+              "",{"stat":"Sum","visible":false,"id":"lambdaInvocations"}]],"setPeriodToTimeRange":true,"singleValueFullPrecision":true}}]}",
+            ],
+          ],
+        },
+        "DashboardName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName",
+              },
+              "-",
+              {
+                "Ref": "AWS::Region",
+              },
+              "-Operational-Insights-Dashboard",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudWatch::Dashboard",
+    },
   },
   "Rules": {
     "CheckBootstrapVersion": {
@@ -3013,6 +4415,33 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
         },
       ],
+    },
+    "ExistingDistributionIdRequiredRule": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Equals": [
+                  {
+                    "Ref": "ExistingCloudFrontDistributionIdParameter",
+                  },
+                  "",
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "If 'UseExistingCloudFrontDistribution' is set to 'Yes', 'ExistingCloudFrontDistributionId' must be provided.",
+        },
+      ],
+      "RuleCondition": {
+        "Fn::Equals": [
+          {
+            "Ref": "UseExistingCloudFrontDistributionParameter",
+          },
+          "Yes",
+        ],
+      },
     },
   },
 }

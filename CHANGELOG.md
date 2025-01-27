@@ -5,13 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2025-01-27
+
+### Changed
+
+- Location of API Gateway infrastructure resources
+- **Breaking** New condition on API gateway will cause a delete/create of ApiGateway::Deployment on stack update
+- **Breaking:** Exception thrown on invalid resize parameters [#463](https://github.com/aws-solutions/serverless-image-handler/pull/463)
+- Code formatting to align with ESLint rules
+- **Breaking** Reduced passthrough of errors from external APIs to response body. Errors will still be logged.
+- Modified CloudFront logging bucket to have versioning enabled by default
+- CloudFront behaviour to redirect http requests to https rather than throwing forbidden error
+- Set-Cookie was added to list of deny-listed response headers
+- Name of solution from Serverless Image Handler on AWS to Dynamic Image Transformation for Amazon CloudFront.
+
+### Added
+
+- Ability to enable origin shield through a deployment parameter
+- Ability to deploy solution without creating a CloudFront distribution
+- CloudFront function to normalize accept headers when AutoWebP is enabled
+- Alternative infrastructure using S3 Object Lambda to overcome 6 MB response size limit
+- Query param named expires which can be used to define when a generated image should no longer be accessible
+- Ability to include smart_crop as a filter for Thumbor style requests, taking advantage of AWS Rekognition face cropping
+- Ability to set CloudWatch log retention period to Infinite
+- Ability to specify Sharp input image size limit [#465](https://github.com/aws-solutions/serverless-image-handler/issues/465) [#476](https://github.com/aws-solutions/serverless-image-handler/pull/476)
+- Query parameter based image editing [#184](https://github.com/aws-solutions/serverless-image-handler/issues/184)
+- Query parameter normalization to improve cache hit rate
+- CloudWatch dashboard to improve Solution observability
+- Additional anonymized metrics to help understand how the solution is being used, identify areas of improvement, and drive future roadmap decisions.
+
+### Removed
+
+- Accept header being used in cache policy when AutoWebP is disabled
+
+### Fixed
+
+- Broken URLs in Signature and Fallback Image template parameters
+
 ## [6.3.3] - 2024-12-27
 
 ### Fixed
+
 - Overlays not checking for valid S3 buckets
 - Failures when updating deployments created in version 6.1.0 and prior [#559](https://github.com/aws-solutions/serverless-image-handler/issues/559)
 
-### Security 
+### Security
 
 - Added allowlist on sharp operations. [Info](https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/create-and-use-image-requests.html#restricted-operations)
 - Added deny list on custom headers for base64 encoded requests. [Info](https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/create-and-use-image-requests.html#include-custom-response-headers)
@@ -20,8 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [6.3.2] - 2024-11-22
 
 ### Fixed
-- Upgrade cross-spawn to v7.0.6 for vulnerability [CVE-2024-9506](https://github.com/advisories/GHSA-5j4c-8p2g-v4jx)
 
+- Upgrade cross-spawn to v7.0.6 for vulnerability [CVE-2024-9506](https://github.com/advisories/GHSA-5j4c-8p2g-v4jx)
 
 ## [6.3.1] - 2024-10-02
 

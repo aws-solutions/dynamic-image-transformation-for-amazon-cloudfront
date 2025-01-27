@@ -8,6 +8,7 @@ export enum StatusCodes {
   NOT_FOUND = 404,
   REQUEST_TOO_LONG = 413,
   INTERNAL_SERVER_ERROR = 500,
+  TIMEOUT = 503,
 }
 
 export enum RequestTypes {
@@ -44,5 +45,5 @@ export enum ContentTypes {
   TIFF = "image/tiff",
   GIF = "image/gif",
   SVG = "image/svg+xml",
-  AVIF= "image/avif",
+  AVIF = "image/avif",
 }

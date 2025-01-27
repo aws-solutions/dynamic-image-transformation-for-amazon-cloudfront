@@ -7,7 +7,7 @@ import { QueryDefinition, GetQueryResultsCommandOutput } from "@aws-sdk/client-c
 import { SQSEvent } from "aws-lambda";
 import { MetricsHelper } from "../../../lambda/helpers/metrics-helper";
 import { ClientHelper } from "../../../lambda/helpers/client-helper";
-import { EventBridgeQueryEvent, MetricData } from '../../../lambda/helpers/types';
+import { EventBridgeQueryEvent, MetricData } from "../../../lambda/helpers/types";
 
 // Mock AWS SDK clients
 jest.mock("@aws-sdk/client-cloudwatch");
@@ -71,7 +71,7 @@ describe("MetricsHelper", () => {
     const result = await metricsHelper.getMetricsData(mockEvent);
 
     expect(clientHelperMock.getCwClient().send).toHaveBeenCalled();
-    expect(result).toEqual({"SomeNamespace/SomeMetricName": [9999]});
+    expect(result).toEqual({ "SomeNamespace/SomeMetricName": [9999] });
   });
 
   it("should get query definitions", async () => {
@@ -160,9 +160,8 @@ describe("MetricsHelper", () => {
   });
 
   it("should properly populate anonymous metric data", async () => {
-    
     // Arrange
-    const metricData : MetricData = {
+    const metricData: MetricData = {
       metric1: [1, 2, 3],
       metric2: [4, 5, 6],
     };
@@ -174,9 +173,9 @@ describe("MetricsHelper", () => {
     axios.post = jest.fn().mockResolvedValue({ statusText: "OK", status: 200 });
 
     // Act
-    const result = await metricsHelper.sendAnonymousMetric(metricData, startTime, endTime)
+    const result = await metricsHelper.sendAnonymousMetric(metricData, startTime, endTime);
     // Assert
-    expect(result.Message).toEqual("Anonymous data was sent successfully.")
+    expect(result.Message).toEqual("Anonymous data was sent successfully.");
 
     // Assert payload Data DataStartTime sent with axios is in expected format
     expect(axios.post).toHaveBeenCalledWith(
@@ -184,5 +183,5 @@ describe("MetricsHelper", () => {
       expect.stringContaining(`"DataStartTime":"2020-09-10 04:00:00.000"`),
       expect.anything()
     );
-  })
+  });
 });

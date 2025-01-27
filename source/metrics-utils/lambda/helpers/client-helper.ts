@@ -7,7 +7,7 @@ import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 
 export class ClientHelper {
   private sqsClient: SQSClient;
-  private cwClients: {[key: string]: CloudWatchClient };
+  private cwClients: { [key: string]: CloudWatchClient };
   private cwLogsClient: CloudWatchLogsClient;
 
   constructor() {
@@ -23,7 +23,7 @@ export class ClientHelper {
 
   getCwClient(region: string = "default"): CloudWatchClient {
     if (region === "default") {
-      region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "default"
+      region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "default";
     }
     if (!(region in this.cwClients)) {
       this.cwClients[region] = region === "default" ? new CloudWatchClient({}) : new CloudWatchClient({ region });

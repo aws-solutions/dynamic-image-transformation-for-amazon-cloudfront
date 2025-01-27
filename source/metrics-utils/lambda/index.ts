@@ -31,7 +31,7 @@ export async function handler(event: EventBridgeQueryEvent | SQSEvent, _context:
     console.info("Metrics data: ", JSON.stringify(metricsData, null, 2));
     await metricsHelper.sendAnonymousMetric(
       metricsData,
-      new Date(endTime.getTime() - ((EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000)),
+      new Date(endTime.getTime() - (EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000),
       endTime
     );
     await metricsHelper.startQueries(event);
@@ -45,7 +45,7 @@ export async function handler(event: EventBridgeQueryEvent | SQSEvent, _context:
     if (Object.keys(metricsData).length > 0) {
       await metricsHelper.sendAnonymousMetric(
         metricsData,
-        new Date(body.endTime - ((EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000)),
+        new Date(body.endTime - (EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000),
         new Date(body.endTime)
       );
     }

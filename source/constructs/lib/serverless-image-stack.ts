@@ -2,7 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { PriceClass } from "aws-cdk-lib/aws-cloudfront";
-import { Aspects, CfnCondition, CfnMapping, CfnOutput, CfnParameter, Fn, Stack, StackProps, Tags } from "aws-cdk-lib";
+import {
+  Aspects,
+  CfnCondition,
+  CfnMapping,
+  CfnOutput,
+  CfnParameter,
+  CfnRule,
+  Fn,
+  Stack,
+  StackProps,
+  Tags,
+} from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { ConditionAspect, SuppressLambdaFunctionCfnRulesAspect } from "../utils/aspects";
 import { BackEnd } from "./back-end/back-end-construct";
@@ -50,7 +61,7 @@ export class ServerlessImageHandlerStack extends Stack {
     });
 
     const logRetentionPeriodParameter = new CfnParameter(this, "LogRetentionPeriodParameter", {
-      type: "Number",
+      type: "String",
       description:
         "This solution automatically logs events to Amazon CloudWatch. Select the amount of time for CloudWatch logs from this solution to be retained (in days).",
       allowedValues: [
@@ -71,13 +82,14 @@ export class ServerlessImageHandlerStack extends Stack {
         "731",
         "1827",
         "3653",
+        "Infinite",
       ],
       default: "180",
     });
 
     const autoWebPParameter = new CfnParameter(this, "AutoWebPParameter", {
       type: "String",
-      description: `Would you like to enable automatic WebP based on accept headers? Select 'Yes' if so.`,
+      description: `Would you like to enable automatic formatting to WebP images when accept headers include "image/webp"? Select 'Yes' if so.`,
       allowedValues: ["Yes", "No"],
       default: "No",
     });
@@ -125,25 +137,88 @@ export class ServerlessImageHandlerStack extends Stack {
     const cloudFrontPriceClassParameter = new CfnParameter(this, "CloudFrontPriceClassParameter", {
       type: "String",
       description:
-        "The AWS CloudFront price class to use. For more information see: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html",
+        "The AWS CloudFront price class to use. Lower price classes will avoid high cost edge locations, reducing cost at the expense of possibly increasing request latency. For more information see: https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_cloudfront/PriceClass.html",
       allowedValues: [PriceClass.PRICE_CLASS_ALL, PriceClass.PRICE_CLASS_200, PriceClass.PRICE_CLASS_100],
       default: PriceClass.PRICE_CLASS_ALL,
+    });
+
+    const originShieldRegionParameter = new CfnParameter(this, "OriginShieldRegionParameter", {
+      type: "String",
+      description:
+        "Enabling Origin Shield may see reduced latency and increased cache hit ratios if your requests often come from many regions. If a region is selected, Origin Shield will be enabled and the Origin Shield caching layer will be set up in that region. For information on choosing a region, see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-shield.html#choose-origin-shield-region",
+      allowedValues: [
+        "Disabled",
+        "us-east-1",
+        "us-east-2",
+        "us-west-2",
+        "ap-south-1",
+        "ap-northeast-1",
+        "ap-southeast-1",
+        "ap-southeast-2",
+        "ap-northeast-1",
+        "eu-central-1",
+        "eu-west-1",
+        "eu-west-2",
+        "sa-east-1",
+      ],
+      default: "Disabled",
+    });
+
+    const enableS3ObjectLambdaParameter = new CfnParameter(this, "EnableS3ObjectLambdaParameter", {
+      type: "String",
+      description:
+        "Enable S3 Object Lambda to improve the maximum response size of image requests beyond 6 MB. If enabled, an S3 Object Lambda Access Point will replace the API Gateway proxying requests to your image handler function. **Important: Modifying this value after initial template deployment will delete the existing CloudFront Distribution and create a new one, providing a new domain name and clearing the cache**",
+      allowedValues: ["Yes", "No"],
+      default: "No",
+    });
+
+    const useExistingCloudFrontDistribution = new CfnParameter(this, "UseExistingCloudFrontDistributionParameter", {
+      type: "String",
+      description:
+        "If you would like to use an existing CloudFront distribution, select 'Yes'. Otherwise, select 'No' to create a new CloudFront distribution. This option will require additional manual setup after deployment. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/attaching-existing-distribution.html",
+      allowedValues: ["Yes", "No"],
+      default: "No",
+    });
+
+    const existingCloudFrontDistributionId = new CfnParameter(this, "ExistingCloudFrontDistributionIdParameter", {
+      type: "String",
+      description:
+        "The ID of the existing CloudFront distribution. This parameter is required if 'Use Existing CloudFront Distribution' is set to 'Yes'.",
+      default: "",
+      allowedPattern: "^$|^E[A-Z0-9]{8,}$",
+    });
+
+    new CfnRule(this, "ExistingDistributionIdRequiredRule", {
+      ruleCondition: Fn.conditionEquals(useExistingCloudFrontDistribution.valueAsString, "Yes"),
+      assertions: [
+        {
+          assert: Fn.conditionNot(Fn.conditionEquals(existingCloudFrontDistributionId.valueAsString, "")),
+          assertDescription:
+            "If 'UseExistingCloudFrontDistribution' is set to 'Yes', 'ExistingCloudFrontDistributionId' must be provided.",
+        },
+      ],
     });
 
     const solutionMapping = new CfnMapping(this, "Solution", {
       mapping: {
         Config: {
           AnonymousUsage: "Yes",
+          DeployCloudWatchDashboard: "Yes",
           SolutionId: props.solutionId,
           Version: props.solutionVersion,
+          SharpSizeLimit: "",
         },
       },
       lazy: false,
     });
 
     const anonymousUsage = `${solutionMapping.findInMap("Config", "AnonymousUsage")}`;
+    const sharpSizeLimit = `${solutionMapping.findInMap("Config", "SharpSizeLimit")}`;
     const sendAnonymousStatistics = new CfnCondition(this, "SendAnonymousStatistics", {
       expression: Fn.conditionEquals(anonymousUsage, "Yes"),
+    });
+    const deployCloudWatchDashboard = new CfnCondition(this, "DeployCloudWatchDashboard", {
+      expression: Fn.conditionEquals(`${solutionMapping.findInMap("Config", "DeployCloudWatchDashboard")}`, "Yes"),
     });
 
     const solutionConstructProps: SolutionConstructProps = {
@@ -151,7 +226,7 @@ export class ServerlessImageHandlerStack extends Stack {
       corsOrigin: corsOriginParameter.valueAsString,
       sourceBuckets: sourceBucketsParameter.valueAsString,
       deployUI: deployDemoUIParameter.valueAsString as YesNo,
-      logRetentionPeriod: logRetentionPeriodParameter.valueAsNumber,
+      logRetentionPeriod: logRetentionPeriodParameter.valueAsString,
       autoWebP: autoWebPParameter.valueAsString,
       enableSignature: enableSignatureParameter.valueAsString as YesNo,
       secretsManager: secretsManagerSecretParameter.valueAsString,
@@ -159,6 +234,10 @@ export class ServerlessImageHandlerStack extends Stack {
       enableDefaultFallbackImage: enableDefaultFallbackImageParameter.valueAsString as YesNo,
       fallbackImageS3Bucket: fallbackImageS3BucketParameter.valueAsString,
       fallbackImageS3KeyBucket: fallbackImageS3KeyParameter.valueAsString,
+      originShieldRegion: originShieldRegionParameter.valueAsString,
+      enableS3ObjectLambda: enableS3ObjectLambdaParameter.valueAsString,
+      useExistingCloudFrontDistribution: useExistingCloudFrontDistribution.valueAsString as YesNo,
+      existingCloudFrontDistributionId: existingCloudFrontDistributionId.valueAsString,
     };
 
     const commonResources = new CommonResources(this, "CommonResources", {
@@ -166,6 +245,13 @@ export class ServerlessImageHandlerStack extends Stack {
       solutionVersion: props.solutionVersion,
       solutionName: props.solutionName,
       ...solutionConstructProps,
+    });
+
+    commonResources.customResources.setupValidateSourceAndFallbackImageBuckets({
+      sourceBuckets: sourceBucketsParameter.valueAsString,
+      fallbackImageS3Bucket: fallbackImageS3BucketParameter.valueAsString,
+      fallbackImageS3Key: fallbackImageS3KeyParameter.valueAsString,
+      enableS3ObjectLambda: enableS3ObjectLambdaParameter.valueAsString,
     });
 
     const frontEnd = new FrontEnd(this, "FrontEnd", {
@@ -179,9 +265,14 @@ export class ServerlessImageHandlerStack extends Stack {
       solutionName: props.solutionName,
       secretsManagerPolicy: commonResources.secretsManagerPolicy,
       sendAnonymousStatistics,
+      deployCloudWatchDashboard,
       logsBucket: commonResources.logsBucket,
       uuid: commonResources.customResources.uuid,
+      regionedBucketName: commonResources.customResources.regionedBucketName,
+      regionedBucketHash: commonResources.customResources.regionedBucketHash,
       cloudFrontPriceClass: cloudFrontPriceClassParameter.valueAsString,
+      conditions: commonResources.conditions,
+      sharpSizeLimit,
       createSourceBucketsResource: commonResources.customResources.createSourceBucketsResource,
       ...solutionConstructProps,
     });
@@ -193,15 +284,14 @@ export class ServerlessImageHandlerStack extends Stack {
       ...solutionConstructProps,
     });
 
-    commonResources.customResources.setupValidateSourceAndFallbackImageBuckets({
-      sourceBuckets: sourceBucketsParameter.valueAsString,
-      fallbackImageS3Bucket: fallbackImageS3BucketParameter.valueAsString,
-      fallbackImageS3Key: fallbackImageS3KeyParameter.valueAsString,
-    });
-
     commonResources.customResources.setupValidateSecretsManager({
       secretsManager: secretsManagerSecretParameter.valueAsString,
       secretsManagerKey: secretsManagerKeyParameter.valueAsString,
+    });
+
+    commonResources.customResources.setupValidateExistingDistribution({
+      existingDistributionId: existingCloudFrontDistributionId.valueAsString,
+      condition: commonResources.conditions.useExistingCloudFrontDistributionCondition,
     });
 
     commonResources.customResources.setupCopyWebsiteCustomResource({
@@ -210,9 +300,19 @@ export class ServerlessImageHandlerStack extends Stack {
     const singletonFunction = this.node.findChild("Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C");
     Aspects.of(singletonFunction).add(new ConditionAspect(commonResources.conditions.deployUICondition));
 
+    const apiEndpointConditionString = Fn.conditionIf(
+      commonResources.conditions.useExistingCloudFrontDistributionCondition.logicalId,
+      `https://` + commonResources.customResources.existingDistributionDomainName,
+      Fn.conditionIf(
+        commonResources.conditions.disableS3ObjectLambdaCondition.logicalId,
+        `https://` + backEnd.domainName,
+        `https://` + backEnd.olDomainName
+      )
+    ).toString();
+
     commonResources.customResources.setupPutWebsiteConfigCustomResource({
       hostingBucket: frontEnd.websiteHostingBucket,
-      apiEndpoint: backEnd.domainName,
+      apiEndpoint: apiEndpointConditionString,
     });
 
     commonResources.appRegistryApplication({
@@ -226,6 +326,10 @@ export class ServerlessImageHandlerStack extends Stack {
     this.templateOptions.metadata = {
       "AWS::CloudFormation::Interface": {
         ParameterGroups: [
+          {
+            Label: { default: "S3 Object Lambda" },
+            Parameters: [enableS3ObjectLambdaParameter.logicalId],
+          },
           {
             Label: { default: "CORS Options" },
             Parameters: [corsEnabledParameter.logicalId, corsOriginParameter.logicalId],
@@ -245,7 +349,7 @@ export class ServerlessImageHandlerStack extends Stack {
           {
             Label: {
               default:
-                "Image URL Signature (Note: Enabling signature is not compatible with previous image URLs, which could result in broken image links. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/considerations.html)",
+                "Image URL Signature (Note: Enabling signature is not compatible with previous image URLs, which could result in broken image links. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/architecture-details.html#image-url-signature)",
             },
             Parameters: [
               enableSignatureParameter.logicalId,
@@ -256,7 +360,7 @@ export class ServerlessImageHandlerStack extends Stack {
           {
             Label: {
               default:
-                "Default Fallback Image (Note: Enabling default fallback image returns the default fallback image instead of JSON object when error happens. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/considerations.html)",
+                "Default Fallback Image (Note: Enabling default fallback image returns the default fallback image instead of JSON object when error happens. Please refer to the implementation guide for details: https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/architecture-details.html#default-fallback-image)",
             },
             Parameters: [
               enableDefaultFallbackImageParameter.logicalId,
@@ -268,8 +372,20 @@ export class ServerlessImageHandlerStack extends Stack {
             Label: { default: "Auto WebP" },
             Parameters: [autoWebPParameter.logicalId],
           },
+          {
+            Label: { default: "CloudFront" },
+            Parameters: [
+              originShieldRegionParameter.logicalId,
+              cloudFrontPriceClassParameter.logicalId,
+              useExistingCloudFrontDistribution.logicalId,
+              existingCloudFrontDistributionId.logicalId,
+            ],
+          },
         ],
         ParameterLabels: {
+          [enableS3ObjectLambdaParameter.logicalId]: {
+            default: "Enable S3 Object Lambda",
+          },
           [corsEnabledParameter.logicalId]: { default: "CORS Enabled" },
           [corsOriginParameter.logicalId]: { default: "CORS Origin" },
           [sourceBucketsParameter.logicalId]: { default: "Source Buckets" },
@@ -297,13 +413,22 @@ export class ServerlessImageHandlerStack extends Stack {
           [cloudFrontPriceClassParameter.logicalId]: {
             default: "CloudFront PriceClass",
           },
+          [originShieldRegionParameter.logicalId]: {
+            default: "Origin Shield Region",
+          },
+          [useExistingCloudFrontDistribution.logicalId]: {
+            default: "Use Existing CloudFront Distribution",
+          },
+          [existingCloudFrontDistributionId.logicalId]: {
+            default: "Existing CloudFront Distribution Id",
+          },
         },
       },
     };
 
     /* eslint-disable no-new */
     new CfnOutput(this, "ApiEndpoint", {
-      value: `https://${backEnd.domainName}`,
+      value: apiEndpointConditionString,
       description: "Link to API endpoint for sending image requests to.",
     });
     new CfnOutput(this, "DemoUrl", {
@@ -331,6 +456,11 @@ export class ServerlessImageHandlerStack extends Stack {
     new CfnOutput(this, "CloudFrontLoggingBucket", {
       value: commonResources.logsBucket.bucketName,
       description: "Amazon S3 bucket for storing CloudFront access logs.",
+    });
+    new CfnOutput(this, "CloudFrontDashboard", {
+      value: `https://console.aws.amazon.com/cloudwatch/home?#dashboards/dashboard/${backEnd.operationalDashboard.dashboardName}`,
+      description: "CloudFront metrics dashboard for the distribution.",
+      condition: deployCloudWatchDashboard,
     });
 
     Aspects.of(this).add(new SuppressLambdaFunctionCfnRulesAspect());

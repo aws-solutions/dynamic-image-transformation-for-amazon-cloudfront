@@ -18,6 +18,9 @@ export interface SendMetricsRequestProperties extends CustomResourceRequestPrope
   AutoWebP: string;
   EnableSignature: string;
   EnableDefaultFallbackImage: string;
+  EnableS3ObjectLambda: string;
+  OriginShieldRegion: string;
+  UseExistingCloudFrontDistribution: string;
 }
 
 export interface PutConfigRequestProperties extends CustomResourceRequestPropertiesBase {
@@ -30,9 +33,19 @@ export interface CheckSourceBucketsRequestProperties extends CustomResourceReque
   SourceBuckets: string;
 }
 
+export interface CheckFirstBucketRegionRequestProperties extends CheckSourceBucketsRequestProperties {
+  UUID: string;
+  S3ObjectLambda: string;
+  StackId: string;
+}
+
 export interface GetAppRegApplicationNameRequestProperties extends CustomResourceRequestPropertiesBase {
   StackId: string;
   DefaultName: string;
+}
+
+export interface ValidateExistingDistributionRequestProperties extends CustomResourceRequestPropertiesBase {
+  ExistingDistributionID: string;
 }
 
 export interface CheckSecretManagerRequestProperties extends CustomResourceRequestPropertiesBase {
@@ -90,6 +103,9 @@ export interface MetricsPayloadData {
   AutoWebP: string;
   EnableSignature: string;
   EnableDefaultFallbackImage: string;
+  EnableS3ObjectLambda: string;
+  OriginShieldRegion: string;
+  UseExistingCloudFrontDistribution: string;
 }
 
 export interface MetricPayload {

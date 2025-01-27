@@ -19,6 +19,12 @@ import {
 } from "./lib";
 import { SecretProvider } from "./secret-provider";
 import { ThumborMapper } from "./thumbor-mapper";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import utc from "dayjs/plugin/utc";
+import { QueryParamMapper } from "./query-param-mapper";
+dayjs.extend(customParseFormat);
+dayjs.extend(utc);
 
 type OriginalImageInfo = Partial<{
   contentType: string;
@@ -98,13 +104,16 @@ export class ImageRequest {
   public async setup(event: ImageHandlerEvent): Promise<ImageRequestInfo> {
     try {
       await this.validateRequestSignature(event);
+      const secondsToExpiry = this.validateRequestExpires(event);
 
       let imageRequestInfo: ImageRequestInfo = <ImageRequestInfo>{};
+      imageRequestInfo.secondsToExpiry = secondsToExpiry;
 
       imageRequestInfo.requestType = this.parseRequestType(event);
       imageRequestInfo.bucket = this.parseImageBucket(event, imageRequestInfo.requestType);
       imageRequestInfo.key = this.parseImageKey(event, imageRequestInfo.requestType, imageRequestInfo.bucket);
       imageRequestInfo.edits = this.parseImageEdits(event, imageRequestInfo.requestType);
+      imageRequestInfo.edits = this.parseQueryParamEdits(event, imageRequestInfo.edits);
 
       const originalImage = await this.getOriginalImage(imageRequestInfo.bucket, imageRequestInfo.key);
       imageRequestInfo = { ...imageRequestInfo, ...originalImage };
@@ -192,13 +201,12 @@ export class ImageRequest {
       return result;
     } catch (error) {
       console.error(error);
-      let status = StatusCodes.INTERNAL_SERVER_ERROR;
-      let message = error.message;
-      if (error.code === "NoSuchKey") {
-        status = StatusCodes.NOT_FOUND;
-        message = `The image ${key} does not exist or the request may not be base64 encoded properly.`;
-      }
-      throw new ImageHandlerError(status, error.code, message);
+      if (error instanceof ImageHandlerError) throw error;
+      throw new ImageHandlerError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "ImageRetrieval::CannotRetrieveImage",
+        "Image could not be retrieved from S3."
+      );
     }
   }
 
@@ -283,10 +291,28 @@ export class ImageRequest {
   }
 
   /**
+   * Parses query parameters to generate image edits
+   * @param event - Lambda event containing query parameters
+   * @param edits - Existing image edits to merge with
+   * @returns Combined image edits
+   */
+  public parseQueryParamEdits(event: ImageHandlerEvent, edits: ImageEdits): ImageEdits {
+    if (event.queryStringParameters) {
+      const queryParamMapping = new QueryParamMapper();
+      const newEdits = queryParamMapping.mapQueryParamsToEdits(event.queryStringParameters);
+      if (Object.keys(newEdits).length > 0) {
+        console.info(`Query param edits: ${JSON.stringify(newEdits)}`);
+        return { ...edits, ...newEdits };
+      }
+    }
+    return edits;
+  }
+
+  /**
    * Parses the name of the appropriate Amazon S3 key corresponding to the original image.
    * @param event Lambda request body.
    * @param requestType Type of the request.
-   * @param bucket
+   * @param bucket The bucket name if the s3:bucketName tag was provided
    * @returns The name of the appropriate Amazon S3 key.
    */
   public parseImageKey(event: ImageHandlerEvent, requestType: RequestTypes, bucket: string = null): string {
@@ -481,6 +507,19 @@ export class ImageRequest {
   }
 
   /**
+   * Creates a query string similar to API Gateway 2.0 payload's $.rawQueryString
+   * @param queryStringParameters Request's query parameters
+   * @returns URL encoded queryString
+   */
+  private recreateQueryString(queryStringParameters: ImageHandlerEvent["queryStringParameters"]): string {
+    return Object.entries(queryStringParameters)
+      .filter(([key]) => key !== "signature")
+      .sort()
+      .map(([key, value]) => [key, value].join("="))
+      .join("&");
+  }
+
+  /**
    * Validates the request's signature.
    * @param event Lambda request body.
    * @returns A promise.
@@ -505,7 +544,9 @@ export class ImageRequest {
         const { signature } = queryStringParameters;
         const secret = JSON.parse(await this.secretProvider.getSecret(SECRETS_MANAGER));
         const key = secret[SECRET_KEY];
-        const hash = createHmac("sha256", key).update(path).digest("hex");
+        const queryString = this.recreateQueryString(queryStringParameters);
+        const stringToSign = queryString !== "" ? [path, queryString].join("?") : path;
+        const hash = createHmac("sha256", key).update(stringToSign).digest("hex");
 
         // Signature should be made with the full path.
         if (signature !== hash) {
@@ -523,6 +564,44 @@ export class ImageRequest {
           "Signature validation failed."
         );
       }
+    }
+  }
+
+  private validateRequestExpires(event: ImageHandlerEvent): number | undefined {
+    try {
+      const { queryStringParameters } = event;
+      const expires = queryStringParameters?.expires;
+
+      if (expires === undefined) {
+        return;
+      }
+      const expiry = dayjs.utc(expires, "YYYYMMDDTHHmmss[Z]", true);
+      const now = dayjs.utc();
+
+      if (!expiry.isValid()) {
+        throw new ImageHandlerError(
+          StatusCodes.BAD_REQUEST,
+          "ImageRequestExpiryFormat",
+          "Request has invalid expires value. The expires query param should map to a real date and follow the following format: YYYYMMDDTHHmmssZ (Ex: Jan 2nd, 1970 at 12:03:04PM UTC becomes 19700102T120304Z)."
+        );
+      }
+      if (expiry.isBefore(now)) {
+        throw new ImageHandlerError(StatusCodes.BAD_REQUEST, "ImageRequestExpired", "Request has expired.");
+      }
+      return expiry.diff(now, "seconds");
+    } catch (error) {
+      if (error.code === "ImageRequestExpired") {
+        throw error;
+      }
+      if (error.code === "ImageRequestExpiryFormat") {
+        throw error;
+      }
+      console.error("Error occurred while checking expiry.", error);
+      throw new ImageHandlerError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "ExpiryDateCheckFailure",
+        "Expiry date check failed."
+      );
     }
   }
 }

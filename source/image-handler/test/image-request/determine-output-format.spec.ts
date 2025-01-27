@@ -8,7 +8,7 @@ import { ImageRequest } from "../../image-request";
 import { ImageHandlerEvent, ImageFormatTypes, ImageRequestInfo, RequestTypes } from "../../lib";
 import { SecretProvider } from "../../secret-provider";
 
-const request: Record<string, any> = {
+const request: Record<string, string | number | object> = {
   bucket: "bucket",
   key: "key",
   edits: {
@@ -20,9 +20,9 @@ const request: Record<string, any> = {
   },
 };
 
-const createEvent = (request): ImageHandlerEvent => {
-  return { path: `${Buffer.from(JSON.stringify(request)).toString("base64")}` };
-};
+const createEvent = (request): ImageHandlerEvent => ({
+  path: `${Buffer.from(JSON.stringify(request)).toString("base64")}`,
+});
 
 describe("determineOutputFormat", () => {
   const s3Client = new S3();
