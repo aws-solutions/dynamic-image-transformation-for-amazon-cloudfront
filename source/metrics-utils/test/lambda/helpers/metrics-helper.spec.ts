@@ -48,7 +48,7 @@ describe("MetricsHelper", () => {
       time: new Date().toISOString(),
       "metrics-data-query": [
         {
-          Id: "SomeId",
+          Id: "id_AWS_Lambda_Invocations_Identifier",
           MetricStat: {
             Metric: {
               Namespace: "SomeNamespace",
@@ -61,7 +61,7 @@ describe("MetricsHelper", () => {
       ],
     };
     const mockMetricDataResults: GetMetricDataCommandOutput = {
-      MetricDataResults: [{ Values: [9999] }],
+      MetricDataResults: [{ Values: [9999], Id: "id_AWS_Lambda_Invocations_Identifier" }],
       $metadata: {},
     };
     clientHelperMock.getCwClient.mockReturnValue({
@@ -71,7 +71,7 @@ describe("MetricsHelper", () => {
     const result = await metricsHelper.getMetricsData(mockEvent);
 
     expect(clientHelperMock.getCwClient().send).toHaveBeenCalled();
-    expect(result).toEqual({ "SomeNamespace/SomeMetricName": [9999] });
+    expect(result).toEqual({ "AWS/Lambda/Invocations/Identifier": [9999] });
   });
 
   it("should get query definitions", async () => {

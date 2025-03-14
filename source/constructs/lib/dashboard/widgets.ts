@@ -1,5 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
+
 import {
   GraphWidget,
   GraphWidgetProps,
@@ -48,7 +49,7 @@ export interface DefaultSingleValueWidgetProps extends Omit<SingleValueWidgetPro
 
 /**
  * Creates a standardized graph widget which adds a RUNNING_SUM line to the metric being graphed
- * @extends GraphWidget
+ * @augments GraphWidget
  */
 export class RunningSumGraphWidget extends GraphWidget {
   constructor(props: GraphWidgetProps) {
@@ -72,7 +73,7 @@ export class RunningSumGraphWidget extends GraphWidget {
 
 /**
  * Creates a standardized graph widget with running sum functionality
- * @extends RunningSumGraphWidget
+ * @augments RunningSumGraphWidget
  */
 export class DefaultGraphWidget extends RunningSumGraphWidget {
   constructor(props: DefaultGraphWidgetProps) {
@@ -102,7 +103,7 @@ export class DefaultGraphWidget extends RunningSumGraphWidget {
 /**
  * Creates a standardized single value widget which adds the provided label to the metric being graphed
  * and sets the period as time range by default.
- * @extends SingleValueWidget
+ * @augments SingleValueWidget
  */
 export class DefaultSingleValueWidget extends SingleValueWidget {
   constructor(props: DefaultSingleValueWidgetProps) {

@@ -453,7 +453,7 @@ async function checkFirstBucketRegion(
   const bucket = SourceBuckets.replace(/\s/g, "");
   const dummyBucketName = `sih-dummy-${requestProperties.UUID}`;
 
-  if (requestProperties.S3ObjectLambda != "Yes") {
+  if (requestProperties.S3ObjectLambda !== "Yes") {
     console.info("Detected non-S3 Object Lambda deployment. Returning first bucket.");
     return { BucketName: bucket, BucketHash: "" };
   }

@@ -27,6 +27,7 @@ import {
   ExecutionDay,
   MetricDataProps,
 } from "./types";
+
 import { SQSEvent } from "aws-lambda";
 import { ClientHelper } from "./client-helper";
 import axios, { RawAxiosRequestConfig } from "axios";
@@ -45,18 +46,26 @@ export class MetricsHelper {
   async getMetricsData(event: EventBridgeQueryEvent): Promise<MetricData> {
     const metricsDataProps: MetricDataProps[] = event["metrics-data-query"];
     const endTime = new Date(event.time);
-    const regionedMetricProps = {};
+    const regionedMetricProps: Record<string, MetricDataQuery[]> = {};
     for (const metric of metricsDataProps) {
+      const metricQuery: MetricDataQuery = {
+        MetricStat: metric.MetricStat,
+        Expression: metric.Expression,
+        Label: metric.Label,
+        ReturnData: metric.ReturnData,
+        Period: metric.Period,
+        Id: metric.Id ? metric.Id : undefined,
+      };
       const region = metric.region ?? "default";
       if (!regionedMetricProps[region]) regionedMetricProps[region] = [];
-      regionedMetricProps[region].push(metric);
+      regionedMetricProps[region].push(metricQuery);
     }
     let results: MetricData = {};
     for (const region in regionedMetricProps) {
       const metricProps = regionedMetricProps[region];
       const cloudFrontInput: GetMetricDataCommandInput = {
         MetricDataQueries: metricProps,
-        StartTime: new Date(endTime.getTime() - (EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000), // 7 or 1 day(s) previous
+        StartTime: new Date(endTime.getTime() - (EXECUTION_DAY === ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000), // 7 or 1 day(s) previous
         EndTime: endTime,
       };
       results = { ...results, ...(await this.fetchMetricsData(cloudFrontInput, region)) };
@@ -67,15 +76,19 @@ export class MetricsHelper {
 
   private async fetchMetricsData(input: GetMetricDataCommandInput, region: string): Promise<MetricData> {
     let command = new GetMetricDataCommand(input);
-
     let response: GetMetricDataCommandOutput;
     const results: MetricData = {};
     do {
       response = await this.clientHelper.getCwClient(region).send(command);
 
-      input.MetricDataQueries?.forEach((item, index) => {
-        const key = `${item.MetricStat?.Metric?.Namespace}/${item.MetricStat?.Metric?.MetricName}`;
-        const value: number[] = response.MetricDataResults?.[index].Values || [];
+      response.MetricDataResults?.forEach((result) => {
+        // Let key be equal to the item id without the id_ prefix and replacing all underscores with slashes
+        const key = result.Id?.replace("id_", "").replace(/_/g, "/");
+        if (!key) {
+          console.error(`Non existent ID returned: ${result}`);
+          throw new Error("Non existent ID returned");
+        }
+        const value: number[] = result.Values || [];
         results[key] = ((results[key] as number[]) || []).concat(...value);
       });
 
@@ -94,7 +107,7 @@ export class MetricsHelper {
         return;
       }
       if (data.field && data.value) {
-        metricsData[data.field!] = parseInt(data.value!, 10);
+        metricsData[data.field] = parseInt(data.value, 10);
       }
     });
     console.debug("Query data: ", JSON.stringify(metricsData, null, 2));
@@ -145,7 +158,7 @@ export class MetricsHelper {
 
   async startQuery(queryProp: QueryProps, endTime: Date): Promise<string> {
     const input: StartQueryCommandInput = {
-      startTime: endTime.getTime() - (EXECUTION_DAY == ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000,
+      startTime: endTime.getTime() - (EXECUTION_DAY === ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000,
       endTime: endTime.getTime(),
       ...queryProp,
     };
@@ -160,7 +173,7 @@ export class MetricsHelper {
 
   async resolveQuery(queryId: string): Promise<ResultField[] | undefined> {
     const command = new GetQueryResultsCommand({ queryId });
-    let response: GetQueryResultsCommandOutput = await this.clientHelper.getCwLogsClient().send(command);
+    const response: GetQueryResultsCommandOutput = await this.clientHelper.getCwLogsClient().send(command);
     console.debug(`Query response: ${JSON.stringify(response)}`);
     if (response.status === "Running") {
       console.debug(`Query is still running. QueryID: ${queryId}`);
@@ -177,7 +190,7 @@ export class MetricsHelper {
 
   async resolveQueries(event: SQSEvent): Promise<(ResultField | undefined)[]> {
     const requestBody = JSON.parse(event.Records[0].body);
-    const queryIds = requestBody["queryIds"];
+    const queryIds = requestBody.queryIds;
     if (Object.keys(queryIds).length <= 0) return [];
     return (await Promise.all(queryIds.map((queryId: string) => this.resolveQuery(queryId)))).flat();
   }
@@ -217,7 +230,7 @@ export class MetricsHelper {
       };
 
       console.info("Sending anonymous metric", payloadStr);
-      const response = await axios.post(METRICS_ENDPOINT, payloadStr, config);
+      await axios.post(METRICS_ENDPOINT, payloadStr, config);
 
       result.Message = "Anonymous data was sent successfully.";
     } catch (err) {

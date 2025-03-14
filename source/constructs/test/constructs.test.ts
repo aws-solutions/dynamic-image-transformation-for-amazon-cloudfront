@@ -11,14 +11,14 @@ test("Dynamic Image Transformation for Amazon CloudFront Stack Snapshot", () => 
     context: {
       solutionId: "SO0023",
       solutionName: "dynamic-image-transformation-for-amazon-cloudfront",
-      solutionVersion: "v7.0.0",
+      solutionVersion: "v7.0.1",
     },
   });
 
   const stack = new ServerlessImageHandlerStack(app, "TestStack", {
     solutionId: "S0ABC",
     solutionName: "dit",
-    solutionVersion: "v7.0.0",
+    solutionVersion: "v7.0.1",
   });
 
   const template = Template.fromStack(stack);

@@ -1,6 +1,6 @@
 {
   "name": "source",
-  "version": "7.0.0",
+  "version": "7.0.1",
   "private": true,
   "description": "ESLint and prettier dependencies to be used within the solution",
   "license": "Apache-2.0",
@@ -9,7 +9,7 @@
     "url": "https://aws.amazon.com/solutions"
   },
   "scripts": {
-    "lint": "npx eslint . --ext .ts",
+    "lint": "npx eslint . --ext .ts --fix",
     "prettier-format": "npx prettier --config .prettierrc.yml '**/*.ts' --write",
     "install:custom-resource": "cd ./custom-resource && npm run clean && npm ci",
     "install:image-handler": "cd ./image-handler && npm run clean && npm ci",

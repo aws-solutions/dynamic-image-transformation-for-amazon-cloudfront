@@ -162,7 +162,6 @@ export class ImageHandler {
    */
   public async applyEdits(originalImage: sharp.Sharp, edits: ImageEdits, isAnimation: boolean): Promise<sharp.Sharp> {
     await this.applyResize(originalImage, edits);
-
     // Apply the image edits
     for (const edit in edits) {
       if (this.skipEdit(edit, isAnimation)) continue;
@@ -192,7 +191,7 @@ export class ImageHandler {
           break;
         }
         default: {
-          if (SHARP_EDIT_ALLOWLIST_ARRAY.includes(edit as any)) {
+          if (SHARP_EDIT_ALLOWLIST_ARRAY.includes(edit)) {
             originalImage[edit](edits[edit]);
           }
         }

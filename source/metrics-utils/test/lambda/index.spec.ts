@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { SQSEvent } from "aws-lambda";
+import { Context, SQSEvent } from "aws-lambda";
 import { handler } from "../../lambda";
 import { EventBridgeQueryEvent } from "../../lambda/helpers/types";
 
@@ -11,6 +11,21 @@ const mockMetricsHelper = {
   resolveQueries: jest.fn(),
   sendAnonymousMetric: jest.fn(),
   processQueryResults: jest.fn(),
+};
+
+const BASE_CONTEXT: Context = {
+  callbackWaitsForEmptyEventLoop: false,
+  functionName: "test",
+  functionVersion: "1",
+  invokedFunctionArn: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  memoryLimitInMB: "128",
+  awsRequestId: "XXXXXXXXXX",
+  logGroupName: "test",
+  logStreamName: "test",
+  getRemainingTimeInMillis: () => 1000,
+  done: () => {},
+  fail: () => {},
+  succeed: () => {},
 };
 
 jest.mock("../../lambda/helpers/metrics-helper", () => {
@@ -43,7 +58,7 @@ describe("Lambda Handler", () => {
       return [];
     });
     // Act
-    const response = await handler(event, {});
+    const response = await handler(event, BASE_CONTEXT);
 
     // Assert
     expect(mockMetricsHelper.getMetricsData).toHaveBeenCalledWith(event);
@@ -88,7 +103,7 @@ describe("Lambda Handler", () => {
     });
 
     // Act
-    const response = await handler(event, {});
+    const response = await handler(event, BASE_CONTEXT);
 
     // Assert
     expect(mockMetricsHelper.resolveQueries).toHaveBeenCalledWith(event);
@@ -103,6 +118,6 @@ describe("Lambda Handler", () => {
     const event = {} as any;
 
     // Act & Assert
-    await expect(handler(event, {})).rejects.toThrow("Invalid event type.");
+    await expect(handler(event, BASE_CONTEXT)).rejects.toThrow("Invalid event type.");
   });
 });

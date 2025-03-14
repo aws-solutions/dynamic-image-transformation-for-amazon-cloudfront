@@ -6,15 +6,6 @@ import sharp from "sharp";
 import { ImageFormatTypes, RequestTypes, StatusCodes } from "./enums";
 import { Headers, ImageEdits } from "./types";
 
-export interface ImageHandlerEvent {
-  path?: string;
-  queryStringParameters?: QueryStringParameters;
-  requestContext?: {
-    elb?: unknown;
-  };
-  headers?: Headers;
-}
-
 export interface QueryStringParameters {
   signature?: string;
   expires?: string;
@@ -26,6 +17,15 @@ export interface QueryStringParameters {
   flip?: string;
   flop?: string;
   grayscale?: string;
+}
+
+export interface ImageHandlerEvent {
+  path?: string;
+  queryStringParameters?: QueryStringParameters;
+  requestContext?: {
+    elb?: unknown;
+  };
+  headers?: Headers;
 }
 
 export interface S3UserRequest {

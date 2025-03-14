@@ -4,12 +4,11 @@
 import { ImageEdits, ImageHandlerError, QueryStringParameters, StatusCodes } from "./lib";
 
 export class QueryParamMapper {
-  mapToBoolean = (value: string): boolean => {
-    return value === "true";
-  };
+  mapToBoolean = (value: string): boolean => value === "true";
+
   private static readonly QUERY_PARAM_MAPPING: Record<
     string,
-    { path: string[]; key: string; transform?: (value: string) => any }
+    { path: string[]; key: string; transform?: (value: string) => string | number | boolean }
   > = {
     format: { path: [], key: "toFormat" },
     fit: { path: ["resize"], key: "fit" },
@@ -21,27 +20,31 @@ export class QueryParamMapper {
     grayscale: { path: [], key: "greyscale", transform: stringToBoolean },
     greyscale: { path: [], key: "greyscale", transform: stringToBoolean },
   };
+
   public static readonly QUERY_PARAM_KEYS = Object.keys(this.QUERY_PARAM_MAPPING);
 
   /**
    * Initializer function for creating a new Thumbor mapping, used by the image
    * handler to perform image modifications based on legacy URL path requests.
-   * @param path The request path.
-   * @returns Image edits based on the request path.
+   * @param queryParameters The query parameter provided alongside the request.
+   * @returns Image edits included due to the provided query parameter.
    */
   public mapQueryParamsToEdits(queryParameters: QueryStringParameters): ImageEdits {
     try {
-      const result: Record<string, any> = {};
+      type Result = {
+        [x: string]: string | number | boolean | Result;
+      };
+      const result: Result = {};
 
       Object.entries(queryParameters).forEach(([param, value]) => {
         if (value !== undefined && QueryParamMapper.QUERY_PARAM_MAPPING[param]) {
           const { path, key, transform } = QueryParamMapper.QUERY_PARAM_MAPPING[param];
 
           // Traverse and create nested objects as needed
-          let current = result;
+          let current: Result = result;
           for (const segment of path) {
             current[segment] = current[segment] || {};
-            current = current[segment];
+            current = current[segment] as Result;
           }
 
           if (transform) {
@@ -64,15 +67,30 @@ export class QueryParamMapper {
   }
 }
 
+/**
+ * Converts a string to a boolean value, using a list a defined falsy values
+ * @param input The input string to be converted
+ * @returns The boolean value of the input string
+ */
 function stringToBoolean(input: string): boolean {
   const falsyValues = ["0", "false", ""];
   return !falsyValues.includes(input.toLowerCase());
 }
 
+/**
+ * Converts a string to an integer value, or null if the string is empty
+ * @param input The input string to be converted
+ * @returns The integer value of the input string, or null if the input is an empty string
+ */
 function stringToNullInt(input: string): number | null {
   return input === "" ? null : parseInt(input);
 }
 
+/**
+ * Converts a string to an integer value, or null if the string is empty or "0"
+ * @param input The input string to be converted
+ * @returns The integer value of the input string, or null if the input is an empty string or "0"
+ */
 function zeroStringToNullInt(input: string): number | null {
   return input === "0" ? null : stringToNullInt(input);
 }

@@ -188,6 +188,7 @@ export class ServerlessImageHandlerStack extends Stack {
       allowedPattern: "^$|^E[A-Z0-9]{8,}$",
     });
 
+    /* eslint-disable no-new */
     new CfnRule(this, "ExistingDistributionIdRequiredRule", {
       ruleCondition: Fn.conditionEquals(useExistingCloudFrontDistribution.valueAsString, "Yes"),
       assertions: [

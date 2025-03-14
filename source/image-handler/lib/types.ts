@@ -7,6 +7,8 @@ import { SHARP_EDIT_ALLOWLIST_ARRAY, ALTERNATE_EDIT_ALLOWLIST_ARRAY } from "./co
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Headers = Record<string, any>;
 
+type AllowlistedEdit = (typeof SHARP_EDIT_ALLOWLIST_ARRAY)[number] | (typeof ALTERNATE_EDIT_ALLOWLIST_ARRAY)[number];
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ImageEdits = Partial<Record<AllowlistedEdit, any>>;
 
@@ -20,7 +22,5 @@ export interface ErrorMapping {
   pattern: string;
   statusCode: number;
   errorType: string;
-  message: string | Function;
+  message: string | ((err: Error) => string);
 }
-
-type AllowlistedEdit = (typeof SHARP_EDIT_ALLOWLIST_ARRAY)[number] | (typeof ALTERNATE_EDIT_ALLOWLIST_ARRAY)[number];

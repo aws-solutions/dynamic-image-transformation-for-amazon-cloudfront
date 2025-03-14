@@ -175,7 +175,6 @@ async function handleRequest(event: ImageHandlerEvent): Promise<ImageHandlerExec
  * Builds error response parameters for S3 Object Lambda WriteGetObjectResponse.
  * Takes an error event and constructs a response with appropriate status code,
  * error body, and cache control settings.
- *
  * @param getObjectEvent - The S3 GetObject event containing output route and token
  * @param error - The ImageHandlerError containing status code and error details
  * @returns WriteGetObjectResponseRequest - Parameters for error response including:
@@ -203,7 +202,6 @@ function buildErrorResponseParams(getObjectEvent, error: ImageHandlerError) {
  * Processes and sanitizes response headers for the image handler.
  * Filters out undefined header values, URI encodes remaining values,
  * and sets appropriate Cache-Control headers based on response status code.
- *
  * @param finalResponse - The execution result
  * @returns Record<string, string> - Processed headers with encoded values and cache settings
  *
@@ -231,7 +229,6 @@ function buildResponseHeaders(finalResponse: ImageHandlerExecutionResult): Recor
  * Builds parameters for S3 Object Lambda's WriteGetObjectResponse operation.
  * Processes response headers and metadata, handling Cache-Control separately
  * and encoding remaining headers as metadata.
- *
  * @param getObjectEvent - The S3 GetObject event containing output route and token
  * @param finalResponse - The execution result containing response body and status code
  * @param responseHeaders - Key-value pairs of response headers to be processed
@@ -240,7 +237,7 @@ function buildResponseHeaders(finalResponse: ImageHandlerExecutionResult): Recor
 function buildWriteResponseParams(
   getObjectEvent: S3GetObjectEvent,
   finalResponse: ImageHandlerExecutionResult,
-  responseHeaders: { [k: string]: any }
+  responseHeaders: { [k: string]: string }
 ): WriteGetObjectResponseRequest {
   const params: WriteGetObjectResponseRequest = {
     Body: finalResponse.body,

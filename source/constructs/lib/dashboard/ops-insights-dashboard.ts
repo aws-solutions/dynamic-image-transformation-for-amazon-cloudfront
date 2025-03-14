@@ -1,5 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
+
 import { Aws, CfnCondition, Duration } from "aws-cdk-lib";
 import { Dashboard, PeriodOverride, TextWidget } from "aws-cdk-lib/aws-cloudwatch";
 import { Size, DefaultGraphWidget, DefaultSingleValueWidget } from "./widgets";

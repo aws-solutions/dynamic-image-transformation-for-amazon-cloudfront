@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.1] - 2025-03-14
+
+### Changed
+
+- Updated metrics module to support identical metrics for different resources
+- Updated aws-cdk-lib and aws-cdk package versions
+
+### Security
+
+- Upgraded esbuild to v0.25.0 for advisory [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99)
+- Upgraded axios to 1.8.2 for advisory [GHSA-jr5f-v2jv-69x6](https://github.com/axios/axios/security/advisories/GHSA-jr5f-v2jv-69x6)
+
+### Fixed
+
+- Minor eslint warnings
+
 ## [7.0.0] - 2025-01-27
 
 ### Changed

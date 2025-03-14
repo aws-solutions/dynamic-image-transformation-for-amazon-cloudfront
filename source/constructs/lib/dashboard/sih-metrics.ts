@@ -1,8 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
+
 import { MathExpression, Metric } from "aws-cdk-lib/aws-cloudwatch";
 
-/** Properties for configuring metrics
+/**
+  Properties for configuring metrics
  */
 export interface MetricProps {
   /** The name of the backend Lambda function to monitor */
