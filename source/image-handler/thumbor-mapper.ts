@@ -343,7 +343,7 @@ export class ThumborMapper {
         break;
       }
       case "rotate": {
-        currentEdits.rotate = Number(filterValue);
+        currentEdits.rotate = filterValue === '' ? undefined : Number(filterValue);
         break;
       }
       case "sharpen": {
