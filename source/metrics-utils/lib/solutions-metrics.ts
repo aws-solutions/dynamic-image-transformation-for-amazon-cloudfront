@@ -37,7 +37,7 @@ export class SolutionsMetrics extends Construct {
     this.metricsLambdaFunction = new NodejsFunction(this, "MetricsLambda", {
       description: "Metrics util",
       entry: path.join(__dirname, "../lambda/index.ts"),
-      runtime: Runtime.NODEJS_18_X,
+      runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(60),
       memorySize: 128,
       environment: {
