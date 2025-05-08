@@ -289,6 +289,25 @@ test("Test that identifier with invalid values throws an error", () => {
   }).toThrow();
 });
 
+test("Test correct version identifier on lambda environment variables", () => {
+  // arrange
+  process.env["VERSION"] = "my-version";
+  const stack = new cdk.Stack();
+
+  // act
+  new SolutionsMetrics(stack, "test-version", {});
+  const template = Template.fromStack(stack);
+
+  // assert
+  template.hasResourceProperties("AWS::Lambda::Function", {
+    Environment: {
+      Variables: {
+        SOLUTION_VERSION: process.env["VERSION"],
+      },
+    },
+  });
+});
+
 function assertPolicyStatementContains(template: Template, pattern: any[]) {
   template.hasResourceProperties("AWS::IAM::Policy", {
     PolicyDocument: {

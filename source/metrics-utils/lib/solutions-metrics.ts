@@ -33,7 +33,7 @@ export class SolutionsMetrics extends Construct {
 
   constructor(scope: Construct, id: string, props: SolutionsMetricProps) {
     super(scope, id);
-
+    const { VERSION } = process.env;
     this.metricsLambdaFunction = new NodejsFunction(this, "MetricsLambda", {
       description: "Metrics util",
       entry: path.join(__dirname, "../lambda/index.ts"),
@@ -44,7 +44,7 @@ export class SolutionsMetrics extends Construct {
         QUERY_PREFIX: `${Aws.STACK_NAME}-`,
         SOLUTION_ID: scope.node.tryGetContext("solutionId"),
         SOLUTION_NAME: scope.node.tryGetContext("solutionName"),
-        SOLUTION_VERSION: scope.node.tryGetContext("solutionVersion"),
+        SOLUTION_VERSION: VERSION ?? scope.node.tryGetContext("solutionVersion"),
         UUID: props.uuid ?? "",
         EXECUTION_DAY: props.executionDay ? props.executionDay : ExecutionDay.MONDAY,
       },

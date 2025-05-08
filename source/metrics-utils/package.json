@@ -1,13 +1,14 @@
 {
   "name": "metrics-utils",
-  "version": "7.0.1",
+  "version": "7.0.3",
   "main": "index.ts",
   "description": "A construct for providing additional anonymous metrics.",
   "license": "Apache-2.0",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "bump-version": "npm version $(cat ../../VERSION.txt) --allow-same-version"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
