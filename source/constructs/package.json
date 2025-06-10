@@ -1,6 +1,6 @@
 {
   "name": "constructs",
-  "version": "7.0.3",
+  "version": "7.0.4",
   "description": "Dynamic Image Transformation for Amazon CloudFront Constructs",
   "license": "Apache-2.0",
   "author": {
@@ -28,7 +28,7 @@
     "@aws-solutions-constructs/core": "2.51.0",
     "@types/jest": "^29.5.6",
     "@types/node": "^20.10.4",
-    "aws-cdk": "^2.1003.0",
+    "aws-cdk": "^2.1018.0",
     "aws-cdk-lib": "^2.182.0",
     "constructs": "^10.3.0",
     "esbuild": "^0.25.0",
@@ -44,7 +44,7 @@
     "semver": "7.5.4"
   },
   "dependencies": {
-    "sharp": "^0.32.6",
-    "metrics-utils": "file:../metrics-utils"
+    "metrics-utils": "file:../metrics-utils",
+    "sharp": "^0.32.6"
   }
 }

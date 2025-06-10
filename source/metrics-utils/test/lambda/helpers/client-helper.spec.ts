@@ -56,7 +56,7 @@ describe("ClientHelper", () => {
   });
 
   it("should return different CloudWatchClient instances on different provided regions", () => {
-    const cwClient1 = clientHelper.getCwClient();
+    const cwClient1 = clientHelper.getCwClient("us-west-1");
     const cwClient2 = clientHelper.getCwClient("us-east-1");
     expect(cwClient1).not.toBe(cwClient2);
     expect(CloudWatchClient).toHaveBeenCalledTimes(2);

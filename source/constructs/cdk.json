@@ -2,7 +2,7 @@
   "app": "npx ts-node --prefer-ts-exts bin/constructs.ts",
   "context": {
     "solutionId": "SO0023",
-    "solutionVersion": "custom-v7.0.3",
+    "solutionVersion": "custom-v7.0.4",
     "solutionName": "dynamic-image-transformation-for-amazon-cloudfront"
   }
 }

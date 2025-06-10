@@ -1,6 +1,6 @@
 {
   "name": "cdk-solution-helper",
-  "version": "1.0.0",
+  "version": "7.0.4",
   "description": "helper to update references in cdk generated cfn template and package lambda assets",
   "main": "index.js",
   "scripts": {
