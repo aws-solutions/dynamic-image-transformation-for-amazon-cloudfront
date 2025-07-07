@@ -1,9 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import Rekognition from "aws-sdk/clients/rekognition";
-import S3, { WriteGetObjectResponseRequest } from "aws-sdk/clients/s3";
-import SecretsManager from "aws-sdk/clients/secretsmanager";
+import { RekognitionClient } from "@aws-sdk/client-rekognition";
+import {
+  S3Client,
+  WriteGetObjectResponseCommand,
+  WriteGetObjectResponseCommandInput,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 
 import { getOptions } from "../solution-utils/get-options";
 import { isNullOrWhiteSpace } from "../solution-utils/helpers";
@@ -25,9 +30,9 @@ import { SecretProvider } from "./secret-provider";
 import { Context } from "aws-lambda";
 
 const awsSdkOptions = getOptions();
-const s3Client = new S3(awsSdkOptions);
-const rekognitionClient = new Rekognition(awsSdkOptions);
-const secretsManagerClient = new SecretsManager(awsSdkOptions);
+const s3Client = new S3Client({ ...awsSdkOptions, followRegionRedirects: true });
+const rekognitionClient = new RekognitionClient(awsSdkOptions);
+const secretsManagerClient = new SecretsManagerClient(awsSdkOptions);
 const secretProvider = new SecretProvider(secretsManagerClient);
 
 const LAMBDA_PAYLOAD_LIMIT = 6 * 1024 * 1024;
@@ -74,7 +79,7 @@ export async function handler(
   const getObjectEvent = event as S3GetObjectEvent;
   const params = buildWriteResponseParams(getObjectEvent, finalResponse, responseHeaders);
   try {
-    await s3Client.writeGetObjectResponse(params).promise();
+    await s3Client.send(new WriteGetObjectResponseCommand(params));
   } catch (error) {
     console.error("Error occurred while writing the response to S3 Object Lambda.", error);
     const errorParams = buildErrorResponseParams(
@@ -85,7 +90,7 @@ export async function handler(
         "It was not possible to write the response to S3 Object Lambda."
       )
     );
-    await s3Client.writeGetObjectResponse(errorParams).promise();
+    await s3Client.send(new WriteGetObjectResponseCommand(errorParams));
   }
 }
 
@@ -186,7 +191,7 @@ async function handleRequest(event: ImageHandlerEvent): Promise<ImageHandlerExec
  */
 function buildErrorResponseParams(getObjectEvent, error: ImageHandlerError) {
   const { statusCode, body } = getErrorResponse(error);
-  const params: WriteGetObjectResponseRequest = {
+  const params: WriteGetObjectResponseCommandInput = {
     RequestRoute: getObjectEvent.getObjectContext.outputRoute,
     RequestToken: getObjectEvent.getObjectContext.outputToken,
     Body: body,
@@ -238,8 +243,8 @@ function buildWriteResponseParams(
   getObjectEvent: S3GetObjectEvent,
   finalResponse: ImageHandlerExecutionResult,
   responseHeaders: { [k: string]: string }
-): WriteGetObjectResponseRequest {
-  const params: WriteGetObjectResponseRequest = {
+): WriteGetObjectResponseCommandInput {
+  const params: WriteGetObjectResponseCommandInput = {
     Body: finalResponse.body,
     RequestRoute: getObjectEvent.getObjectContext.outputRoute,
     RequestToken: getObjectEvent.getObjectContext.outputToken,
@@ -273,12 +278,12 @@ export async function handleDefaultFallbackImage(
   error
 ): Promise<ImageHandlerExecutionResult> {
   const { DEFAULT_FALLBACK_IMAGE_BUCKET, DEFAULT_FALLBACK_IMAGE_KEY, ENABLE_S3_OBJECT_LAMBDA } = process.env;
-  const defaultFallbackImage = await s3Client
-    .getObject({
+  const defaultFallbackImage = await s3Client.send(
+    new GetObjectCommand({
       Bucket: DEFAULT_FALLBACK_IMAGE_BUCKET,
       Key: DEFAULT_FALLBACK_IMAGE_KEY,
     })
-    .promise();
+  );
 
   const headers = getResponseHeaders(false, isAlb);
   headers["Content-Type"] = defaultFallbackImage.ContentType;
@@ -296,8 +301,8 @@ export async function handleDefaultFallbackImage(
     headers,
     body:
       ENABLE_S3_OBJECT_LAMBDA === "Yes"
-        ? Buffer.from(defaultFallbackImage.Body as Uint8Array)
-        : defaultFallbackImage.Body.toString("base64"),
+        ? Buffer.from(await defaultFallbackImage.Body.transformToByteArray())
+        : await defaultFallbackImage.Body.transformToString("base64"),
   };
 }
 

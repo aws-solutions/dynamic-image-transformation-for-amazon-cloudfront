@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import fs from "fs";
-
-import { mockAwsS3, mockContext } from "./mock";
+import { mockS3Commands, mockContext } from "./mock";
 
 import { handler } from "../index";
 import { ImageHandlerError, ImageHandlerEvent, S3GetObjectEvent, StatusCodes } from "../lib";
@@ -14,8 +13,18 @@ describe("index", () => {
   // Arrange
   process.env.SOURCE_BUCKETS = "source-bucket";
   const OLD_ENV = process.env;
+
+  // Mock for SdkStream body
   const mockImage = Buffer.from("SampleImageContent\n");
-  const mockFallbackImage = Buffer.from("SampleFallbackImageContent\n");
+  const mockImageBody = {
+    transformToByteArray: async () => new Uint8Array(mockImage),
+    transformToString: async (encoding) => mockImage.toString(encoding || "utf-8"),
+  };
+  const mockFallbackImageBuffer = Buffer.from("SampleFallbackImageContent\n");
+  const mockFallbackImage = {
+    transformToByteArray: async () => new Uint8Array(mockFallbackImageBuffer),
+    transformToString: async (encoding) => mockFallbackImageBuffer.toString(encoding || "utf-8"),
+  };
 
   const commonMetadata = {
     "Access-Control-Allow-Credentials": "true",
@@ -26,8 +35,11 @@ describe("index", () => {
   };
 
   beforeEach(() => {
+    // reset all mockS3Commands mocks
+    Object.values(mockS3Commands).forEach((mock) => {
+      mock.mockReset();
+    });
     process.env = { ...OLD_ENV };
-    jest.resetAllMocks();
   });
 
   afterAll(() => {
@@ -36,11 +48,8 @@ describe("index", () => {
 
   it("should return the image when there is no error using RestAPI handler", async () => {
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: mockImage, ContentType: "image/jpeg" });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody, ContentType: "image/jpeg" });
+
     // Arrange
     const event: ImageHandlerEvent = { path: "/test.jpg" };
 
@@ -62,7 +71,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -72,16 +81,8 @@ describe("index", () => {
   it("should return the image when there is no error using S3 Object Lambda handler", async () => {
     process.env.ENABLE_S3_OBJECT_LAMBDA = "Yes";
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: mockImage, ContentType: "image/jpeg" });
-      },
-    }));
-    mockAwsS3.writeGetObjectResponse.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ status: 200, Body: undefined });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValueOnce({ Body: mockImageBody, ContentType: "image/jpeg" });
+    mockS3Commands.writeGetObjectResponse.mockResolvedValueOnce({ status: 200, Body: undefined });
     mockContext.getRemainingTimeInMillis.mockImplementationOnce(() => 60000);
     // Arrange
     const event: S3GetObjectEvent = {
@@ -99,12 +100,12 @@ describe("index", () => {
     const result = await handler(event, mockContext as unknown as Context);
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
     expect(result).toEqual(undefined);
-    expect(mockAwsS3.writeGetObjectResponse).toHaveBeenCalledWith({
+    expect(mockS3Commands.writeGetObjectResponse).toHaveBeenCalledWith({
       Body: mockImage,
       RequestRoute: event.getObjectContext.outputRoute,
       RequestToken: event.getObjectContext.outputToken,
@@ -122,20 +123,14 @@ describe("index", () => {
   it("should return timeout error when s3 object lambda duration is exceeded", async () => {
     process.env.ENABLE_S3_OBJECT_LAMBDA = "Yes";
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({ Body: mockImage, ContentType: "image/jpeg" });
-          }, 100);
-        });
-      },
-    }));
-    mockAwsS3.writeGetObjectResponse.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve({ status: 200, Body: undefined });
-      },
-    }));
+    mockS3Commands.getObject.mockImplementationOnce(() => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ Body: mockImageBody, ContentType: "image/jpeg" });
+        }, 100);
+      });
+    });
+    mockS3Commands.writeGetObjectResponse.mockResolvedValue({ status: 200, Body: undefined });
     mockContext.getRemainingTimeInMillis.mockImplementationOnce(() => 1000);
     // Arrange
     const event: S3GetObjectEvent = {
@@ -153,12 +148,12 @@ describe("index", () => {
     const result = await handler(event, mockContext as unknown as Context);
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
     expect(result).toEqual(undefined);
-    expect(mockAwsS3.writeGetObjectResponse).toHaveBeenCalledWith({
+    expect(mockS3Commands.writeGetObjectResponse).toHaveBeenCalledWith({
       Body: '{"status":503,"code":"TimeoutException","message":"Image processing timed out."}',
       RequestRoute: event.getObjectContext.outputRoute,
       RequestToken: event.getObjectContext.outputToken,
@@ -175,11 +170,8 @@ describe("index", () => {
 
   it("should return the image with custom headers when custom headers are provided", async () => {
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: mockImage, ContentType: "image/jpeg" });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody, ContentType: "image/jpeg" });
+
     // Arrange
     const event: ImageHandlerEvent = {
       path: "/eyJidWNrZXQiOiJzb3VyY2UtYnVja2V0Iiwia2V5IjoidGVzdC5qcGciLCJoZWFkZXJzIjp7IkN1c3RvbS1IZWFkZXIiOiJDdXN0b21WYWx1ZSJ9fQ==",
@@ -204,7 +196,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -213,11 +205,8 @@ describe("index", () => {
 
   it("should return the image when the request is from ALB", async () => {
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: mockImage, ContentType: "image/jpeg" });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValueOnce({ Body: mockImageBody, ContentType: "image/jpeg" });
+
     // Arrange
     const event: ImageHandlerEvent = {
       path: "/test.jpg",
@@ -243,7 +232,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -254,11 +243,9 @@ describe("index", () => {
     // Arrange
     const event: ImageHandlerEvent = { path: "/test.jpg" };
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened."));
-      },
-    }));
+    mockS3Commands.getObject.mockRejectedValueOnce(
+      new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened.")
+    );
 
     // Act
     const result = await handler(event);
@@ -279,7 +266,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -293,11 +280,7 @@ describe("index", () => {
     };
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: mockImage, ContentType: "image/jpeg" });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValueOnce({ Body: mockImageBody, ContentType: "image/jpeg" });
 
     // Act
     const result = await handler(event);
@@ -318,7 +301,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -335,21 +318,12 @@ describe("index", () => {
     const event: ImageHandlerEvent = { path: "/test.jpg" };
 
     // Mock
-    mockAwsS3.getObject.mockReset();
-    mockAwsS3.getObject
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.reject(new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "UnknownError", null));
-        },
-      }))
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            Body: mockFallbackImage,
-            ContentType: "image/png",
-          });
-        },
-      }));
+    mockS3Commands.getObject
+      .mockRejectedValueOnce(new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "UnknownError", null))
+      .mockResolvedValueOnce({
+        Body: mockFallbackImage,
+        ContentType: "image/png",
+      });
 
     // Act
     const result = await handler(event);
@@ -364,15 +338,15 @@ describe("index", () => {
         "Content-Type": "image/png",
         "Cache-Control": "max-age=31536000,public",
       },
-      body: mockFallbackImage.toString("base64"),
+      body: mockFallbackImageBuffer.toString("base64"),
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(1, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(1, {
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(2, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(2, {
       Bucket: "fallback-image-bucket",
       Key: "fallback-image.png",
     });
@@ -393,22 +367,13 @@ describe("index", () => {
     };
 
     // Mock
-    mockAwsS3.getObject.mockReset();
-    mockAwsS3.getObject
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.reject(new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "UnknownError", null));
-        },
-      }))
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            Body: mockFallbackImage,
-            ContentType: "image/png",
-            CacheControl: "max-age=12,public",
-          });
-        },
-      }));
+    mockS3Commands.getObject
+      .mockRejectedValueOnce(new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "UnknownError", null))
+      .mockResolvedValueOnce({
+        Body: mockFallbackImage,
+        ContentType: "image/png",
+        CacheControl: "max-age=12,public",
+      });
 
     // Act
     const result = await handler(event);
@@ -424,15 +389,15 @@ describe("index", () => {
         "Cache-Control": "max-age=12,public",
         "Last-Modified": undefined,
       },
-      body: mockFallbackImage.toString("base64"),
+      body: mockFallbackImageBuffer.toString("base64"),
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(1, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(1, {
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(2, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(2, {
       Bucket: "fallback-image-bucket",
       Key: "fallback-image.png",
     });
@@ -452,21 +417,12 @@ describe("index", () => {
     };
 
     // Mock
-    mockAwsS3.getObject.mockReset();
-    mockAwsS3.getObject
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.reject(new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "UnknownError", null));
-        },
-      }))
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            Body: mockFallbackImage,
-            ContentType: "image/png",
-          });
-        },
-      }));
+    mockS3Commands.getObject
+      .mockRejectedValueOnce(new ImageHandlerError(StatusCodes.INTERNAL_SERVER_ERROR, "UnknownError", null))
+      .mockResolvedValueOnce({
+        Body: mockFallbackImage,
+        ContentType: "image/png",
+      });
 
     // Act
     const result = await handler(event);
@@ -482,15 +438,15 @@ describe("index", () => {
         "Cache-Control": "max-age=11,public",
         "Last-Modified": undefined,
       },
-      body: mockFallbackImage.toString("base64"),
+      body: mockFallbackImageBuffer.toString("base64"),
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(1, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(1, {
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(2, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(2, {
       Bucket: "fallback-image-bucket",
       Key: "fallback-image.png",
     });
@@ -510,12 +466,9 @@ describe("index", () => {
     };
 
     // Mock
-    mockAwsS3.getObject.mockReset();
-    mockAwsS3.getObject.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened."));
-      },
-    }));
+    mockS3Commands.getObject.mockRejectedValueOnce(
+      new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened.")
+    );
 
     // Act
     const result = await handler(event);
@@ -537,11 +490,11 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(1, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(1, {
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
-    expect(mockAwsS3.getObject).toHaveBeenNthCalledWith(2, {
+    expect(mockS3Commands.getObject).toHaveBeenNthCalledWith(2, {
       Bucket: "fallback-image-bucket",
       Key: "fallback-image.png",
     });
@@ -556,11 +509,9 @@ describe("index", () => {
     const event: ImageHandlerEvent = { path: "/test.jpg" };
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened."));
-      },
-    }));
+    mockS3Commands.getObject.mockRejectedValueOnce(
+      new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened.")
+    );
 
     // Act
     const result = await handler(event);
@@ -582,7 +533,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -597,11 +548,9 @@ describe("index", () => {
     const event: ImageHandlerEvent = { path: "/test.jpg" };
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened."));
-      },
-    }));
+    mockS3Commands.getObject.mockRejectedValueOnce(
+      new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened.")
+    );
 
     // Act
     const result = await handler(event);
@@ -623,7 +572,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -642,11 +591,9 @@ describe("index", () => {
     };
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened."));
-      },
-    }));
+    mockS3Commands.getObject.mockRejectedValueOnce(
+      new ImageHandlerError(StatusCodes.NOT_FOUND, "NoSuchKey", "NoSuchKey error happened.")
+    );
 
     // Act
     const result = await handler(event);
@@ -667,7 +614,7 @@ describe("index", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "source-bucket",
       Key: "test.jpg",
     });
@@ -691,13 +638,14 @@ describe("index", () => {
     const baseImage = fs.readFileSync("./test/image/transparent-5x5.jpeg");
 
     // Mock
-    mockAwsS3.getObject.mockImplementation((data) => ({
-      promise() {
-        return Promise.resolve({
-          Body: data.Key === "transparent-10x10.png" ? overlayImage : baseImage,
-        });
-      },
-    }));
+    mockS3Commands.getObject.mockImplementation((data) => {
+      return Promise.resolve({
+        Body:
+          data.Key === "transparent-10x10.png"
+            ? { transformToByteArray: async () => new Uint8Array(overlayImage) }
+            : { transformToByteArray: async () => new Uint8Array(baseImage) },
+      });
+    });
 
     // Act
     const result = await handler(event);
@@ -725,7 +673,7 @@ describe("index", () => {
     cacheControl: string | RegExp,
     additionalMetadata: {} = {}
   ) => {
-    expect(mockAwsS3.writeGetObjectResponse).toHaveBeenCalledWith({
+    expect(mockS3Commands.writeGetObjectResponse).toHaveBeenCalledWith({
       Body: mockImage,
       RequestRoute: event.getObjectContext.outputRoute,
       RequestToken: event.getObjectContext.outputToken,
@@ -782,21 +730,13 @@ describe("index", () => {
     writeGetObjectAssertion(event, expect.stringMatching(/^max-age=[0-5],public$/));
   });
 
-  function setupObjectLambdaB64EncodedTest(eventObject: Object, image: Buffer = mockImage): S3GetObjectEvent {
+  function setupObjectLambdaB64EncodedTest(eventObject: Object): S3GetObjectEvent {
     process.env.ENABLE_S3_OBJECT_LAMBDA = "Yes";
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: image, ContentType: "image/jpeg" });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValueOnce({ Body: mockImageBody, ContentType: "image/jpeg" });
 
     const encStr = Buffer.from(JSON.stringify(eventObject)).toString("base64");
 
-    mockAwsS3.writeGetObjectResponse.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ status: 200, Body: undefined });
-      },
-    }));
+    mockS3Commands.writeGetObjectResponse.mockResolvedValue({ status: 200, Body: undefined });
     mockContext.getRemainingTimeInMillis.mockImplementationOnce(() => 60000);
     return {
       getObjectContext: {

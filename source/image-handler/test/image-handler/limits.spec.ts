@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import Rekognition from "aws-sdk/clients/rekognition";
-import S3 from "aws-sdk/clients/s3";
+import { RekognitionClient } from "@aws-sdk/client-rekognition";
+import { S3Client } from "@aws-sdk/client-s3";
 
 import { ImageHandler } from "../../image-handler";
 import { ImageRequestInfo, RequestTypes, StatusCodes } from "../../lib";
 
-const s3Client = new S3();
-const rekognitionClient = new Rekognition();
+const s3Client = new S3Client();
+const rekognitionClient = new RekognitionClient();
 
 describe("limits", () => {
   it("Should fail the return payload is larger than 6MB", async () => {

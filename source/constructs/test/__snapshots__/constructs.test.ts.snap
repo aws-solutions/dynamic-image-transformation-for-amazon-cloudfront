@@ -1186,6 +1186,16 @@ function processQueryParams(querystring) {
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiANYE4494B31": {
       "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W59",
+              "reason": "No authorization currently on the API Gateway",
+            },
+          ],
+        },
+      },
       "Properties": {
         "AuthorizationType": "NONE",
         "HttpMethod": "ANY",
@@ -1245,6 +1255,16 @@ function processQueryParams(querystring) {
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiCloudWatchRole12575C4D": {
       "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "F10",
+              "reason": "Inline policy used in solutions construct",
+            },
+          ],
+        },
+      },
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -1317,6 +1337,7 @@ function processQueryParams(querystring) {
         "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiANYE4494B31",
       ],
       "Metadata": {
+        "aws:cdk:do-not-refactor": true,
         "cfn_nag": {
           "rules_to_suppress": [
             {
@@ -1336,6 +1357,16 @@ function processQueryParams(querystring) {
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiDeploymentStageimageB55D20E3": {
       "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W87",
+              "reason": "Cache not enabled, using CloudFront for caching viewer response",
+            },
+          ],
+        },
+      },
       "Properties": {
         "AccessLogSetting": {
           "DestinationArn": {
@@ -1396,6 +1427,16 @@ function processQueryParams(querystring) {
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaLambdaRestApiproxyANY8F9763E1": {
       "Condition": "CommonResourcesDisableS3ObjectLambdaCondition017AC33C",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W59",
+              "reason": "No authorization currently on the API Gateway",
+            },
+          ],
+        },
+      },
       "Properties": {
         "AuthorizationType": "NONE",
         "HttpMethod": "ANY",
@@ -1533,6 +1574,16 @@ function processQueryParams(querystring) {
     },
     "BackEndImageHandlerCloudFrontDistributionB5464C90": {
       "Condition": "BackEndDeployS3OLDistribution869FCC7C",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W70",
+              "reason": "Since the distribution uses the CloudFront domain name, CloudFront automatically sets the security policy to TLSv1 regardless of the value of MinimumProtocolVersion",
+            },
+          ],
+        },
+      },
       "Properties": {
         "DistributionConfig": {
           "Comment": "Image Handler Distribution for Dynamic Image Transformation for Amazon CloudFront",
@@ -1983,6 +2034,10 @@ function processQueryParams(querystring) {
             {
               "id": "W84",
               "reason": "CloudWatch log group is always encrypted by default.",
+            },
+            {
+              "id": "W86",
+              "reason": "Retention days are configured with property override",
             },
           ],
         },
@@ -2555,6 +2610,20 @@ function handler(event) {
         "BackEndSolutionMetricsMetricsLambdaServiceRoleDefaultPolicyEBDDA47A",
         "BackEndSolutionMetricsMetricsLambdaServiceRoleF4BC77CD",
       ],
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W89",
+              "reason": "Not in vpc",
+            },
+            {
+              "id": "W92",
+              "reason": "No need for ReservedConcurrentExecutions, does not support any application functional logic",
+            },
+          ],
+        },
+      },
       "Properties": {
         "Code": {
           "S3Bucket": {
@@ -3058,6 +3127,10 @@ function handler(event) {
             {
               "id": "W11",
               "reason": "Allow '*' because it is required for making DescribeRegions API call as it doesn't support resource-level permissions and require to choose all resources.",
+            },
+            {
+              "id": "F10",
+              "reason": "Using inline policy",
             },
           ],
         },

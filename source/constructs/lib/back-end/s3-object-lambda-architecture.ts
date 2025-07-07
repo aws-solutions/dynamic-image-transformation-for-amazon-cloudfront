@@ -28,6 +28,7 @@ import { readFileSync } from "fs";
 import { BackEnd, BackEndProps } from "./back-end-construct";
 import { Effect, Policy, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { S3ObjectLambdaOrigin } from "./s3-object-lambda-origin";
+import { addCfnSuppressRules } from "../../utils/utils";
 
 export interface S3ObjectLambdaArchitectureProps extends BackEndProps {
   originRequestPolicy: OriginRequestPolicy;
@@ -180,6 +181,13 @@ export class S3ObjectLambdaArchitecture {
         })
       )
     );
+    addCfnSuppressRules(this.imageHandlerCloudFrontDistribution, [
+      {
+        id: "W70",
+        reason:
+          "Since the distribution uses the CloudFront domain name, CloudFront automatically sets the security policy to TLSv1 regardless of the value of MinimumProtocolVersion",
+      },
+    ]);
 
     const conditionalCloudFrontDistributionId = Fn.conditionIf(
       props.conditions.useExistingCloudFrontDistributionCondition.logicalId,

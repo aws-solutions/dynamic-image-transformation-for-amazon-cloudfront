@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockAwsS3, mockContext, consoleInfoSpy } from "./mock";
+import { mockS3Commands, mockContext, consoleInfoSpy } from "./mock";
 import {
   CustomResourceActions,
   CustomResourceRequestTypes,
@@ -40,26 +40,19 @@ Key: 'Value'
 };`;
 
   beforeEach(() => {
-    jest.resetAllMocks();
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   it("Should return success to put config file", async () => {
-    mockAwsS3.putObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({});
-      },
-    }));
+    mockS3Commands.putObject.mockResolvedValueOnce({});
 
     const result = await handler(event, mockContext);
     const resourceProperties = event.ResourceProperties as PutConfigRequestProperties;
 
     expect.assertions(2);
 
-    expect(mockAwsS3.putObject).toHaveBeenCalledWith({
+    // The command is now checked in the mock.ts file, so we just verify the mock was called
+    expect(mockS3Commands.putObject).toHaveBeenCalledWith({
       Bucket: resourceProperties.DestS3Bucket,
       Body: mockConfig,
       Key: resourceProperties.DestS3key,
@@ -75,11 +68,7 @@ Key: 'Value'
   });
 
   it("Should return failed when PutObject fails", async () => {
-    mockAwsS3.putObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(null, "PutObject failed"));
-      },
-    }));
+    mockS3Commands.putObject.mockRejectedValueOnce(new CustomResourceError(null, "PutObject failed"));
 
     const result = await handler(event, mockContext);
     const resourceProperties = event.ResourceProperties as PutConfigRequestProperties;
@@ -89,7 +78,7 @@ Key: 'Value'
     expect(consoleInfoSpy).toHaveBeenCalledWith(
       `Attempting to save content blob destination location: ${resourceProperties.DestS3Bucket}/${resourceProperties.DestS3key}`
     );
-    expect(mockAwsS3.putObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.putObject).toHaveBeenCalledWith({
       Bucket: resourceProperties.DestS3Bucket,
       Body: mockConfig,
       Key: resourceProperties.DestS3key,
@@ -107,17 +96,9 @@ Key: 'Value'
   });
 
   it("Should retry and return success when IAM policy is not so S3 API returns AccessDenied", async () => {
-    mockAwsS3.putObject
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.reject(new CustomResourceError(ErrorCodes.ACCESS_DENIED, null));
-        },
-      }))
-      .mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve();
-        },
-      }));
+    mockS3Commands.putObject
+      .mockRejectedValueOnce(new CustomResourceError(ErrorCodes.ACCESS_DENIED, null))
+      .mockResolvedValueOnce({});
 
     const result = await handler(event, mockContext);
     const resourceProperties = event.ResourceProperties as PutConfigRequestProperties;
@@ -128,7 +109,7 @@ Key: 'Value'
       `Attempting to save content blob destination location: ${resourceProperties.DestS3Bucket}/${resourceProperties.DestS3key}`
     );
     expect(consoleInfoSpy).toHaveBeenCalledWith("Waiting for retry...");
-    expect(mockAwsS3.putObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.putObject).toHaveBeenCalledWith({
       Bucket: resourceProperties.DestS3Bucket,
       Body: mockConfig,
       Key: resourceProperties.DestS3key,

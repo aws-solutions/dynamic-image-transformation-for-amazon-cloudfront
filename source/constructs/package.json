@@ -1,6 +1,6 @@
 {
   "name": "constructs",
-  "version": "7.0.4",
+  "version": "7.0.5",
   "description": "Dynamic Image Transformation for Amazon CloudFront Constructs",
   "license": "Apache-2.0",
   "author": {
@@ -37,14 +37,8 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
-  "overrides": {
-    "semver": "7.5.4"
-  },
-  "resolutions": {
-    "semver": "7.5.4"
-  },
   "dependencies": {
     "metrics-utils": "file:../metrics-utils",
-    "sharp": "^0.32.6"
+    "sharp": "^0.34.2"
   }
 }

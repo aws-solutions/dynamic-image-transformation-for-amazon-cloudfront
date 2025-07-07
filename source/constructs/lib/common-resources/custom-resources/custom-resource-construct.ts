@@ -203,6 +203,10 @@ export class CustomResourcesConstruct extends Construct {
         reason:
           "Allow '*' because it is required for making DescribeRegions API call as it doesn't support resource-level permissions and require to choose all resources.",
       },
+      {
+        id: "F10",
+        reason: "Using inline policy",
+      },
     ]);
 
     props.secretsManagerPolicy.attachToRole(this.customResourceRole);

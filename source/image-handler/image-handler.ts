@@ -1,8 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import Rekognition from "aws-sdk/clients/rekognition";
-import S3 from "aws-sdk/clients/s3";
+import {
+  RekognitionClient,
+  DetectFacesCommand,
+  DetectModerationLabelsCommand,
+  DetectFacesResponse,
+  DetectModerationLabelsResponse,
+} from "@aws-sdk/client-rekognition";
+import { GetObjectCommand, GetObjectCommandOutput, S3Client } from "@aws-sdk/client-s3";
 import sharp, { FormatEnum, OverlayOptions, ResizeOptions } from "sharp";
 
 import {
@@ -22,7 +28,7 @@ import { getAllowedSourceBuckets } from "./image-request";
 import { SHARP_EDIT_ALLOWLIST_ARRAY } from "./lib/constants";
 
 export class ImageHandler {
-  constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
+  constructor(private readonly s3Client: S3Client, private readonly rekognitionClient: RekognitionClient) {}
 
   /**
    * Creates a Sharp object from Buffer
@@ -35,18 +41,12 @@ export class ImageHandler {
   private async instantiateSharpImage(originalImage: Buffer, edits: ImageEdits, options: Object): Promise<sharp.Sharp> {
     let image: sharp.Sharp = null;
     try {
-      if (!edits || !Object.keys(edits).length) {
-        return sharp(originalImage, options);
-      }
-      if (edits.rotate !== undefined && edits.rotate === null) {
-        image = sharp(originalImage, options);
+      if (edits && edits.rotate !== undefined && edits.rotate === null) {
+        image = sharp(originalImage, options); // for strip metadata case like strip_exif()
       } else {
-        const metadata = await sharp(originalImage, options).metadata();
-        image = metadata.orientation
-          ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
-          : sharp(originalImage, options).withMetadata();
+        await sharp(originalImage, options).metadata(); // validation
+        image = sharp(originalImage, options).withMetadata();
       }
-
       return image;
     } catch (error) {
       this.handleError(
@@ -188,6 +188,18 @@ export class ImageHandler {
           break;
         }
         case "animated": {
+          break;
+        }
+        case "rotate": {
+          // Handle rotate specifically to support autoOrient when undefined
+          if (edits.rotate === undefined) {
+            // When rotate is undefined (filters:rotate() without parameters), call autoOrient()
+            // This aligns with Sharp's behavior where rotate() without parameters auto-orients based on EXIF
+            originalImage.autoOrient();
+          } else if (edits.rotate !== null) {
+            // When rotate has a value (including 0), apply the rotation
+            originalImage.rotate(edits.rotate);
+          }
           break;
         }
         default: {
@@ -415,7 +427,7 @@ export class ImageHandler {
     originalImage: sharp.Sharp,
     blur: number | undefined,
     moderationLabels: string[],
-    foundContentLabels: Rekognition.DetectModerationLabelsResponse
+    foundContentLabels: DetectModerationLabelsResponse
   ): void {
     const blurValue = blur !== undefined ? Math.ceil(blur) : 50;
 
@@ -515,7 +527,7 @@ export class ImageHandler {
     const params = { Bucket: bucket, Key: key };
     try {
       const { width, height } = sourceImageMetadata;
-      const overlayImage: S3.GetObjectOutput = await this.s3Client.getObject(params).promise();
+      const overlayImage: GetObjectCommandOutput = await this.s3Client.send(new GetObjectCommand(params));
       const resizeOptions: ResizeOptions = {
         fit: ImageFitTypes.INSIDE,
       };
@@ -533,7 +545,7 @@ export class ImageHandler {
       const alphaValue = zeroToHundred.test(alpha) ? parseInt(alpha) : 0;
       const imageBuffer = Buffer.isBuffer(overlayImage.Body)
         ? overlayImage.Body
-        : Buffer.from(overlayImage.Body as Uint8Array);
+        : Buffer.from(await overlayImage.Body.transformToByteArray());
       return await sharp(imageBuffer)
         .resize(resizeOptions)
         .composite([
@@ -599,7 +611,7 @@ export class ImageHandler {
    * @param boundingBox.Width width of bounding box
    */
   private handleBounds(
-    response: Rekognition.DetectFacesResponse,
+    response: DetectFacesResponse,
     faceIndex: number,
     boundingBox: { Height?: number; Left?: number; Top?: number; Width?: number }
   ): void {
@@ -629,7 +641,7 @@ export class ImageHandler {
     const params = { Image: { Bytes: imageBuffer } };
 
     try {
-      const response = await this.rekognitionClient.detectFaces(params).promise();
+      const response = await this.rekognitionClient.send(new DetectFacesCommand(params));
       if (response.FaceDetails.length <= 0) {
         return { height: 1, left: 0, top: 0, width: 1 };
       }
@@ -682,13 +694,13 @@ export class ImageHandler {
   private async detectInappropriateContent(
     imageBuffer: Buffer,
     minConfidence: number | undefined
-  ): Promise<Rekognition.DetectModerationLabelsResponse> {
+  ): Promise<DetectModerationLabelsResponse> {
     try {
       const params = {
         Image: { Bytes: imageBuffer },
         MinConfidence: minConfidence ?? 75,
       };
-      return await this.rekognitionClient.detectModerationLabels(params).promise();
+      return await this.rekognitionClient.send(new DetectModerationLabelsCommand(params));
     } catch (error) {
       this.handleError(
         error,

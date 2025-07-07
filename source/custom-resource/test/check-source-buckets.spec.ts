@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { consoleErrorSpy, consoleInfoSpy, mockAwsS3, mockContext } from "./mock";
+import { consoleErrorSpy, consoleInfoSpy, mockS3Commands, mockContext } from "./mock";
 import { CustomResourceActions, CustomResourceRequestTypes, CustomResourceRequest, CustomResourceError } from "../lib";
 import { handler } from "../index";
 
@@ -24,19 +24,11 @@ describe("CHECK_SOURCE_BUCKETS", () => {
   };
 
   beforeEach(() => {
-    jest.resetAllMocks();
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   it("Should return success to check source buckets", async () => {
-    mockAwsS3.headBucket.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
+    mockS3Commands.headBucket.mockResolvedValue({});
 
     const result = await handler(event, mockContext);
 
@@ -50,11 +42,7 @@ describe("CHECK_SOURCE_BUCKETS", () => {
   });
 
   it("should return failed when any buckets do not exist", async () => {
-    mockAwsS3.headBucket.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(null, "HeadObject failed."));
-      },
-    }));
+    mockS3Commands.headBucket.mockRejectedValue(new CustomResourceError(null, "HeadObject failed."));
 
     const result = await handler(event, mockContext);
 

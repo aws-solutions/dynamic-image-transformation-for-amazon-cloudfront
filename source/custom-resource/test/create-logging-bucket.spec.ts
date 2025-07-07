@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { consoleErrorSpy, consoleInfoSpy, mockAwsEc2, mockAwsS3, mockContext } from "./mock";
+import { consoleErrorSpy, consoleInfoSpy, mockEC2Commands, mockS3Commands, mockContext } from "./mock";
 import { CustomResourceActions, CustomResourceRequestTypes, CustomResourceRequest, CustomResourceError } from "../lib";
 import { handler } from "../index";
 
@@ -23,41 +23,17 @@ describe("CREATE_LOGGING_BUCKET", () => {
   };
 
   beforeEach(() => {
-    consoleInfoSpy.mockReset();
-    consoleErrorSpy.mockReset();
+    jest.clearAllMocks();
   });
 
   it("Should return success and bucket name", async () => {
-    mockAwsEc2.describeRegions.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Regions: [{ RegionName: "mock-region-1" }] });
-      },
-    }));
-    mockAwsS3.createBucket.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketEncryption.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketPolicy.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketTagging.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
+    mockEC2Commands.describeRegions.mockResolvedValue({ Regions: [{ RegionName: "mock-region-1" }] });
+
+    mockS3Commands.createBucket.mockResolvedValue({});
+    mockS3Commands.putBucketVersioning.mockResolvedValue({});
+    mockS3Commands.putBucketEncryption.mockResolvedValue({});
+    mockS3Commands.putBucketPolicy.mockResolvedValue({});
+    mockS3Commands.putBucketTagging.mockResolvedValue({});
 
     await handler(event, mockContext);
 
@@ -83,12 +59,7 @@ describe("CREATE_LOGGING_BUCKET", () => {
   });
 
   it("Should return failure when there is an error getting opt-in regions", async () => {
-    mockAwsEc2.describeRegions.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new Error("describeRegions failed"));
-      },
-    }));
-
+    mockEC2Commands.describeRegions.mockRejectedValue(new Error("describeRegions failed"));
     const result = await handler(event, mockContext);
 
     expect.assertions(1);
@@ -105,16 +76,8 @@ describe("CREATE_LOGGING_BUCKET", () => {
   });
 
   it("Should return failure when there is an error creating the bucket", async () => {
-    mockAwsEc2.describeRegions.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Regions: [] });
-      },
-    }));
-    mockAwsS3.createBucket.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(null, "createBucket failed"));
-      },
-    }));
+    mockEC2Commands.describeRegions.mockResolvedValue({ Regions: [] });
+    mockS3Commands.createBucket.mockRejectedValue(new CustomResourceError(null, "createBucket failed"));
 
     const result = await handler(event, mockContext);
 
@@ -132,26 +95,10 @@ describe("CREATE_LOGGING_BUCKET", () => {
   });
 
   it("Should return failure when there is an error enabling encryption on the created bucket", async () => {
-    mockAwsEc2.describeRegions.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Regions: [] });
-      },
-    }));
-    mockAwsS3.createBucket.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketEncryption.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(null, "putBucketEncryption failed"));
-      },
-    }));
+    mockEC2Commands.describeRegions.mockResolvedValue({ Regions: [] });
+    mockS3Commands.createBucket.mockResolvedValue({});
+    mockS3Commands.putBucketVersioning.mockResolvedValue({});
+    mockS3Commands.putBucketEncryption.mockRejectedValue(new CustomResourceError(null, "putBucketEncryption failed"));
 
     const result = await handler(event, mockContext);
 
@@ -177,31 +124,11 @@ describe("CREATE_LOGGING_BUCKET", () => {
   });
 
   it("Should return failure when there is an error applying a policy to the created bucket", async () => {
-    mockAwsEc2.describeRegions.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Regions: [] });
-      },
-    }));
-    mockAwsS3.createBucket.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketEncryption.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketPolicy.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(null, "putBucketPolicy failed"));
-      },
-    }));
+    mockEC2Commands.describeRegions.mockResolvedValue({ Regions: [] });
+    mockS3Commands.createBucket.mockResolvedValue({});
+    mockS3Commands.putBucketVersioning.mockResolvedValue({});
+    mockS3Commands.putBucketEncryption.mockResolvedValue({});
+    mockS3Commands.putBucketPolicy.mockRejectedValue(new CustomResourceError(null, "putBucketPolicy failed"));
 
     const result = await handler(event, mockContext);
 
@@ -230,36 +157,12 @@ describe("CREATE_LOGGING_BUCKET", () => {
   });
 
   it("Should log a failure when there is an error adding a tag to the created bucket", async () => {
-    mockAwsEc2.describeRegions.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Regions: [{ RegionName: "mock-region-1" }] });
-      },
-    }));
-    mockAwsS3.createBucket.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketVersioning.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketEncryption.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketPolicy.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve();
-      },
-    }));
-    mockAwsS3.putBucketTagging.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(null, "putBucketTagging failed"));
-      },
-    }));
+    mockEC2Commands.describeRegions.mockResolvedValue({ Regions: [{ RegionName: "mock-region-1" }] });
+    mockS3Commands.createBucket.mockResolvedValue({});
+    mockS3Commands.putBucketVersioning.mockResolvedValue({});
+    mockS3Commands.putBucketEncryption.mockResolvedValue({});
+    mockS3Commands.putBucketPolicy.mockResolvedValue({});
+    mockS3Commands.putBucketTagging.mockRejectedValue(new CustomResourceError(null, "putBucketTagging failed"));
 
     await handler(event, mockContext);
 

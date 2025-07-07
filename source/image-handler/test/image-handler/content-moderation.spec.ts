@@ -1,18 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockAwsRekognition } from "../mock";
+import { mockRekognitionCommands } from "../mock";
 
-import Rekognition from "aws-sdk/clients/rekognition";
-import S3 from "aws-sdk/clients/s3";
+import { RekognitionClient } from "@aws-sdk/client-rekognition";
+import { S3Client } from "@aws-sdk/client-s3";
 import fs from "fs";
 import sharp from "sharp";
 
 import { ImageHandler } from "../../image-handler";
 import { ImageEdits, ImageHandlerError, StatusCodes } from "../../lib";
 
-const s3Client = new S3();
-const rekognitionClient = new Rekognition();
+const s3Client = new S3Client();
+const rekognitionClient = new RekognitionClient();
 // jest spy
 const blurSpy = jest.spyOn(sharp.prototype, "blur");
 
@@ -32,21 +32,17 @@ describe("contentModeration", () => {
     const edits: ImageEdits = { contentModeration: { minConfidence: 70 } };
 
     // Mock
-    mockAwsRekognition.detectModerationLabels.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          ModerationLabels: [
-            {
-              Confidence: 99.76720428466,
-              Name: "Smoking",
-              ParentName: "Tobacco",
-            },
-            { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
-          ],
-          ModerationModelVersion: "4.0",
-        });
-      },
-    }));
+    mockRekognitionCommands.detectModerationLabels.mockResolvedValue({
+      ModerationLabels: [
+        {
+          Confidence: 99.76720428466,
+          Name: "Smoking",
+          ParentName: "Tobacco",
+        },
+        { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
+      ],
+      ModerationModelVersion: "4.0",
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -54,7 +50,7 @@ describe("contentModeration", () => {
     const expected = image.blur(50);
 
     // Assert
-    expect(mockAwsRekognition.detectModerationLabels).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectModerationLabels).toHaveBeenCalledWith({
       Image: { Bytes: buffer },
       MinConfidence: 70,
     });
@@ -76,21 +72,17 @@ describe("contentModeration", () => {
     };
 
     // Mock
-    mockAwsRekognition.detectModerationLabels.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          ModerationLabels: [
-            {
-              Confidence: 99.76720428466,
-              Name: "Smoking",
-              ParentName: "Tobacco",
-            },
-            { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
-          ],
-          ModerationModelVersion: "4.0",
-        });
-      },
-    }));
+    mockRekognitionCommands.detectModerationLabels.mockResolvedValue({
+      ModerationLabels: [
+        {
+          Confidence: 99.76720428466,
+          Name: "Smoking",
+          ParentName: "Tobacco",
+        },
+        { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
+      ],
+      ModerationModelVersion: "4.0",
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -98,7 +90,7 @@ describe("contentModeration", () => {
     const expected = image.blur(100);
 
     // Assert
-    expect(mockAwsRekognition.detectModerationLabels).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectModerationLabels).toHaveBeenCalledWith({
       Image: { Bytes: buffer },
       MinConfidence: 75,
     });
@@ -119,21 +111,17 @@ describe("contentModeration", () => {
     };
 
     // Mock
-    mockAwsRekognition.detectModerationLabels.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          ModerationLabels: [
-            {
-              Confidence: 99.76720428466,
-              Name: "Smoking",
-              ParentName: "Tobacco",
-            },
-            { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
-          ],
-          ModerationModelVersion: "4.0",
-        });
-      },
-    }));
+    mockRekognitionCommands.detectModerationLabels.mockResolvedValue({
+      ModerationLabels: [
+        {
+          Confidence: 99.76720428466,
+          Name: "Smoking",
+          ParentName: "Tobacco",
+        },
+        { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
+      ],
+      ModerationModelVersion: "4.0",
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -141,7 +129,7 @@ describe("contentModeration", () => {
     const expected = image.blur(50);
 
     // Assert
-    expect(mockAwsRekognition.detectModerationLabels).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectModerationLabels).toHaveBeenCalledWith({
       Image: { Bytes: buffer },
       MinConfidence: 75,
     });
@@ -166,28 +154,24 @@ describe("contentModeration", () => {
     };
 
     // Mock
-    mockAwsRekognition.detectModerationLabels.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          ModerationLabels: [
-            {
-              Confidence: 99.76720428466,
-              Name: "Smoking",
-              ParentName: "Tobacco",
-            },
-            { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
-          ],
-          ModerationModelVersion: "4.0",
-        });
-      },
-    }));
+    mockRekognitionCommands.detectModerationLabels.mockResolvedValueOnce({
+      ModerationLabels: [
+        {
+          Confidence: 99.76720428466,
+          Name: "Smoking",
+          ParentName: "Tobacco",
+        },
+        { Confidence: 99.76720428466, Name: "Tobacco", ParentName: "" },
+      ],
+      ModerationModelVersion: "4.0",
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     const result = await imageHandler.applyEdits(image, edits, false);
 
     // Assert
-    expect(mockAwsRekognition.detectModerationLabels).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectModerationLabels).toHaveBeenCalledWith({
       Image: { Bytes: buffer },
       MinConfidence: 80,
     });
@@ -202,21 +186,17 @@ describe("contentModeration", () => {
     const edits: ImageEdits = { contentModeration: true };
 
     // Mock
-    mockAwsRekognition.detectModerationLabels.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          ModerationLabels: [
-            {
-              Confidence: 99.76720428466,
-              Name: "Fake Name",
-              ParentName: "Fake Parent Name",
-            },
-            { Confidence: 99.76720428466, Name: "Fake Name", ParentName: "" },
-          ],
-          ModerationModelVersion: "5.0",
-        });
-      },
-    }));
+    mockRekognitionCommands.detectModerationLabels.mockResolvedValue({
+      ModerationLabels: [
+        {
+          Confidence: 99.76720428466,
+          Name: "Fake Name",
+          ParentName: "Fake Parent Name",
+        },
+        { Confidence: 99.76720428466, Name: "Fake Name", ParentName: "" },
+      ],
+      ModerationModelVersion: "5.0",
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -224,7 +204,7 @@ describe("contentModeration", () => {
     const expected = await sharp(originalImage, { failOnError: false }).withMetadata().blur(50).toBuffer();
 
     // Assert
-    expect(mockAwsRekognition.detectModerationLabels).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectModerationLabels).toHaveBeenCalledWith({
       Image: { Bytes: buffer },
       MinConfidence: 75,
     });
@@ -244,17 +224,13 @@ describe("contentModeration", () => {
     };
 
     // Mock
-    mockAwsRekognition.detectModerationLabels.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(
-          new ImageHandlerError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "Rekognition::DetectModerationLabelsError",
-            "Rekognition call failed. Please contact the system administrator."
-          )
-        );
-      },
-    }));
+    mockRekognitionCommands.detectModerationLabels.mockRejectedValue(
+      new ImageHandlerError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "Rekognition::DetectModerationLabelsError",
+        "Rekognition call failed. Please contact the system administrator."
+      )
+    );
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -262,7 +238,7 @@ describe("contentModeration", () => {
       await imageHandler.applyEdits(image, edits, false);
     } catch (error) {
       // Assert
-      expect(mockAwsRekognition.detectModerationLabels).toHaveBeenCalledWith({
+      expect(mockRekognitionCommands.detectModerationLabels).toHaveBeenCalledWith({
         Image: { Bytes: buffer },
         MinConfidence: 90,
       });

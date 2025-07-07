@@ -1,16 +1,16 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import Rekognition from "aws-sdk/clients/rekognition";
-import S3 from "aws-sdk/clients/s3";
+import { RekognitionClient } from "@aws-sdk/client-rekognition";
+import { S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 
 import { ImageHandler } from "../../image-handler";
 import { ImageEdits, ImageRequestInfo, RequestTypes } from "../../lib";
 import fs from "fs";
 
-const s3Client = new S3();
-const rekognitionClient = new Rekognition();
+const s3Client = new S3Client();
+const rekognitionClient = new RekognitionClient();
 const image = fs.readFileSync("./test/image/25x15.png");
 const withMetatdataSpy = jest.spyOn(sharp.prototype, "withMetadata");
 
@@ -107,5 +107,19 @@ describe("instantiateSharpImage", () => {
 
     // Assert
     expect(withMetatdataSpy).toHaveBeenCalledWith({ orientation: 1 });
+  });
+
+  it("Should include image metadata when there are no edits in the request", async () => {
+    // Arrange
+    const edits = {};
+    const options = { faiOnError: false };
+    const imageHandler = new ImageHandler(s3Client, rekognitionClient);
+
+    // Act
+    await imageHandler["instantiateSharpImage"](image, edits, options);
+
+    // Assert
+    expect(withMetatdataSpy).toHaveBeenCalled();
+    expect(withMetatdataSpy).toHaveBeenCalledWith();
   });
 });

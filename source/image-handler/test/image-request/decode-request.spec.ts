@@ -1,17 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockAwsS3 } from "../mock";
-import S3 from "aws-sdk/clients/s3";
-import SecretsManager from "aws-sdk/clients/secretsmanager";
+import { mockS3Commands } from "../mock";
+import { S3Client } from "@aws-sdk/client-s3";
+import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 
 import { ImageRequest } from "../../image-request";
 import { ImageHandlerEvent, StatusCodes } from "../../lib";
 import { SecretProvider } from "../../secret-provider";
 
 describe("decodeRequest", () => {
-  const s3Client = new S3();
-  const secretsManager = new SecretsManager();
+  const s3Client = new S3Client();
+  const secretsManager = new SecretsManagerClient();
   const secretProvider = new SecretProvider(secretsManager);
 
   it("Should pass if a valid base64-encoded path has been specified", () => {
@@ -76,12 +76,11 @@ describe("decodeRequest", () => {
     const OLD_ENV = process.env;
 
     beforeEach(() => {
-      jest.resetAllMocks();
+      jest.clearAllMocks();
       process.env = { ...OLD_ENV };
     });
 
     afterEach(() => {
-      jest.clearAllMocks();
       process.env = OLD_ENV;
     });
 
@@ -91,7 +90,11 @@ describe("decodeRequest", () => {
       key: "validKey",
     };
     const path = `/${Buffer.from(JSON.stringify(baseRequest)).toString("base64")}`;
-    const mockBody = Buffer.from("SampleImageContent\n");
+    const mockImage = Buffer.from("SampleImageContent\n");
+    // Mock for SdkStream body
+    const mockImageBody = {
+      transformToByteArray: async () => new Uint8Array(mockImage),
+    };
     it.each([
       {
         expires: "19700101T000000Z",
@@ -144,23 +147,20 @@ describe("decodeRequest", () => {
         path,
       };
       // Mock
-      mockAwsS3.getObject.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({ Body: mockBody });
-        },
-      }));
+      mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
+
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
 
       const imageRequestInfo = await imageRequest.setup(event);
 
       // Assert
-      expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
         Bucket: "validBucket",
         Key: "validKey",
       });
 
-      expect(imageRequestInfo.originalImage).toEqual(mockBody);
+      expect(imageRequestInfo.originalImage).toEqual(mockImage);
     });
 
     it("Should validate request if expires is valid", async () => {
@@ -178,19 +178,16 @@ describe("decodeRequest", () => {
         },
       };
       // Mock
-      mockAwsS3.getObject.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({ Body: mockBody });
-        },
-      }));
+      mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
+
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
       const imageRequestInfo = await imageRequest.setup(event);
-      expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
         Bucket: "validBucket",
         Key: "validKey",
       });
-      expect(imageRequestInfo.originalImage).toEqual(mockBody);
+      expect(imageRequestInfo.originalImage).toEqual(mockImage);
     });
   });
 });

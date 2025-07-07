@@ -132,7 +132,10 @@ export class BackEnd extends Construct {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            return [`cd ${outputDir}`, "rm -rf node_modules/sharp && npm install --arch=x64 --platform=linux sharp"];
+            return [
+              `cd ${outputDir}`,
+              "rm -rf node_modules/sharp && npm install --cpu=x64 --os=linux --libc=glibc sharp", // npm 10.4.0+ --libc=glibc is needed for the platform-specific deps to be installed when cross-compiling sharp from mac to linux
+            ];
           },
         },
       },
@@ -154,6 +157,10 @@ export class BackEnd extends Construct {
       {
         id: "W84",
         reason: "CloudWatch log group is always encrypted by default.",
+      },
+      {
+        id: "W86",
+        reason: "Retention days are configured with property override",
       },
     ]);
 

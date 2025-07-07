@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockAwsS3, mockAwsSecretManager } from "../mock";
+import { mockS3Commands, mockSecretsManagerCommands } from "../mock";
 
-import S3 from "aws-sdk/clients/s3";
-import SecretsManager from "aws-sdk/clients/secretsmanager";
+import { S3Client } from "@aws-sdk/client-s3";
+import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 
 import { ImageRequest } from "../../image-request";
 import { ImageHandlerError, ImageHandlerEvent, RequestTypes, StatusCodes } from "../../lib";
@@ -12,12 +12,23 @@ import { SecretProvider } from "../../secret-provider";
 
 describe("setup", () => {
   const OLD_ENV = process.env;
-  const s3Client = new S3();
-  const secretsManager = new SecretsManager();
+  const s3Client = new S3Client();
+  const secretsManager = new SecretsManagerClient();
   let secretProvider = new SecretProvider(secretsManager);
 
+  const mockImage = Buffer.from("SampleImageContent\n");
+
+  // Mock for SdkStream body
+  const mockImageBody = {
+    transformToByteArray: async () => new Uint8Array(mockImage),
+    transformToString: async (encoding) => mockImage.toString(encoding || "utf-8"),
+  };
+
   beforeEach(() => {
-    jest.resetAllMocks();
+    // reset all mockS3Commands mocks
+    Object.values(mockS3Commands).forEach((mock) => {
+      mock.mockReset();
+    });
     process.env = { ...OLD_ENV };
   });
 
@@ -35,11 +46,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -50,13 +57,13 @@ describe("setup", () => {
       key: "validKey",
       edits: { grayscale: true },
       outputFormat: "jpeg",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/jpeg",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "validBucket",
       Key: "validKey",
     });
@@ -71,11 +78,7 @@ describe("setup", () => {
     process.env = { SOURCE_BUCKETS: "validBucket, validBucket2" };
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -86,12 +89,12 @@ describe("setup", () => {
       key: "中文",
       edits: { grayscale: true },
       outputFormat: "jpeg",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       contentType: "image/jpeg",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "validBucket",
       Key: "中文",
     });
@@ -106,11 +109,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -121,12 +120,12 @@ describe("setup", () => {
       key: "validKey",
       edits: { toFormat: "png" },
       outputFormat: "png",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/png",
     };
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "validBucket",
       Key: "validKey",
     });
@@ -139,11 +138,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "allowedBucket001, allowedBucket002";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -153,13 +148,13 @@ describe("setup", () => {
       bucket: "allowedBucket001",
       key: "test-image-001.jpg",
       edits: { grayscale: true },
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "allowedBucket001",
       Key: "test-image-001.jpg",
     });
@@ -174,11 +169,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "allowedBucket001, allowedBucket002";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -191,14 +182,14 @@ describe("setup", () => {
         toFormat: "png",
         png: { quality: 50 },
       },
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       outputFormat: "png",
       contentType: "image/png",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "allowedBucket001",
       Key: "test-image-001.jpg",
     });
@@ -217,17 +208,13 @@ describe("setup", () => {
     };
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          CacheControl: "max-age=300,public",
-          ContentType: "image/jpeg",
-          Expires: "Tue, 24 Dec 2019 13:46:28 GMT",
-          LastModified: "Sat, 19 Dec 2009 16:30:47 GMT",
-          Body: Buffer.from("SampleImageContent\n"),
-        });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({
+      CacheControl: "max-age=300,public",
+      ContentType: "image/jpeg",
+      Expires: "Tue, 24 Dec 2019 13:46:28 GMT",
+      LastModified: "Sat, 19 Dec 2009 16:30:47 GMT",
+      Body: mockImageBody,
+    });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -240,7 +227,7 @@ describe("setup", () => {
         grayscale: true,
         rotate: 90,
       },
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=300,public",
       contentType: "image/jpeg",
       expires: "Tue, 24 Dec 2019 13:46:28 GMT",
@@ -248,7 +235,7 @@ describe("setup", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "allowedBucket001",
       Key: "custom-image.jpg",
     });
@@ -267,17 +254,13 @@ describe("setup", () => {
     };
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          CacheControl: "max-age=300,public",
-          ContentType: "image/jpeg",
-          Expires: "Tue, 24 Dec 2019 13:46:28 GMT",
-          LastModified: "Sat, 19 Dec 2009 16:30:47 GMT",
-          Body: Buffer.from("SampleImageContent\n"),
-        });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({
+      CacheControl: "max-age=300,public",
+      ContentType: "image/jpeg",
+      Expires: "Tue, 24 Dec 2019 13:46:28 GMT",
+      LastModified: "Sat, 19 Dec 2009 16:30:47 GMT",
+      Body: mockImageBody,
+    });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -290,7 +273,7 @@ describe("setup", () => {
         grayscale: true,
         rotate: 90,
       },
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=300,public",
       contentType: "image/jpeg",
       expires: "Tue, 24 Dec 2019 13:46:28 GMT",
@@ -298,7 +281,7 @@ describe("setup", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "allowedBucket001",
       Key: "custom-image",
     });
@@ -341,20 +324,12 @@ describe("setup", () => {
       };
 
       // Mock
-      mockAwsS3.getObject.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-        },
-      }));
-      mockAwsSecretManager.getSecretValue.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            SecretString: JSON.stringify({
-              [process.env.SECRET_KEY]: "secret",
-            }),
-          });
-        },
-      }));
+      mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
+      mockSecretsManagerCommands.getSecretValue.mockResolvedValue({
+        SecretString: JSON.stringify({
+          [process.env.SECRET_KEY]: "secret",
+        }),
+      });
 
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -365,17 +340,17 @@ describe("setup", () => {
         key: "validKey",
         edits: { toFormat: "png" },
         outputFormat: "png",
-        originalImage: Buffer.from("SampleImageContent\n"),
+        originalImage: mockImage,
         cacheControl: "max-age=31536000,public",
         contentType: "image/png",
       };
 
       // Assert
-      expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
         Bucket: "validBucket",
         Key: "validKey",
       });
-      expect(mockAwsSecretManager.getSecretValue).toHaveBeenCalledWith({
+      expect(mockSecretsManagerCommands.getSecretValue).toHaveBeenCalledWith({
         SecretId: process.env.SECRETS_MANAGER,
       });
       expect(imageRequestInfo).toEqual(expectedResult);
@@ -432,15 +407,11 @@ describe("setup", () => {
       };
 
       // Mock
-      mockAwsSecretManager.getSecretValue.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            SecretString: JSON.stringify({
-              [process.env.SECRET_KEY]: "secret",
-            }),
-          });
-        },
-      }));
+      mockSecretsManagerCommands.getSecretValue.mockResolvedValue({
+        SecretString: JSON.stringify({
+          [process.env.SECRET_KEY]: "secret",
+        }),
+      });
 
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -448,7 +419,7 @@ describe("setup", () => {
         await imageRequest.setup(event);
       } catch (error) {
         // Assert
-        expect(mockAwsSecretManager.getSecretValue).toHaveBeenCalledWith({
+        expect(mockSecretsManagerCommands.getSecretValue).toHaveBeenCalledWith({
           SecretId: process.env.SECRETS_MANAGER,
         });
         expect(error).toMatchObject({
@@ -469,7 +440,7 @@ describe("setup", () => {
       };
 
       // Mock
-      mockAwsSecretManager.getSecretValue.mockImplementationOnce(() => ({
+      mockSecretsManagerCommands.getSecretValue.mockImplementationOnce(() => ({
         promise() {
           return Promise.reject(
             new ImageHandlerError(
@@ -487,7 +458,7 @@ describe("setup", () => {
         await imageRequest.setup(event);
       } catch (error) {
         // Assert
-        expect(mockAwsSecretManager.getSecretValue).toHaveBeenCalledWith({
+        expect(mockSecretsManagerCommands.getSecretValue).toHaveBeenCalledWith({
           SecretId: process.env.SECRETS_MANAGER,
         });
         expect(error).toMatchObject({
@@ -512,14 +483,10 @@ describe("setup", () => {
       };
 
       // Mock
-      mockAwsS3.getObject.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            ContentType: "image/svg+xml",
-            Body: Buffer.from("SampleImageContent\n"),
-          });
-        },
-      }));
+      mockS3Commands.getObject.mockResolvedValue({
+        ContentType: "image/svg+xml",
+        Body: mockImageBody,
+      });
 
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -529,13 +496,13 @@ describe("setup", () => {
         bucket: "validBucket",
         key: "image.svg",
         edits: {},
-        originalImage: Buffer.from("SampleImageContent\n"),
+        originalImage: mockImage,
         cacheControl: "max-age=31536000,public",
         contentType: "image/svg+xml",
       };
 
       // Assert
-      expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
         Bucket: "validBucket",
         Key: "image.svg",
       });
@@ -549,14 +516,10 @@ describe("setup", () => {
       };
 
       // Mock
-      mockAwsS3.getObject.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            ContentType: "image/svg+xml",
-            Body: Buffer.from("SampleImageContent\n"),
-          });
-        },
-      }));
+      mockS3Commands.getObject.mockResolvedValue({
+        ContentType: "image/svg+xml",
+        Body: mockImageBody,
+      });
 
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -567,13 +530,13 @@ describe("setup", () => {
         key: "image.svg",
         edits: { resize: { width: 100, height: 100 } },
         outputFormat: "png",
-        originalImage: Buffer.from("SampleImageContent\n"),
+        originalImage: mockImage,
         cacheControl: "max-age=31536000,public",
         contentType: "image/png",
       };
 
       // Assert
-      expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
         Bucket: "validBucket",
         Key: "image.svg",
       });
@@ -587,14 +550,10 @@ describe("setup", () => {
       };
 
       // Mock
-      mockAwsS3.getObject.mockImplementationOnce(() => ({
-        promise() {
-          return Promise.resolve({
-            ContentType: "image/svg+xml",
-            Body: Buffer.from("SampleImageContent\n"),
-          });
-        },
-      }));
+      mockS3Commands.getObject.mockResolvedValue({
+        ContentType: "image/svg+xml",
+        Body: mockImageBody,
+      });
 
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -605,13 +564,13 @@ describe("setup", () => {
         key: "image.svg",
         edits: { toFormat: "jpeg" },
         outputFormat: "jpeg",
-        originalImage: Buffer.from("SampleImageContent\n"),
+        originalImage: mockImage,
         cacheControl: "max-age=31536000,public",
         contentType: "image/jpeg",
       };
 
       // Assert
-      expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
         Bucket: "validBucket",
         Key: "image.svg",
       });
@@ -627,11 +586,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -642,13 +597,13 @@ describe("setup", () => {
       key: "validKey",
       headers: { "Cache-Control": "max-age=31536000,public" },
       outputFormat: "jpeg",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/jpeg",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "validBucket",
       Key: "validKey",
     });
@@ -662,11 +617,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "test, validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -684,7 +635,7 @@ describe("setup", () => {
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "test",
       Key: "test.png",
     });
@@ -698,11 +649,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "test, validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -714,13 +661,13 @@ describe("setup", () => {
       edits: undefined,
       headers: undefined,
       outputFormat: "webp",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/webp",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "test",
       Key: "test.png",
     });
@@ -734,11 +681,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "test, validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -750,13 +693,13 @@ describe("setup", () => {
       edits: undefined,
       headers: undefined,
       outputFormat: "webp",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/webp",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "test",
       Key: "test.png",
     });
@@ -770,11 +713,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "test, validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -786,13 +725,13 @@ describe("setup", () => {
       edits: undefined,
       headers: undefined,
       outputFormat: "webp",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/webp",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "test",
       Key: "test.png",
     });
@@ -809,11 +748,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "test, validBucket, validBucket2";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -825,13 +760,13 @@ describe("setup", () => {
       edits: { toFormat: "png" },
       headers: undefined,
       outputFormat: "png",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/png",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "test",
       Key: "test.png",
     });
@@ -847,11 +782,8 @@ describe("setup", () => {
       SOURCE_BUCKETS: "test, test2",
     };
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
+
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
     const imageRequestInfo = await imageRequest.setup(event);
@@ -862,12 +794,12 @@ describe("setup", () => {
       edits: { grayscale: true },
       headers: undefined,
       outputFormat: "jpeg",
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       contentType: "image/jpeg",
     };
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: "test", Key: "中文" });
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({ Bucket: "test", Key: "中文" });
     expect(imageRequestInfo).toEqual(expectedResult);
   });
 
@@ -882,11 +814,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "allowedBucket001, allowedBucket002";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -898,14 +826,14 @@ describe("setup", () => {
       edits: {
         toFormat: "png",
       },
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       outputFormat: "png",
       contentType: "image/png",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "allowedBucket001",
       Key: "test-image-001.jpg",
     });
@@ -923,11 +851,7 @@ describe("setup", () => {
     process.env.SOURCE_BUCKETS = "allowedBucket001, allowedBucket002";
 
     // Mock
-    mockAwsS3.getObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
-      },
-    }));
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -939,14 +863,14 @@ describe("setup", () => {
       edits: {
         toFormat: "png",
       },
-      originalImage: Buffer.from("SampleImageContent\n"),
+      originalImage: mockImage,
       cacheControl: "max-age=31536000,public",
       outputFormat: "png",
       contentType: "image/png",
     };
 
     // Assert
-    expect(mockAwsS3.getObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
       Bucket: "allowedBucket001",
       Key: "test-image-001.jpg",
     });

@@ -3,16 +3,16 @@
 
 import { consoleInfoSpy } from "../mock";
 
-import S3 from "aws-sdk/clients/s3";
-import SecretsManager from "aws-sdk/clients/secretsmanager";
+import { S3Client } from "@aws-sdk/client-s3";
+import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 
 import { ImageRequest } from "../../image-request";
 import { RequestTypes, StatusCodes } from "../../lib";
 import { SecretProvider } from "../../secret-provider";
 
 describe("parseRequestType", () => {
-  const s3Client = new S3();
-  const secretsManager = new SecretsManager();
+  const s3Client = new S3Client();
+  const secretsManager = new SecretsManagerClient();
   const secretProvider = new SecretProvider(secretsManager);
   const OLD_ENV = process.env;
 

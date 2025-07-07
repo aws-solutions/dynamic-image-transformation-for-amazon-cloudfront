@@ -1,6 +1,6 @@
 {
   "name": "metrics-utils",
-  "version": "7.0.4",
+  "version": "7.0.5",
   "main": "index.ts",
   "description": "A construct for providing additional anonymous metrics.",
   "license": "Apache-2.0",

@@ -8,5 +8,5 @@ module.exports = {
     'text',
     ['lcov', { 'projectRoot': '../' }]
   ],
-  setupFiles: ['./test/setJestEnvironmentVariables.ts']
+  setupFiles: ['./test/setJestEnvironmentVariables.ts', './test/setupJestMocks.ts']
 };

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockCloudFormation, mockServiceCatalogAppRegistry, mockContext } from "./mock";
+import { mockCloudFormationCommands, mockServiceCatalogAppRegistryCommands, mockContext } from "./mock";
 import { CustomResourceActions, CustomResourceRequestTypes, CustomResourceRequest } from "../lib";
 import { handler } from "../index";
 
@@ -24,32 +24,19 @@ describe("GET_APP_REG_APPLICATION_NAME", () => {
   };
 
   beforeEach(() => {
-    jest.resetAllMocks();
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   it("Should return default application name when application name could not be retrieved", async () => {
-    mockCloudFormation.describeStackResources.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve({
-          StackResources: [
-            {
-              LogicalResourceId: "SourceBucketA",
-              PhysicalResourceId: "bucket-a",
-            },
-          ],
-        });
-      },
-    }));
-
-    mockServiceCatalogAppRegistry.getApplication.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve({});
-      },
-    }));
+    mockCloudFormationCommands.describeStackResources.mockResolvedValue({
+      StackResources: [
+        {
+          LogicalResourceId: "SourceBucketA",
+          PhysicalResourceId: "bucket-a",
+        },
+      ],
+    });
+    mockServiceCatalogAppRegistryCommands.getApplication.mockResolvedValue({});
 
     const result = await handler(event, mockContext);
     expect(result).toEqual({
@@ -59,19 +46,10 @@ describe("GET_APP_REG_APPLICATION_NAME", () => {
   });
 
   it("Should return default application name when application does not yet exist in the stack", async () => {
-    mockCloudFormation.describeStackResources.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve({
-          StackResources: [],
-        });
-      },
-    }));
-
-    mockServiceCatalogAppRegistry.getApplication.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve({});
-      },
-    }));
+    mockCloudFormationCommands.describeStackResources.mockResolvedValue({
+      StackResources: [],
+    });
+    mockServiceCatalogAppRegistryCommands.getApplication.mockResolvedValue({});
 
     const result = await handler(event, mockContext);
     expect(result).toEqual({
@@ -82,27 +60,18 @@ describe("GET_APP_REG_APPLICATION_NAME", () => {
 
   it("Should return application name when available", async () => {
     const applicationName = "SIHApplication";
-    mockCloudFormation.describeStackResources.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve({
-          StackResources: [
-            {
-              LogicalResourceId: "SourceBucketA",
-              PhysicalResourceId: "bucket-a",
-            },
-          ],
-        });
-      },
-    }));
+    mockCloudFormationCommands.describeStackResources.mockResolvedValue({
+      StackResources: [
+        {
+          LogicalResourceId: "SourceBucketA",
+          PhysicalResourceId: "bucket-a",
+        },
+      ],
+    });
 
-    mockServiceCatalogAppRegistry.getApplication.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve({
-          name: applicationName,
-        });
-      },
-    }));
-
+    mockServiceCatalogAppRegistryCommands.getApplication.mockResolvedValue({
+      name: applicationName,
+    });
     const result = await handler(event, mockContext);
     expect(result).toEqual({
       Status: "SUCCESS",

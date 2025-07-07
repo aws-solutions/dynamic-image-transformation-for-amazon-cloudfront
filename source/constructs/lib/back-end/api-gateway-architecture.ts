@@ -161,6 +161,26 @@ export class ApiGatewayArchitecture {
           "AWS::ApiGateway::Method AuthorizationType is set to 'NONE' because API Gateway behind CloudFront does not support AWS_IAM authentication",
       },
     ]);
+    addCfnSuppressRules(imageHandlerCloudFrontApiGatewayLambda.apiGateway.deploymentStage, [
+      {
+        id: "W87",
+        reason: "Cache not enabled, using CloudFront for caching viewer response",
+      },
+    ]);
+    addCfnSuppressRules(imageHandlerCloudFrontApiGatewayLambda.apiGatewayCloudWatchRole, [
+      {
+        id: "F10",
+        reason: "Inline policy used in solutions construct",
+      },
+    ]);
+    imageHandlerCloudFrontApiGatewayLambda.apiGateway.methods.forEach((method) => {
+      addCfnSuppressRules(method, [
+        {
+          id: "W59",
+          reason: "No authorization currently on the API Gateway",
+        },
+      ]);
+    });
 
     imageHandlerCloudFrontApiGatewayLambda.apiGateway.node.tryRemoveChild("Endpoint"); // we don't need the RestApi endpoint in the outputs
     scope.domainName = Fn.conditionIf(

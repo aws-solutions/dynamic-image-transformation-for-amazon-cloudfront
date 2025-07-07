@@ -38,10 +38,6 @@ describe("SEND_ANONYMOUS_METRIC", () => {
   };
 
   beforeEach(() => {
-    jest.resetAllMocks();
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 

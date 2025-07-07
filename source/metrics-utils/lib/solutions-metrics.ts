@@ -50,6 +50,19 @@ export class SolutionsMetrics extends Construct {
       },
     });
 
+    (this.metricsLambdaFunction.node.defaultChild as CfnResource).addMetadata("cfn_nag", {
+      rules_to_suppress: [
+        {
+          id: "W89",
+          reason: "Not in vpc",
+        },
+        {
+          id: "W92",
+          reason: "No need for ReservedConcurrentExecutions, does not support any application functional logic",
+        },
+      ],
+    });
+
     const ruleToLambda = new EventbridgeToLambda(this, "EventbridgeRuleToLambda", {
       eventRuleProps: {
         schedule: Schedule.cron({

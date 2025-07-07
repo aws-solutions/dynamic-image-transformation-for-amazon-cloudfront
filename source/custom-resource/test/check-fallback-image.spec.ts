@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockAwsS3, mockContext } from "./mock";
+import { mockS3Commands, mockContext } from "./mock";
 import {
   CheckFallbackImageRequestProperties,
   CustomResourceActions,
@@ -37,25 +37,17 @@ describe("CHECK_FALLBACK_IMAGE", () => {
   };
 
   beforeEach(() => {
-    jest.resetAllMocks();
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   it("Should return success when the default fallback image exists", async () => {
-    mockAwsS3.headObject.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve(head);
-      },
-    }));
+    mockS3Commands.headObject.mockResolvedValue(head);
 
     const result = await handler(event, mockContext);
 
     expect.assertions(2);
 
-    expect(mockAwsS3.headObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.headObject).toHaveBeenCalledWith({
       Bucket: "fallback-image-bucket",
       Key: "fallback-image.jpg",
     });
@@ -107,18 +99,14 @@ describe("CHECK_FALLBACK_IMAGE", () => {
   });
 
   it("Should return failed when the default fallback image does not exist", async () => {
-    mockAwsS3.headObject.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError("NotFound", null));
-      },
-    }));
+    mockS3Commands.headObject.mockRejectedValue(new CustomResourceError("NotFound", null));
     (event.ResourceProperties as CheckFallbackImageRequestProperties).FallbackImageS3Key = "fallback-image.jpg";
 
     const result = await handler(event, mockContext);
 
     expect.assertions(2);
 
-    expect(mockAwsS3.headObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.headObject).toHaveBeenCalledWith({
       Bucket: "fallback-image-bucket",
       Key: "fallback-image.jpg",
     });
@@ -134,27 +122,15 @@ describe("CHECK_FALLBACK_IMAGE", () => {
   });
 
   it("Should retry and return success when IAM policy is not ready so S3 API returns AccessDenied or Forbidden", async () => {
-    mockAwsS3.headObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(ErrorCodes.ACCESS_DENIED, null));
-      },
-    }));
-    mockAwsS3.headObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError(ErrorCodes.FORBIDDEN, null));
-      },
-    }));
-    mockAwsS3.headObject.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve(head);
-      },
-    }));
+    mockS3Commands.headObject.mockRejectedValue(new CustomResourceError(ErrorCodes.ACCESS_DENIED, null));
+    mockS3Commands.headObject.mockRejectedValue(new CustomResourceError(ErrorCodes.FORBIDDEN, null));
+    mockS3Commands.headObject.mockResolvedValue(head);
 
     const result = await handler(event, mockContext);
 
     expect.assertions(2);
 
-    expect(mockAwsS3.headObject).toHaveBeenCalledWith({
+    expect(mockS3Commands.headObject).toHaveBeenCalledWith({
       Bucket: "fallback-image-bucket",
       Key: "fallback-image.jpg",
     });

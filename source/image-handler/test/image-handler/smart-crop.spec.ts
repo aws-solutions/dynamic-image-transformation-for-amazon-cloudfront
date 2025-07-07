@@ -1,19 +1,23 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockAwsRekognition } from "../mock";
+import { mockRekognitionCommands } from "../mock";
 
-import Rekognition from "aws-sdk/clients/rekognition";
-import S3 from "aws-sdk/clients/s3";
+import { RekognitionClient } from "@aws-sdk/client-rekognition";
+import { S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 
 import { ImageHandler } from "../../image-handler";
 import { BoundingBox, BoxSize, ImageEdits, ImageHandlerError, StatusCodes } from "../../lib";
 
-const s3Client = new S3();
-const rekognitionClient = new Rekognition();
+const s3Client = new S3Client();
+const rekognitionClient = new RekognitionClient();
 
 describe("smartCrop", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("Should pass if an edit with the smartCrop keyname is passed to the function", async () => {
     // Arrange
     const originalImage = Buffer.from(
@@ -25,24 +29,20 @@ describe("smartCrop", () => {
     const edits: ImageEdits = { smartCrop: { faceIndex: 0, padding: 0 } };
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          FaceDetails: [
-            {
-              BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
-            },
-          ],
-        });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({
+      FaceDetails: [
+        {
+          BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
+        },
+      ],
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     const result = await imageHandler.applyEdits(image, edits, false);
 
     // Assert
-    expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
       Image: { Bytes: buffer },
     });
     expect(result["options"].input).not.toEqual(originalImage);
@@ -61,24 +61,22 @@ describe("smartCrop", () => {
     };
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          FaceDetails: [
-            {
-              BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
-            },
-          ],
-        });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({
+      FaceDetails: [
+        {
+          BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
+        },
+      ],
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     await imageHandler.applyEdits(image, edits, false);
 
     // Rekognition should have been called with a png image, regardless of the toFormat edit
-    expect((await sharp(mockAwsRekognition.detectFaces.mock.calls[0][0].Image.Bytes).metadata()).format).toEqual("png");
+    expect((await sharp(mockRekognitionCommands.detectFaces.mock.calls[0][0].Image.Bytes).metadata()).format).toEqual(
+      "png"
+    );
   });
 
   it("Should pass if an excessive padding value is passed to the smartCrop filter", async () => {
@@ -92,17 +90,13 @@ describe("smartCrop", () => {
     const edits: ImageEdits = { smartCrop: { faceIndex: 0, padding: 80 } };
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          FaceDetails: [
-            {
-              BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
-            },
-          ],
-        });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({
+      FaceDetails: [
+        {
+          BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
+        },
+      ],
+    });
 
     // Act
     try {
@@ -110,7 +104,7 @@ describe("smartCrop", () => {
       await imageHandler.applyEdits(image, edits, false);
     } catch (error) {
       // Assert
-      expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+      expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
         Image: { Bytes: buffer },
       });
       expect(error).toMatchObject({
@@ -133,17 +127,13 @@ describe("smartCrop", () => {
     const edits: ImageEdits = { smartCrop: { faceIndex: 10, padding: 0 } };
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          FaceDetails: [
-            {
-              BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
-            },
-          ],
-        });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({
+      FaceDetails: [
+        {
+          BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
+        },
+      ],
+    });
 
     // Act
     try {
@@ -151,7 +141,7 @@ describe("smartCrop", () => {
       await imageHandler.applyEdits(image, edits, false);
     } catch (error) {
       // Assert
-      expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+      expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
         Image: { Bytes: buffer },
       });
       expect(error).toMatchObject({
@@ -174,24 +164,20 @@ describe("smartCrop", () => {
     const edits: ImageEdits = { smartCrop: true };
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          FaceDetails: [
-            {
-              BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
-            },
-          ],
-        });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({
+      FaceDetails: [
+        {
+          BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
+        },
+      ],
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     const result = await imageHandler.applyEdits(image, edits, false);
 
     // Assert
-    expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
       Image: { Bytes: buffer },
     });
     expect(result["options"].input).not.toEqual(originalImage); // eslint-disable-line dot-notation
@@ -251,17 +237,13 @@ describe("smartCrop", () => {
     const faceIndex = 0;
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          FaceDetails: [
-            {
-              BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
-            },
-          ],
-        });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({
+      FaceDetails: [
+        {
+          BoundingBox: { Height: 0.18, Left: 0.55, Top: 0.33, Width: 0.23 },
+        },
+      ],
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -274,7 +256,7 @@ describe("smartCrop", () => {
       top: 0.33,
       width: 0.23,
     };
-    expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
       Image: { Bytes: currentImage },
     });
     expect(result).toEqual(expectedResult);
@@ -286,17 +268,13 @@ describe("smartCrop", () => {
     const faceIndex = 0;
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.reject(
-          new ImageHandlerError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "SmartCrop::Error",
-            "Smart Crop could not be applied. Please contact the system administrator."
-          )
-        );
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockRejectedValue(
+      new ImageHandlerError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "SmartCrop::Error",
+        "Smart Crop could not be applied. Please contact the system administrator."
+      )
+    );
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -304,7 +282,7 @@ describe("smartCrop", () => {
       await imageHandler.getBoundingBox(currentImage, faceIndex);
     } catch (error) {
       // Assert
-      expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+      expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
         Image: { Bytes: currentImage },
       });
       expect(error).toMatchObject({
@@ -321,11 +299,7 @@ describe("smartCrop", () => {
     const faceIndex = 0;
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({ FaceDetails: [] });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({ FaceDetails: [] });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -338,7 +312,7 @@ describe("smartCrop", () => {
       top: 0,
       width: 1,
     };
-    expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
       Image: { Bytes: currentImage },
     });
     expect(result).toEqual(expectedResult);
@@ -350,17 +324,13 @@ describe("smartCrop", () => {
     const faceIndex = 0;
 
     // Mock
-    mockAwsRekognition.detectFaces.mockImplementationOnce(() => ({
-      promise() {
-        return Promise.resolve({
-          FaceDetails: [
-            {
-              BoundingBox: { Height: 1, Left: 0.5, Top: 0.3, Width: 0.65 },
-            },
-          ],
-        });
-      },
-    }));
+    mockRekognitionCommands.detectFaces.mockResolvedValue({
+      FaceDetails: [
+        {
+          BoundingBox: { Height: 1, Left: 0.5, Top: 0.3, Width: 0.65 },
+        },
+      ],
+    });
 
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
@@ -373,7 +343,7 @@ describe("smartCrop", () => {
       top: 0.3,
       width: 0.5,
     };
-    expect(mockAwsRekognition.detectFaces).toHaveBeenCalledWith({
+    expect(mockRekognitionCommands.detectFaces).toHaveBeenCalledWith({
       Image: { Bytes: currentImage },
     });
     expect(result).toEqual(expectedResult);

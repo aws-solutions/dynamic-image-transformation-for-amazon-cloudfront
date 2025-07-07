@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mockAwsSecretManager, mockContext } from "./mock";
+import { mockSecretsManagerCommands, mockContext } from "./mock";
 import {
   CustomResourceActions,
   CustomResourceRequestTypes,
@@ -34,20 +34,11 @@ describe("CHECK_SECRETS_MANAGER", () => {
   };
 
   beforeEach(() => {
-    jest.resetAllMocks();
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   it("Should return success when secrets manager secret and secret's key exists", async () => {
-    mockAwsSecretManager.getSecretValue.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve(secret);
-      },
-    }));
-
+    mockSecretsManagerCommands.getSecretValue.mockResolvedValue(secret);
     const result = await handler(event, mockContext);
 
     expect.assertions(1);
@@ -100,11 +91,7 @@ describe("CHECK_SECRETS_MANAGER", () => {
   });
 
   it("Should return failed when secret key does not exist", async () => {
-    mockAwsSecretManager.getSecretValue.mockImplementation(() => ({
-      promise() {
-        return Promise.resolve(secret);
-      },
-    }));
+    mockSecretsManagerCommands.getSecretValue.mockResolvedValue(secret);
 
     const resourceProperties = event.ResourceProperties as CheckSecretManagerRequestProperties;
     resourceProperties.SecretsManagerKey = "none-existing-key";
@@ -125,11 +112,10 @@ describe("CHECK_SECRETS_MANAGER", () => {
   });
 
   it("Should return failed when GetSecretValue fails", async () => {
-    mockAwsSecretManager.getSecretValue.mockImplementation(() => ({
-      promise() {
-        return Promise.reject(new CustomResourceError("InternalServerError", "GetSecretValue failed."));
-      },
-    }));
+    mockSecretsManagerCommands.getSecretValue.mockRejectedValue(
+      new CustomResourceError("InternalServerError", "GetSecretValue failed.")
+    );
+
     (event.ResourceProperties as CheckSecretManagerRequestProperties).SecretsManagerName = "secrets-manager-key";
 
     const result = await handler(event, mockContext);
