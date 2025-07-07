@@ -719,6 +719,7 @@ detect-libc under the Apache-2.0 license.
 @smithy/hash-stream-node under the Apache-2.0 license.
 @aws-sdk/client-secrets-manager under the Apache-2.0 license.
 @aws-sdk/client-service-catalog-appregistry under the Apache-2.0 license.
+@aws-sdk/client-rekognition under the Apache-2.0 license.
 moment under the MIT license.
 metrics-utils under the Apache-2.0 license.
 @aws-cdk/aws-servicecatalogappregistry-alpha under the Apache-2.0 license.
