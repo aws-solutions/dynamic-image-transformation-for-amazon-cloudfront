@@ -1,6 +1,6 @@
 {
   "name": "constructs",
-  "version": "7.0.5",
+  "version": "7.0.6",
   "description": "Dynamic Image Transformation for Amazon CloudFront Constructs",
   "license": "Apache-2.0",
   "author": {

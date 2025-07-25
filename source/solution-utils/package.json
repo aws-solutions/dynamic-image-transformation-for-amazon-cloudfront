@@ -1,6 +1,6 @@
 {
   "name": "solution-utils",
-  "version": "7.0.5",
+  "version": "7.0.6",
   "private": true,
   "description": "Utilities to be used within this solution",
   "license": "Apache-2.0",
