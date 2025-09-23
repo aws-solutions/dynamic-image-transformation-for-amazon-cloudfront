@@ -73,6 +73,7 @@ export class ImageRequest {
         ImageFormatTypes.JPEG,
         ImageFormatTypes.PNG,
         ImageFormatTypes.WEBP,
+        ImageFormatTypes.TIF,
         ImageFormatTypes.TIFF,
         ImageFormatTypes.HEIF,
         ImageFormatTypes.GIF,
