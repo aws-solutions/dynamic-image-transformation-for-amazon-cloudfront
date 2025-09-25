@@ -26,6 +26,33 @@ import { QueryParamMapper } from "./query-param-mapper";
 dayjs.extend(customParseFormat);
 dayjs.extend(utc);
 
+/**
+ * Maps image format types to their correct MIME types
+ * @param format The image format type
+ * @returns The correct MIME type for the format
+ */
+function getContentTypeFromFormat(format: ImageFormatTypes): string {
+  switch (format) {
+    case ImageFormatTypes.TIF:
+      return ContentTypes.TIFF;
+    case ImageFormatTypes.TIFF:
+      return ContentTypes.TIFF;
+    case ImageFormatTypes.JPG:
+    case ImageFormatTypes.JPEG:
+      return ContentTypes.JPEG;
+    case ImageFormatTypes.PNG:
+      return ContentTypes.PNG;
+    case ImageFormatTypes.WEBP:
+      return ContentTypes.WEBP;
+    case ImageFormatTypes.GIF:
+      return ContentTypes.GIF;
+    case ImageFormatTypes.AVIF:
+      return ContentTypes.AVIF;
+    default:
+      return `image/${format}`;
+  }
+}
+
 type OriginalImageInfo = Partial<{
   contentType: string;
   expires: string;
@@ -80,7 +107,7 @@ export class ImageRequest {
         ImageFormatTypes.AVIF,
       ];
 
-      imageRequestInfo.contentType = `image/${imageRequestInfo.outputFormat}`;
+      imageRequestInfo.contentType = getContentTypeFromFormat(imageRequestInfo.outputFormat);
       if (
         requestType.includes(imageRequestInfo.requestType) &&
         acceptedValues.includes(imageRequestInfo.outputFormat)
