@@ -26,6 +26,7 @@ import { QueryParamMapper } from "./query-param-mapper";
 dayjs.extend(customParseFormat);
 dayjs.extend(utc);
 
+
 type OriginalImageInfo = Partial<{
   contentType: string;
   expires: string;
@@ -73,13 +74,16 @@ export class ImageRequest {
         ImageFormatTypes.JPEG,
         ImageFormatTypes.PNG,
         ImageFormatTypes.WEBP,
+        ImageFormatTypes.TIF,
         ImageFormatTypes.TIFF,
         ImageFormatTypes.HEIF,
         ImageFormatTypes.GIF,
         ImageFormatTypes.AVIF,
       ];
 
-      imageRequestInfo.contentType = `image/${imageRequestInfo.outputFormat}`;
+      imageRequestInfo.contentType = imageRequestInfo.outputFormat === ImageFormatTypes.TIF
+        ? ContentTypes.TIFF
+        : `image/${imageRequestInfo.outputFormat}`;
       if (
         requestType.includes(imageRequestInfo.requestType) &&
         acceptedValues.includes(imageRequestInfo.outputFormat)
