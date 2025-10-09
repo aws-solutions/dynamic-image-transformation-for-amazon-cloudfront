@@ -728,6 +728,8 @@ export class ImageHandler {
         return "png";
       case ImageFormatTypes.WEBP:
         return "webp";
+      case ImageFormatTypes.TIF:
+        return "tiff";
       case ImageFormatTypes.TIFF:
         return "tiff";
       case ImageFormatTypes.HEIF:

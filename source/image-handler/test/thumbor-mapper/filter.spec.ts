@@ -274,6 +274,20 @@ describe("filter", () => {
     expect(edits).toEqual(expectedResult);
   });
 
+  it("Should pass if the filter is successfully translated from Thumbor:quality() for TIF", () => {
+    // Arrange
+    const edit = "filters:quality(50)";
+    const filetype = ImageFormatTypes.TIF;
+
+    // Act
+    const thumborMapper = new ThumborMapper();
+    const edits = thumborMapper.mapFilter(edit, filetype);
+
+    // Assert
+    const expectedResult = { tiff: { quality: 50 } };
+    expect(edits).toEqual(expectedResult);
+  });
+
   it("Should pass if the filter is successfully translated from Thumbor:quality()", () => {
     // Arrange
     const edit = "filters:quality(50)";
