@@ -166,6 +166,26 @@ async function handleRequest(event: ImageHandlerEvent): Promise<ImageHandlerExec
       }
     }
 
+    try {
+      const { bucket, key } = await imageRequest.setup(event);
+
+      const headers: Headers = {
+        Location: `https://${bucket}.s3-us-west-1.amazonaws.com/${key}`,
+      };
+
+      return {
+        statusCode: StatusCodes.MOVED_PERMANENTLY,
+        isBase64Encoded: false,
+        headers,
+        body: "",
+      };
+    } catch (error) {
+      console.error(
+        "Error occurred while getting the default fallback image.",
+        error
+      );
+    }
+
     const { statusCode, body } = getErrorResponse(error);
     return {
       statusCode,
