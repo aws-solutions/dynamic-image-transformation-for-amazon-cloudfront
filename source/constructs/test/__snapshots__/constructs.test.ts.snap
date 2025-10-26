@@ -287,7 +287,7 @@ exports[`Dynamic Image Transformation for Amazon CloudFront Stack Snapshot 1`] =
           "default": "Enable Default Fallback Image",
         },
         "EnableS3ObjectLambdaParameter": {
-          "default": "Enable S3 Object Lambda",
+          "default": "Enable S3 Object Lambda (DEPRECATED)",
         },
         "EnableSignatureParameter": {
           "default": "Enable Signature",
@@ -522,7 +522,7 @@ exports[`Dynamic Image Transformation for Amazon CloudFront Stack Snapshot 1`] =
         "No",
       ],
       "Default": "No",
-      "Description": "Enable S3 Object Lambda to improve the maximum response size of image requests beyond 6 MB. If enabled, an S3 Object Lambda Access Point will replace the API Gateway proxying requests to your image handler function. **Important: Modifying this value after initial template deployment will delete the existing CloudFront Distribution and create a new one, providing a new domain name and clearing the cache**",
+      "Description": "Deprecated: This option has been deprecated. Amazon S3 Object Lambda will no longer be open to new customers starting on November 7, 2025. If you were not an existing user of S3 Object Lambda before November 7, 2025, select 'No'. For more information, please visit https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html. **Important: Modifying this value after initial template deployment will delete the existing CloudFront Distribution and create a new one, providing a new domain name and clearing the cache**.",
       "Type": "String",
     },
     "EnableSignatureParameter": {

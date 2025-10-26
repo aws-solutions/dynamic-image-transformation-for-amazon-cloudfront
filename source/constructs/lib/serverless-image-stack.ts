@@ -167,10 +167,21 @@ export class ServerlessImageHandlerStack extends Stack {
     const enableS3ObjectLambdaParameter = new CfnParameter(this, "EnableS3ObjectLambdaParameter", {
       type: "String",
       description:
-        "Enable S3 Object Lambda to improve the maximum response size of image requests beyond 6 MB. If enabled, an S3 Object Lambda Access Point will replace the API Gateway proxying requests to your image handler function. **Important: Modifying this value after initial template deployment will delete the existing CloudFront Distribution and create a new one, providing a new domain name and clearing the cache**",
+        "Deprecated: This option has been deprecated. Amazon S3 Object Lambda will no longer be open to new customers starting on November 7, 2025. If you were not an existing user of S3 Object Lambda before November 7, 2025, select 'No'. For more information, please visit https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html. **Important: Modifying this value after initial template deployment will delete the existing CloudFront Distribution and create a new one, providing a new domain name and clearing the cache**.",
       allowedValues: ["Yes", "No"],
       default: "No",
     });
+
+   
+    console.warn("\n" + "=".repeat(80));
+    console.warn("⚠️  S3 Object Lambda Feature Deprecation Notice");
+    console.warn("=".repeat(80));
+    console.warn("The EnableS3ObjectLambdaParameter has been DEPRECATED.");
+    console.warn("");
+    console.warn("❌ For NEW deployments: Do NOT set EnableS3ObjectLambdaParameter=Yes");
+    console.warn("✅ For EXISTING deployments: You can continue using this feature");
+    console.warn("📋 Default value is 'No' - recommended for all new deployments");
+    console.warn("=".repeat(80) + "\n");
 
     const useExistingCloudFrontDistribution = new CfnParameter(this, "UseExistingCloudFrontDistributionParameter", {
       type: "String",
@@ -377,7 +388,7 @@ export class ServerlessImageHandlerStack extends Stack {
         ],
         ParameterLabels: {
           [enableS3ObjectLambdaParameter.logicalId]: {
-            default: "Enable S3 Object Lambda",
+            default: "Enable S3 Object Lambda (DEPRECATED)",
           },
           [corsEnabledParameter.logicalId]: { default: "CORS Enabled" },
           [corsOriginParameter.logicalId]: { default: "CORS Origin" },
