@@ -26,6 +26,11 @@ demo-ui-config.js
 .temp_redpencil
 bom.json
 
+# deployment environment files (keep .env.example)
+.env.dev
+.env.prod
+.env.staging
+
 # System Files
 **/.DS_Store
 **/.vscode
