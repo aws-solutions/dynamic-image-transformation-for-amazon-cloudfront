@@ -62,6 +62,8 @@ Environment Variables (optional):
     SOURCE_BUCKETS              Comma-separated list of S3 bucket names
     DEPLOY_DEMO_UI              Yes/No - Deploy demo UI (default: No)
     ENABLE_S3_OBJECT_LAMBDA     Yes/No - Enable S3 Object Lambda (default: No)
+    ENABLE_SIGNED_URLS          Yes/No - Enable CloudFront signed URLs (default: No)
+    TRUSTED_KEY_GROUP_IDS       Comma-separated CloudFront key group IDs (required if ENABLE_SIGNED_URLS=Yes)
 
 Examples:
     $0                               # Deploy to dev (default)
@@ -192,6 +194,21 @@ fi
 if [ -n "$ENABLE_S3_OBJECT_LAMBDA" ]; then
     CDK_PARAMS="$CDK_PARAMS --parameters EnableS3ObjectLambdaParameter=$ENABLE_S3_OBJECT_LAMBDA"
     print_info "Using ENABLE_S3_OBJECT_LAMBDA: $ENABLE_S3_OBJECT_LAMBDA"
+fi
+
+if [ -n "$ENABLE_SIGNED_URLS" ]; then
+    CDK_PARAMS="$CDK_PARAMS --parameters EnableSignedUrlsParameter=$ENABLE_SIGNED_URLS"
+    print_info "Using ENABLE_SIGNED_URLS: $ENABLE_SIGNED_URLS"
+
+    if [ "$ENABLE_SIGNED_URLS" = "Yes" ] && [ -z "$TRUSTED_KEY_GROUP_IDS" ]; then
+        print_error "TRUSTED_KEY_GROUP_IDS is required when ENABLE_SIGNED_URLS is set to Yes"
+        exit 1
+    fi
+fi
+
+if [ -n "$TRUSTED_KEY_GROUP_IDS" ]; then
+    CDK_PARAMS="$CDK_PARAMS --parameters TrustedKeyGroupIdsParameter=$TRUSTED_KEY_GROUP_IDS"
+    print_info "Using TRUSTED_KEY_GROUP_IDS: $TRUSTED_KEY_GROUP_IDS"
 fi
 
 echo ""

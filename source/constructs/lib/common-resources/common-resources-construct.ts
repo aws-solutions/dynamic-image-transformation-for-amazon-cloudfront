@@ -26,6 +26,7 @@ export interface Conditions {
   readonly disableS3ObjectLambdaCondition: CfnCondition;
   readonly isLogRetentionPeriodInfinite: CfnCondition;
   readonly useExistingCloudFrontDistributionCondition: CfnCondition;
+  readonly enableSignedUrlsCondition: CfnCondition;
 }
 
 /**
@@ -70,6 +71,9 @@ export class CommonResources extends Construct {
       }),
       useExistingCloudFrontDistributionCondition: new CfnCondition(this, "UseExistingCloudFrontDistributionCondition", {
         expression: Fn.conditionEquals(props.useExistingCloudFrontDistribution, "Yes"),
+      }),
+      enableSignedUrlsCondition: new CfnCondition(this, "EnableSignedUrlsCondition", {
+        expression: Fn.conditionEquals(props.enableSignedUrls, "Yes"),
       }),
     };
 
