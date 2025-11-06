@@ -64,6 +64,8 @@ Environment Variables (optional):
     ENABLE_S3_OBJECT_LAMBDA     Yes/No - Enable S3 Object Lambda (default: No)
     ENABLE_SIGNED_URLS          Yes/No - Enable CloudFront signed URLs (default: No)
     TRUSTED_KEY_GROUP_IDS       Comma-separated CloudFront key group IDs (required if ENABLE_SIGNED_URLS=Yes)
+    CORS_ENABLED                Yes/No - Enable CORS for cross-origin requests (default: No)
+    CORS_ORIGIN                 Allowed origin (* for any, or specific domain like https://example.com)
 
 Examples:
     $0                               # Deploy to dev (default)
@@ -209,6 +211,16 @@ fi
 if [ -n "$TRUSTED_KEY_GROUP_IDS" ]; then
     CDK_PARAMS="$CDK_PARAMS --parameters TrustedKeyGroupIdsParameter=$TRUSTED_KEY_GROUP_IDS"
     print_info "Using TRUSTED_KEY_GROUP_IDS: $TRUSTED_KEY_GROUP_IDS"
+fi
+
+if [ -n "$CORS_ENABLED" ]; then
+    CDK_PARAMS="$CDK_PARAMS --parameters CorsEnabledParameter=$CORS_ENABLED"
+    print_info "Using CORS_ENABLED: $CORS_ENABLED"
+fi
+
+if [ -n "$CORS_ORIGIN" ]; then
+    CDK_PARAMS="$CDK_PARAMS --parameters CorsOriginParameter=$CORS_ORIGIN"
+    print_info "Using CORS_ORIGIN: $CORS_ORIGIN"
 fi
 
 echo ""
