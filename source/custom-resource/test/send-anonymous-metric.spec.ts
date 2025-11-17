@@ -34,7 +34,6 @@ describe("SEND_ANONYMOUS_METRIC", () => {
       SourceBuckets: "bucket-1, bucket-2, bucket-3",
       EnableS3ObjectLambda: "Yes",
       OriginShieldRegion: "Disabled",
-      UseExistingCloudFrontDistribution: "No"
     },
   };
 
@@ -68,8 +67,6 @@ describe("SEND_ANONYMOUS_METRIC", () => {
           TimeStamp: mockISOTimeStamp,
           UUID: "mock-uuid",
           Version: "solution-version",
-          AccountId: undefined,
-          StackId: "mock-stack-id",
           Data: {
             Region: "mock-region-1",
             Type: "Create",
@@ -82,7 +79,6 @@ describe("SEND_ANONYMOUS_METRIC", () => {
             NumberOfSourceBuckets: 3,
             EnableS3ObjectLambda: "Yes",
             OriginShieldRegion: "Disabled",
-            UseExistingCloudFrontDistribution: "No"
           },
         },
       },
@@ -116,8 +112,6 @@ describe("SEND_ANONYMOUS_METRIC", () => {
           TimeStamp: mockISOTimeStamp,
           UUID: "mock-uuid",
           Version: "solution-version",
-          StackId: "mock-stack-id",
-          AccountId: undefined,
           Data: {
             Region: "mock-region-1",
             Type: "Create",
@@ -130,7 +124,6 @@ describe("SEND_ANONYMOUS_METRIC", () => {
             NumberOfSourceBuckets: 3,
             EnableS3ObjectLambda: "Yes",
             OriginShieldRegion: "Disabled",
-            UseExistingCloudFrontDistribution: "No"
           },
         },
       },

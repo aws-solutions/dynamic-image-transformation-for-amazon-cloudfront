@@ -13,7 +13,6 @@ export async function handler(cdkAssetFolderPath: string | undefined, outputPath
     await assetPackager.createAssetZip(path);
   }
   await assetPackager.moveZips(outputPath);
-  await assetPackager.moveJsons(outputPath);
 }
 
 if (require.main === module) {

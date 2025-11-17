@@ -28,13 +28,9 @@ export async function handler(event: EventBridgeQueryEvent | SQSEvent, _context:
 
     const endTime = new Date(event.time);
     const metricsData = await metricsHelper.getMetricsData(event);
-    
-    const configMetrics = await metricsHelper.scanConfigTable();
-    const combinedMetrics = { ...metricsData, ...configMetrics };
-    
-    console.info("Metrics data: ", JSON.stringify(combinedMetrics, null, 2));
+    console.info("Metrics data: ", JSON.stringify(metricsData, null, 2));
     await metricsHelper.sendAnonymousMetric(
-      combinedMetrics,
+      metricsData,
       new Date(endTime.getTime() - (EXECUTION_DAY === ExecutionDay.DAILY ? 1 : 7) * 86400 * 1000),
       endTime
     );

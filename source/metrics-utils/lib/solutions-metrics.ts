@@ -12,20 +12,16 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
 import { LambdaToSqsToLambda } from "@aws-solutions-constructs/aws-lambda-sqs-lambda";
 import { MetricDataQuery } from "@aws-sdk/client-cloudwatch";
-import { ILogGroup, QueryDefinition, QueryDefinitionProps, QueryString, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { ILogGroup, QueryDefinition, QueryDefinitionProps, QueryString } from "aws-cdk-lib/aws-logs";
 import { ExecutionDay, MetricDataProps, SolutionsMetricProps } from "../lambda/helpers/types";
 import {
   addLambdaBilledDurationMemorySize,
   addCloudFrontMetric,
   addLambdaInvocationCount,
-  addECSImageSizeMetrics,
-  addECSImageFormatMetrics,
-  addECSTransformationTimeBuckets,
-  addECSImageSizeBuckets,
-  addECSImageRequestCount,
-  addECSOriginTypeMetrics,
-  addECSTransformationUsageMetrics,
-  addTransformationSourceMetrics,
+  addECSAverageCPUUtilization,
+  addECSAverageMemoryUtilization,
+  addDynamoDBConsumedWriteCapacityUnits,
+  addDynamoDBConsumedReadCapacityUnits,
 } from "./query-builders";
 
 export class SolutionsMetrics extends Construct {
@@ -44,7 +40,6 @@ export class SolutionsMetrics extends Construct {
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(60),
       memorySize: 128,
-      logRetention: RetentionDays.ONE_WEEK,
       environment: {
         QUERY_PREFIX: `${Aws.STACK_NAME}-`,
         SOLUTION_ID: scope.node.tryGetContext("solutionId"),
@@ -52,20 +47,8 @@ export class SolutionsMetrics extends Construct {
         SOLUTION_VERSION: VERSION ?? scope.node.tryGetContext("solutionVersion"),
         UUID: props.uuid ?? "",
         EXECUTION_DAY: props.executionDay ? props.executionDay : ExecutionDay.MONDAY,
-        AWS_ACCOUNT_ID: Aws.ACCOUNT_ID,
-        AWS_STACK_ID: Aws.STACK_ID,
       },
     });
-
-    if (props.configTableArn) {
-      this.metricsLambdaFunction.addEnvironment('CONFIG_TABLE_ARN', props.configTableArn);
-      this.metricsLambdaFunction.addToRolePolicy(
-        new PolicyStatement({
-          actions: ['dynamodb:Scan'],
-          resources: [props.configTableArn],
-        })
-      );
-    }
 
     (this.metricsLambdaFunction.node.defaultChild as CfnResource).addMetadata("cfn_nag", {
       rules_to_suppress: [
@@ -198,26 +181,18 @@ export class SolutionsMetrics extends Construct {
   addLambdaInvocationCount: typeof addLambdaInvocationCount;
   addLambdaBilledDurationMemorySize: typeof addLambdaBilledDurationMemorySize;
   addCloudFrontMetric: typeof addCloudFrontMetric;
-  addECSImageSizeMetrics: typeof addECSImageSizeMetrics;
-  addECSImageFormatMetrics: typeof addECSImageFormatMetrics;
-  addECSTransformationTimeBuckets: typeof addECSTransformationTimeBuckets;
-  addECSImageSizeBuckets: typeof addECSImageSizeBuckets;
-  addECSImageRequestCount: typeof addECSImageRequestCount;
-  addECSOriginTypeMetrics: typeof addECSOriginTypeMetrics;
-  addECSTransformationUsageMetrics: typeof addECSTransformationUsageMetrics;
-  addTransformationSourceMetrics: typeof addTransformationSourceMetrics;
+  addECSAverageCPUUtilization: typeof addECSAverageCPUUtilization;
+  addECSAverageMemoryUtilization: typeof addECSAverageMemoryUtilization;
+  addDynamoDBConsumedWriteCapacityUnits: typeof addDynamoDBConsumedWriteCapacityUnits;
+  addDynamoDBConsumedReadCapacityUnits: typeof addDynamoDBConsumedReadCapacityUnits;
 }
 
 Object.assign(SolutionsMetrics.prototype, {
   addLambdaInvocationCount,
   addLambdaBilledDurationMemorySize,
   addCloudFrontMetric,
-  addECSImageSizeMetrics,
-  addECSImageFormatMetrics,
-  addECSTransformationTimeBuckets,
-  addECSImageSizeBuckets,
-  addECSImageRequestCount,
-  addECSOriginTypeMetrics,
-  addECSTransformationUsageMetrics,
-  addTransformationSourceMetrics,
+  addECSAverageCPUUtilization,
+  addECSAverageMemoryUtilization,
+  addDynamoDBConsumedWriteCapacityUnits,
+  addDynamoDBConsumedReadCapacityUnits,
 });

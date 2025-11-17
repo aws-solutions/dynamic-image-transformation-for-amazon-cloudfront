@@ -7,7 +7,6 @@
 **/.zip
 **/tmp
 **/out-tsc
-.scannerwork
 
 # dependencies
 **/node_modules
@@ -33,9 +32,3 @@ bom.json
 **/.idea
 build
 dist
-
-# amazon q
-.q
-
-# Cypress artifacts
-source/admin-ui/src/e2e-tests/artifacts/
