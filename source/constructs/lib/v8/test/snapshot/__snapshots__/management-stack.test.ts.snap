@@ -1,0 +1,2634 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ManagementStack Snapshot Test 1`] = `
+{
+  "Description": "Test Management Stack for DIT v8",
+  "Outputs": {
+    "APIEndpoint": {
+      "Description": "URL for the DIT Admin API",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "DataAccessLayerDITApi51636B57",
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region",
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix",
+            },
+            "/",
+            {
+              "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
+            },
+            "/",
+          ],
+        ],
+      },
+    },
+    "AuthCognitoDomainPrefixA6F6E8D2": {
+      "Description": "Cognito Domain Prefix",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "dit-",
+            {
+              "Ref": "AWS::AccountId",
+            },
+            "-",
+            {
+              "Ref": "AWS::Region",
+            },
+          ],
+        ],
+      },
+    },
+    "AuthUserPoolIdC0605E59": {
+      "Value": {
+        "Ref": "AuthUserPool8115E87F",
+      },
+    },
+    "DataAccessLayerConfigTableName418C3F73": {
+      "Description": "DynamoDB table for storing all DIT configurations",
+      "Value": {
+        "Ref": "DataAccessLayerConfigTableFC483DD7",
+      },
+    },
+    "DataAccessLayerDITApiEndpoint6B901B2A": {
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "DataAccessLayerDITApi51636B57",
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region",
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix",
+            },
+            "/",
+            {
+              "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
+            },
+            "/",
+          ],
+        ],
+      },
+    },
+    "WebPortalUrl": {
+      "Description": "URL for the DIT Admin Web Portal",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Fn::GetAtt": [
+                "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                "DomainName",
+              ],
+            },
+          ],
+        ],
+      },
+    },
+  },
+  "Parameters": {
+    "AdminEmail": {
+      "AllowedPattern": "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+.[a-zA-Z0-9-.]+$",
+      "ConstraintDescription": "Must be a valid email address",
+      "Description": "Email address of the admin user",
+      "MaxLength": 100,
+      "MinLength": 7,
+      "Type": "String",
+    },
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+    "DeploymentSize": {
+      "AllowedValues": [
+        "small",
+        "medium",
+        "large",
+        "xlarge",
+      ],
+      "ConstraintDescription": "Must be one of: small, medium, large, xlarge",
+      "Default": "small",
+      "Description": "T-shirt sizing for ECS Fargate deployment configuration. **Small**: 1 vCPU, 2GB RAM, 2 desired tasks (1-4 range). **Medium**: 2 vCPU, 4GB RAM, 3 desired tasks (2-8 range). **Large**: 2 vCPU, 4GB RAM, 8 desired tasks (6-20 range). **XLarge**: 2 vCPU, 4GB RAM, 30 desired tasks (24-96 range)",
+      "Type": "String",
+    },
+    "OriginOverrideHeader": {
+      "AllowedPattern": "^$|^[a-zA-Z0-9-]+$",
+      "ConstraintDescription": "Must be a valid HTTP header name or empty",
+      "Default": "",
+      "Description": "HTTP header used to override the image origin (if present in request, mapping lookup is skipped). This is meant for advanced use-cases only, please refer to implementation guide.",
+      "Type": "String",
+    },
+  },
+  "Resources": {
+    "AdminUIDeploymentAwsCliLayer7F18FF6D": {
+      "Properties": {
+        "Content": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "c49d356cac773d491c5f7ac148995a1181498a8e289429f8612a7f7e3814f535.zip",
+        },
+        "Description": "/opt/awscli/aws",
+      },
+      "Type": "AWS::Lambda::LayerVersion",
+    },
+    "AdminUIDeploymentCustomResource4138A2A5": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "DestinationBucketName": {
+          "Ref": "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+        },
+        "OutputObjectKeys": true,
+        "Prune": true,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn",
+          ],
+        },
+        "SourceBucketNames": [
+          {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+        ],
+        "SourceMarkers": [
+          {},
+          {
+            "<<marker:0xbaba:0>>": {
+              "Fn::Join": [
+                "",
+                [
+                  """,
+                  {
+                    "Ref": "AuthUserPool8115E87F",
+                  },
+                  """,
+                ],
+              ],
+            },
+            "<<marker:0xbaba:1>>": {
+              "Fn::Join": [
+                "",
+                [
+                  """,
+                  {
+                    "Ref": "AuthUserPoolWebUIClient86DE5DEB",
+                  },
+                  """,
+                ],
+              ],
+            },
+            "<<marker:0xbaba:2>>": {
+              "Fn::Join": [
+                "",
+                [
+                  ""dit-",
+                  {
+                    "Ref": "AWS::AccountId",
+                  },
+                  "-",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ".auth.",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ".amazoncognito.com"",
+                ],
+              ],
+            },
+            "<<marker:0xbaba:3>>": {
+              "Fn::Join": [
+                "",
+                [
+                  ""https://",
+                  {
+                    "Fn::GetAtt": [
+                      "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                      "DomainName",
+                    ],
+                  },
+                  "/"",
+                ],
+              ],
+            },
+            "<<marker:0xbaba:4>>": {
+              "Fn::Join": [
+                "",
+                [
+                  ""https://",
+                  {
+                    "Fn::GetAtt": [
+                      "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                      "DomainName",
+                    ],
+                  },
+                  "/auth/logout-complete"",
+                ],
+              ],
+            },
+            "<<marker:0xbaba:5>>": {
+              "Fn::Join": [
+                "",
+                [
+                  ""https://",
+                  {
+                    "Ref": "DataAccessLayerDITApi51636B57",
+                  },
+                  ".execute-api.",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ".",
+                  {
+                    "Ref": "AWS::URLSuffix",
+                  },
+                  "/",
+                  {
+                    "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
+                  },
+                  "/"",
+                ],
+              ],
+            },
+          },
+        ],
+        "SourceMarkersConfig": [
+          {},
+          {},
+        ],
+        "SourceObjectKeys": "Omitted to remove snapshot dependency on hash",
+        "WaitForDistributionInvalidation": true,
+      },
+      "Type": "Custom::CDKBucketDeployment",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "AuthInitialFullAccessUser3C7C83CA": {
+      "Properties": {
+        "UserAttributes": [
+          {
+            "Name": "email_verified",
+            "Value": "true",
+          },
+          {
+            "Name": "email",
+            "Value": {
+              "Ref": "AdminEmail",
+            },
+          },
+        ],
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F",
+        },
+        "Username": {
+          "Ref": "AdminEmail",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolUser",
+    },
+    "AuthManagedLoginBranding4DD8E3C1": {
+      "Properties": {
+        "ClientId": {
+          "Ref": "AuthUserPoolWebUIClient86DE5DEB",
+        },
+        "UseCognitoProvidedValues": true,
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F",
+        },
+      },
+      "Type": "AWS::Cognito::ManagedLoginBranding",
+    },
+    "AuthUserPool8115E87F": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "verified_email",
+              "Priority": 1,
+            },
+          ],
+        },
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true,
+          "InviteMessageTemplate": {
+            "EmailMessage": {
+              "Fn::Join": [
+                "",
+                [
+                  "<p>Dynamic Image Transformation on Amazon CloudFront - Web UI</p><p>Here are your temporary login credentials for the WebUI: https://",
+                  {
+                    "Fn::GetAtt": [
+                      "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                      "DomainName",
+                    ],
+                  },
+                  "</p>
+<p>
+Region: ",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  "<br />
+Username: <strong>{username}</strong><br />
+Temporary Password: <strong>{####}</strong>
+</p>",
+                ],
+              ],
+            },
+            "EmailSubject": "Welcome to DIT",
+          },
+        },
+        "AutoVerifiedAttributes": [
+          "email",
+        ],
+        "EmailVerificationMessage": "Your Dynamic Image Transformation console verification code is {####}",
+        "EmailVerificationSubject": "Your Dynamic Image Transformation console verification code",
+        "EnabledMfas": [
+          "SOFTWARE_TOKEN_MFA",
+        ],
+        "MfaConfiguration": "ON",
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 8,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": true,
+            "RequireUppercase": true,
+            "TemporaryPasswordValidityDays": 7,
+          },
+        },
+        "Schema": [
+          {
+            "Mutable": false,
+            "Name": "email",
+            "Required": true,
+          },
+        ],
+        "SmsVerificationMessage": "The verification code to your new account is {####}",
+        "UserPoolAddOns": {
+          "AdvancedSecurityMode": "ENFORCED",
+        },
+        "UsernameAttributes": [
+          "email",
+        ],
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_CODE",
+          "EmailMessage": "Your Dynamic Image Transformation console verification code is {####}",
+          "EmailSubject": "Your Dynamic Image Transformation console verification code",
+          "SmsMessage": "The verification code to your new account is {####}",
+        },
+      },
+      "Type": "AWS::Cognito::UserPool",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "AuthUserPoolResourceServerADA84D6F": {
+      "Properties": {
+        "Identifier": "dit-api",
+        "Name": "Resource server representing the API Gateway of the solution",
+        "Scopes": [
+          {
+            "ScopeDescription": "Access to solution API",
+            "ScopeName": "api",
+          },
+        ],
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolResourceServer",
+    },
+    "AuthUserPoolUserPoolDomain4EEAE7CF": {
+      "Properties": {
+        "Domain": {
+          "Fn::Join": [
+            "",
+            [
+              "dit-",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              "-",
+              {
+                "Ref": "AWS::Region",
+              },
+            ],
+          ],
+        },
+        "ManagedLoginVersion": 2,
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolDomain",
+    },
+    "AuthUserPoolWebUIClient86DE5DEB": {
+      "DependsOn": [
+        "AuthUserPoolResourceServerADA84D6F",
+      ],
+      "Properties": {
+        "AccessTokenValidity": 60,
+        "AllowedOAuthFlows": [
+          "code",
+        ],
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthScopes": [
+          "openid",
+          "profile",
+          "email",
+          "aws.cognito.signin.user.admin",
+          "dit-api/api",
+        ],
+        "CallbackURLs": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "https://",
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                    "DomainName",
+                  ],
+                },
+                "/",
+              ],
+            ],
+          },
+        ],
+        "ExplicitAuthFlows": [
+          "ALLOW_USER_SRP_AUTH",
+          "ALLOW_REFRESH_TOKEN_AUTH",
+        ],
+        "IdTokenValidity": 60,
+        "LogoutURLs": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "https://",
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                    "DomainName",
+                  ],
+                },
+                "/",
+              ],
+            ],
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "https://",
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                    "DomainName",
+                  ],
+                },
+                "/auth/logout-complete",
+              ],
+            ],
+          },
+        ],
+        "RefreshTokenValidity": 60,
+        "SupportedIdentityProviders": [
+          "COGNITO",
+        ],
+        "TokenValidityUnits": {
+          "AccessToken": "minutes",
+          "IdToken": "minutes",
+          "RefreshToken": "minutes",
+        },
+        "UserPoolId": {
+          "Ref": "AuthUserPool8115E87F",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolClient",
+    },
+    "CSPUpdaterCSPUpdaterCustomResource91C60D66": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "DistributionId": {
+          "Ref": "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+        },
+        "ResponseHeadersPolicyId": {
+          "Ref": "CSPUpdaterEnhancedCSPPolicy29E9C1BA",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CSPUpdaterCSPUpdaterProviderframeworkonEventE7D5E323",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::CloudFormation::CustomResource",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "CSPUpdaterCSPUpdaterFunction1ED2BD33": {
+      "DependsOn": [
+        "CSPUpdaterCSPUpdaterFunctionServiceRoleDefaultPolicyE164CCBB",
+        "CSPUpdaterCSPUpdaterFunctionServiceRoleDCA79242",
+      ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
+      "Properties": {
+        "Code": {
+          "S3Bucket": "Omitted to remove snapshot dependency on bucket",
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "CSPUpdaterCSPUpdaterFunctionLogGroup3255BE06",
+          },
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "CSPUpdaterCSPUpdaterFunctionServiceRoleDCA79242",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 30,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CSPUpdaterCSPUpdaterFunctionLogGroup3255BE06": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
+          ],
+        },
+      },
+      "Properties": {
+        "RetentionInDays": 3653,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CSPUpdaterCSPUpdaterFunctionServiceRoleDCA79242": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CSPUpdaterCSPUpdaterFunctionServiceRoleDefaultPolicyE164CCBB": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "cloudfront:GetDistributionConfig",
+                "cloudfront:UpdateDistribution",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:cloudfront::",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":distribution/",
+                    {
+                      "Ref": "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                    },
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CSPUpdaterCSPUpdaterFunctionServiceRoleDefaultPolicyE164CCBB",
+        "Roles": [
+          {
+            "Ref": "CSPUpdaterCSPUpdaterFunctionServiceRoleDCA79242",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CSPUpdaterCSPUpdaterProviderframeworkonEventE7D5E323": {
+      "DependsOn": [
+        "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRoleDefaultPolicy0AFAE5F5",
+        "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRole9DF2EE66",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "Omitted to remove snapshot dependency on bucket",
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Description": "AWS CDK resource provider framework - onEvent (TestManagementStack/CSPUpdater/CSPUpdaterProvider)",
+        "Environment": {
+          "Variables": {
+            "USER_ON_EVENT_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "CSPUpdaterCSPUpdaterFunction1ED2BD33",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "Handler": "framework.onEvent",
+        "LoggingConfig": {
+          "ApplicationLogLevel": "FATAL",
+          "LogFormat": "JSON",
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRole9DF2EE66",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRole9DF2EE66": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRoleDefaultPolicy0AFAE5F5": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CSPUpdaterCSPUpdaterFunction1ED2BD33",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CSPUpdaterCSPUpdaterFunction1ED2BD33",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:GetFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CSPUpdaterCSPUpdaterFunction1ED2BD33",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRoleDefaultPolicy0AFAE5F5",
+        "Roles": [
+          {
+            "Ref": "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRole9DF2EE66",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CSPUpdaterEnhancedCSPPolicy29E9C1BA": {
+      "Properties": {
+        "ResponseHeadersPolicyConfig": {
+          "Comment": "Enhanced security headers for CSP with external services",
+          "CustomHeadersConfig": {
+            "Items": [
+              {
+                "Header": "Cache-Control",
+                "Override": true,
+                "Value": "no-store, no-cache",
+              },
+            ],
+          },
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "CSP-for-DIT-Admin-UI-Enhanced-",
+                {
+                  "Ref": "AWS::Region",
+                },
+              ],
+            ],
+          },
+          "SecurityHeadersConfig": {
+            "ContentSecurityPolicy": {
+              "ContentSecurityPolicy": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "upgrade-insecure-requests; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: https:; connect-src 'self' https://cognito-identity.",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ".amazonaws.com https://cognito-idp.",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ".amazonaws.com dit-",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    "-",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ".auth.",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ".amazoncognito.com https://",
+                    {
+                      "Ref": "DataAccessLayerDITApi51636B57",
+                    },
+                    ".execute-api.",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ".",
+                    {
+                      "Ref": "AWS::URLSuffix",
+                    },
+                    "/",
+                    {
+                      "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
+                    },
+                    "/; default-src 'self';",
+                  ],
+                ],
+              },
+              "Override": false,
+            },
+            "ContentTypeOptions": {
+              "Override": true,
+            },
+            "FrameOptions": {
+              "FrameOption": "DENY",
+              "Override": true,
+            },
+            "ReferrerPolicy": {
+              "Override": true,
+              "ReferrerPolicy": "strict-origin-when-cross-origin",
+            },
+            "StrictTransportSecurity": {
+              "AccessControlMaxAgeSec": 47304000,
+              "IncludeSubdomains": true,
+              "Override": true,
+            },
+          },
+        },
+      },
+      "Type": "AWS::CloudFront::ResponseHeadersPolicy",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536": {
+      "DependsOn": [
+        "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",
+        "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "Omitted to remove snapshot dependency on bucket",
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Environment": {
+          "Variables": {
+            "AWS_CA_BUNDLE": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+          },
+        },
+        "Handler": "index.handler",
+        "Layers": [
+          {
+            "Ref": "AdminUIDeploymentAwsCliLayer7F18FF6D",
+          },
+        ],
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.13",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":s3:::",
+                      {
+                        "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+                      },
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":s3:::",
+                      {
+                        "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",
+        "Roles": [
+          {
+            "Ref": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "DataAccessLayerApiLambda53F93106": {
+      "DependsOn": [
+        "DataAccessLayerApiLambdaServiceRoleDefaultPolicyEDE8072B",
+        "DataAccessLayerApiLambdaServiceRole24F83C52",
+      ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
+      "Properties": {
+        "Code": {
+          "S3Bucket": "Omitted to remove snapshot dependency on bucket",
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Environment": {
+          "Variables": {
+            "CONFIG_TABLE_NAME": {
+              "Ref": "DataAccessLayerConfigTableFC483DD7",
+            },
+            "POWERTOOLS_LOGGER_LOG_EVENT": "false",
+            "POWERTOOLS_LOGGER_LOG_LEVEL": "INFO",
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "DataAccessLayerApiLambdaLogGroup8B3CE8F8",
+          },
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "DataAccessLayerApiLambdaServiceRole24F83C52",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 30,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "DataAccessLayerApiLambdaLogGroup8B3CE8F8": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
+          ],
+        },
+      },
+      "Properties": {
+        "RetentionInDays": 3653,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "DataAccessLayerApiLambdaServiceRole24F83C52": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "DataAccessLayerApiLambdaServiceRoleDefaultPolicyEDE8072B": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "dynamodb:BatchGetItem",
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+                "dynamodb:Query",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DataAccessLayerConfigTableFC483DD7",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DataAccessLayerConfigTableFC483DD7",
+                          "Arn",
+                        ],
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "DataAccessLayerApiLambdaServiceRoleDefaultPolicyEDE8072B",
+        "Roles": [
+          {
+            "Ref": "DataAccessLayerApiLambdaServiceRole24F83C52",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "DataAccessLayerCORSResponse4xx88C1D1E3": {
+      "Properties": {
+        "ResponseParameters": {
+          "gatewayresponse.header.gatewayresponse.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+          "gatewayresponse.header.gatewayresponse.header.Access-Control-Allow-Methods": "'GET,OPTIONS,POST,PUT,DELETE'",
+          "gatewayresponse.header.gatewayresponse.header.Access-Control-Allow-Origin": "'*'",
+        },
+        "ResponseType": "DEFAULT_4XX",
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::GatewayResponse",
+    },
+    "DataAccessLayerCORSResponse5xx07AEF476": {
+      "Properties": {
+        "ResponseParameters": {
+          "gatewayresponse.header.gatewayresponse.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+          "gatewayresponse.header.gatewayresponse.header.Access-Control-Allow-Methods": "'GET,OPTIONS,POST,PUT,DELETE'",
+          "gatewayresponse.header.gatewayresponse.header.Access-Control-Allow-Origin": "'*'",
+        },
+        "ResponseType": "DEFAULT_5XX",
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::GatewayResponse",
+    },
+    "DataAccessLayerConfigTableFC483DD7": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "DYNAMODB_TABLE_ENCRYPTED_KMS",
+          ],
+        },
+      },
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "PK",
+            "AttributeType": "S",
+          },
+          {
+            "AttributeName": "GSI1PK",
+            "AttributeType": "S",
+          },
+          {
+            "AttributeName": "GSI1SK",
+            "AttributeType": "S",
+          },
+          {
+            "AttributeName": "GSI2PK",
+            "AttributeType": "S",
+          },
+          {
+            "AttributeName": "GSI3PK",
+            "AttributeType": "S",
+          },
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "GSI1",
+            "KeySchema": [
+              {
+                "AttributeName": "GSI1PK",
+                "KeyType": "HASH",
+              },
+              {
+                "AttributeName": "GSI1SK",
+                "KeyType": "RANGE",
+              },
+            ],
+            "Projection": {
+              "ProjectionType": "ALL",
+            },
+          },
+          {
+            "IndexName": "GSI2",
+            "KeySchema": [
+              {
+                "AttributeName": "GSI2PK",
+                "KeyType": "HASH",
+              },
+            ],
+            "Projection": {
+              "ProjectionType": "ALL",
+            },
+          },
+          {
+            "IndexName": "GSI3",
+            "KeySchema": [
+              {
+                "AttributeName": "GSI3PK",
+                "KeyType": "HASH",
+              },
+            ],
+            "Projection": {
+              "ProjectionType": "ALL",
+            },
+          },
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "PK",
+            "KeyType": "HASH",
+          },
+        ],
+        "Replicas": [
+          {
+            "GlobalSecondaryIndexes": [
+              {
+                "IndexName": "GSI1",
+              },
+              {
+                "IndexName": "GSI2",
+              },
+              {
+                "IndexName": "GSI3",
+              },
+            ],
+            "PointInTimeRecoverySpecification": {
+              "PointInTimeRecoveryEnabled": true,
+            },
+            "Region": {
+              "Ref": "AWS::Region",
+            },
+          },
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+        },
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES",
+        },
+      },
+      "Type": "AWS::DynamoDB::GlobalTable",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "DataAccessLayerDITApi51636B57": {
+      "Properties": {
+        "Name": "DITApi",
+      },
+      "Type": "AWS::ApiGateway::RestApi",
+    },
+    "DataAccessLayerDITApiANY6E92AB3D": {
+      "Properties": {
+        "AuthorizationScopes": [
+          "dit-api/api",
+        ],
+        "AuthorizationType": "COGNITO_USER_POOLS",
+        "AuthorizerId": {
+          "Ref": "DataAccessLayerFullAccessAuthorizer9954F0E5",
+        },
+        "HttpMethod": "ANY",
+        "Integration": {
+          "IntegrationHttpMethod": "POST",
+          "Type": "AWS_PROXY",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":lambda:path/2015-03-31/functions/",
+                {
+                  "Fn::GetAtt": [
+                    "DataAccessLayerApiLambda53F93106",
+                    "Arn",
+                  ],
+                },
+                "/invocations",
+              ],
+            ],
+          },
+        },
+        "ResourceId": {
+          "Fn::GetAtt": [
+            "DataAccessLayerDITApi51636B57",
+            "RootResourceId",
+          ],
+        },
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "DataAccessLayerDITApiANYApiPermissionTestManagementStackDataAccessLayerDITApi8A6BE97DANY1DCBC28E": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "DataAccessLayerApiLambda53F93106",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "DataAccessLayerDITApi51636B57",
+              },
+              "/",
+              {
+                "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
+              },
+              "/*/",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "DataAccessLayerDITApiANYApiPermissionTestTestManagementStackDataAccessLayerDITApi8A6BE97DANYAE8F61DC": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "DataAccessLayerApiLambda53F93106",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "DataAccessLayerDITApi51636B57",
+              },
+              "/test-invoke-stage/*/",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "DataAccessLayerDITApiAccount13F50FA2": {
+      "DeletionPolicy": "Retain",
+      "DependsOn": [
+        "DataAccessLayerDITApi51636B57",
+      ],
+      "Properties": {
+        "CloudWatchRoleArn": {
+          "Fn::GetAtt": [
+            "DataAccessLayerDITApiCloudWatchRole5597E17C",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::ApiGateway::Account",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "DataAccessLayerDITApiCloudWatchRole5597E17C": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "apigateway.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "DataAccessLayerDITApiDeploymentF2E2DE9Fd8399d1bcccbecfb05e0c520c9950873": {
+      "DependsOn": [
+        "DataAccessLayerCORSResponse4xx88C1D1E3",
+        "DataAccessLayerCORSResponse5xx07AEF476",
+        "DataAccessLayerDITApiproxyANY751BCCB6",
+        "DataAccessLayerDITApiproxyOPTIONSCB41EFA8",
+        "DataAccessLayerDITApiproxyF57F8464",
+        "DataAccessLayerDITApiANY6E92AB3D",
+        "DataAccessLayerDITApiOPTIONSAEFE0783",
+      ],
+      "Metadata": {
+        "aws:cdk:do-not-refactor": true,
+      },
+      "Properties": {
+        "Description": "Automatically created by the RestApi construct",
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::Deployment",
+    },
+    "DataAccessLayerDITApiDeploymentStageprod1B577AB5": {
+      "DependsOn": [
+        "DataAccessLayerDITApiAccount13F50FA2",
+      ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "API_GW_CACHE_ENABLED_AND_ENCRYPTED",
+          ],
+        },
+      },
+      "Properties": {
+        "AccessLogSetting": {
+          "DestinationArn": {
+            "Fn::GetAtt": [
+              "DataAccessLayerProdLogs1C739F5D",
+              "Arn",
+            ],
+          },
+          "Format": "{"requestId":"$context.requestId","extendedRequestId":"$context.extendedRequestId","sourceIp":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","method":"$context.httpMethod","resourcePath":"$context.resourcePath","protocol":"$context.protocol","status":"$context.status","requestTime":"$context.requestTime","responseLength":"$context.responseLength"}",
+        },
+        "DeploymentId": {
+          "Ref": "DataAccessLayerDITApiDeploymentF2E2DE9Fd8399d1bcccbecfb05e0c520c9950873",
+        },
+        "MethodSettings": [
+          {
+            "DataTraceEnabled": false,
+            "HttpMethod": "*",
+            "ResourcePath": "/*",
+            "ThrottlingBurstLimit": 200,
+            "ThrottlingRateLimit": 100,
+          },
+        ],
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+        "StageName": "prod",
+        "TracingEnabled": true,
+      },
+      "Type": "AWS::ApiGateway::Stage",
+    },
+    "DataAccessLayerDITApiOPTIONSAEFE0783": {
+      "Properties": {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "HttpMethod": "OPTIONS",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+                "method.response.header.Access-Control-Allow-Methods": "'*'",
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+              },
+              "StatusCode": "204",
+            },
+          ],
+          "RequestTemplates": {
+            "application/json": "{ statusCode: 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true,
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+            "StatusCode": "204",
+          },
+        ],
+        "ResourceId": {
+          "Fn::GetAtt": [
+            "DataAccessLayerDITApi51636B57",
+            "RootResourceId",
+          ],
+        },
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "DataAccessLayerDITApiproxyANY751BCCB6": {
+      "Properties": {
+        "AuthorizationScopes": [
+          "dit-api/api",
+        ],
+        "AuthorizationType": "COGNITO_USER_POOLS",
+        "AuthorizerId": {
+          "Ref": "DataAccessLayerFullAccessAuthorizer9954F0E5",
+        },
+        "HttpMethod": "ANY",
+        "Integration": {
+          "IntegrationHttpMethod": "POST",
+          "Type": "AWS_PROXY",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":lambda:path/2015-03-31/functions/",
+                {
+                  "Fn::GetAtt": [
+                    "DataAccessLayerApiLambda53F93106",
+                    "Arn",
+                  ],
+                },
+                "/invocations",
+              ],
+            ],
+          },
+        },
+        "ResourceId": {
+          "Ref": "DataAccessLayerDITApiproxyF57F8464",
+        },
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "DataAccessLayerDITApiproxyANYApiPermissionTestManagementStackDataAccessLayerDITApi8A6BE97DANYproxyE6DEB256": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "DataAccessLayerApiLambda53F93106",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "DataAccessLayerDITApi51636B57",
+              },
+              "/",
+              {
+                "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
+              },
+              "/*/*",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "DataAccessLayerDITApiproxyANYApiPermissionTestTestManagementStackDataAccessLayerDITApi8A6BE97DANYproxy61758DEA": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "DataAccessLayerApiLambda53F93106",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "DataAccessLayerDITApi51636B57",
+              },
+              "/test-invoke-stage/*/*",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "DataAccessLayerDITApiproxyF57F8464": {
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "DataAccessLayerDITApi51636B57",
+            "RootResourceId",
+          ],
+        },
+        "PathPart": "{proxy+}",
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::Resource",
+    },
+    "DataAccessLayerDITApiproxyOPTIONSCB41EFA8": {
+      "Properties": {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "HttpMethod": "OPTIONS",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+                "method.response.header.Access-Control-Allow-Methods": "'*'",
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+              },
+              "StatusCode": "204",
+            },
+          ],
+          "RequestTemplates": {
+            "application/json": "{ statusCode: 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true,
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+            "StatusCode": "204",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "DataAccessLayerDITApiproxyF57F8464",
+        },
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "DataAccessLayerFullAccessAuthorizer9954F0E5": {
+      "Properties": {
+        "IdentitySource": "method.request.header.Authorization",
+        "Name": "FullAccessAuthorizer",
+        "ProviderARNs": [
+          {
+            "Fn::GetAtt": [
+              "AuthUserPool8115E87F",
+              "Arn",
+            ],
+          },
+        ],
+        "RestApiId": {
+          "Ref": "DataAccessLayerDITApi51636B57",
+        },
+        "Type": "COGNITO_USER_POOLS",
+      },
+      "Type": "AWS::ApiGateway::Authorizer",
+    },
+    "DataAccessLayerProdLogs1C739F5D": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
+          ],
+        },
+      },
+      "Properties": {
+        "RetentionInDays": 3653,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "ImageProcessingNestedStackImageProcessingNestedStackResource96AF94AE": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Parameters": {
+          "DeploymentSize": {
+            "Ref": "DeploymentSize",
+          },
+          "OriginOverrideHeader": {
+            "Ref": "OriginOverrideHeader",
+          },
+          "referencetoTestManagementStackDataAccessLayerConfigTable9BD19AB9Arn": {
+            "Fn::GetAtt": [
+              "DataAccessLayerConfigTableFC483DD7",
+              "Arn",
+            ],
+          },
+          "referencetoTestManagementStackDataAccessLayerConfigTable9BD19AB9StreamArn": {
+            "Fn::GetAtt": [
+              "DataAccessLayerConfigTableFC483DD7",
+              "StreamArn",
+            ],
+          },
+          "referencetoTestManagementStackMetricsUUID9BBED294UUID": {
+            "Fn::GetAtt": [
+              "MetricsUUIDABD69ADD",
+              "UUID",
+            ],
+          },
+        },
+        "TemplateURL": "Omitted to remove snapshot dependency on hash",
+      },
+      "Type": "AWS::CloudFormation::Stack",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
+      "DependsOn": [
+        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "Omitted to remove snapshot dependency on bucket",
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:PutRetentionPolicy",
+                "logs:DeleteRetentionPolicy",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+        "Roles": [
+          {
+            "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "MetricsA5C7F5DB": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "AnonymousData": "Yes",
+        "CustomAction": "sendMetric",
+        "DeploymentSize": {
+          "Ref": "DeploymentSize",
+        },
+        "Region": {
+          "Ref": "AWS::Region",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "MetricsCustomResourceLambda8AAD16EB",
+            "Arn",
+          ],
+        },
+        "UUID": {
+          "Fn::GetAtt": [
+            "MetricsUUIDABD69ADD",
+            "UUID",
+          ],
+        },
+        "UseExistingCloudFrontDistribution": "n/a",
+      },
+      "Type": "AWS::CloudFormation::CustomResource",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "MetricsCustomResourceLambda8AAD16EB": {
+      "DependsOn": [
+        "MetricsCustomResourceLambdaServiceRole493FC361",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "Omitted to remove snapshot dependency on bucket",
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Environment": {
+          "Variables": {
+            "SOLUTION_ID": "SO0023",
+            "SOLUTION_VERSION": "Omitted to remove snapshot dependency on solution version",
+          },
+        },
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "MetricsCustomResourceLambdaServiceRole493FC361",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 30,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "MetricsCustomResourceLambdaLogRetention200C8177": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "MetricsCustomResourceLambda8AAD16EB",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 7,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
+    },
+    "MetricsCustomResourceLambdaServiceRole493FC361": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "MetricsUUIDABD69ADD": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "CustomAction": "createUuid",
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "MetricsCustomResourceLambda8AAD16EB",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::CloudFormation::CustomResource",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA": {
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W70",
+              "reason": "Since the distribution uses the CloudFront domain name, CloudFront automatically sets the security policy to TLSv1 regardless of the value of MinimumProtocolVersion",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "DistributionConfig": {
+          "Comment": "Admin UI Distribution for Dynamic Image Transformation for Amazon CloudFront",
+          "CustomErrorResponses": [
+            {
+              "ErrorCode": 403,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html",
+            },
+            {
+              "ErrorCode": 404,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html",
+            },
+          ],
+          "DefaultCacheBehavior": {
+            "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+            "Compress": true,
+            "TargetOriginId": "TestManagementStackWebDistributionAdminUIDistributionToS3CloudFrontDistributionOrigin19EDB06FA",
+            "ViewerProtocolPolicy": "redirect-to-https",
+          },
+          "DefaultRootObject": "index.html",
+          "Enabled": true,
+          "HttpVersion": "http2",
+          "IPV6Enabled": true,
+          "Logging": {
+            "Bucket": {
+              "Fn::GetAtt": [
+                "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucket1CBD1EBB",
+                "RegionalDomainName",
+              ],
+            },
+            "Prefix": "admin-ui-cloudfront/",
+          },
+          "Origins": [
+            {
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+                  "RegionalDomainName",
+                ],
+              },
+              "Id": "TestManagementStackWebDistributionAdminUIDistributionToS3CloudFrontDistributionOrigin19EDB06FA",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "WebDistributionAdminUIDistributionToS3CloudFrontOac6E25E5C5",
+                  "Id",
+                ],
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": "",
+              },
+            },
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Distribution",
+    },
+    "WebDistributionAdminUIDistributionToS3CloudFrontOac6E25E5C5": {
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Description": "Origin access control provisioned by aws-cloudfront-s3",
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "aws-cloudfront-s3-AdminToS3-",
+                {
+                  "Fn::Select": [
+                    2,
+                    {
+                      "Fn::Split": [
+                        "/",
+                        {
+                          "Ref": "AWS::StackId",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            ],
+          },
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4",
+        },
+      },
+      "Type": "AWS::CloudFront::OriginAccessControl",
+    },
+    "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucket1CBD1EBB": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AccessControl": "LogDeliveryWrite",
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "LoggingConfiguration": {
+          "DestinationBucketName": {
+            "Ref": "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketAccessLog1B2CB542",
+          },
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "ObjectWriter",
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketAccessLog1B2CB542": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W35",
+              "reason": "This S3 bucket is used as the access logging bucket for another bucket",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "ObjectWriter",
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketAccessLogPolicyF0EDCBBD": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketAccessLog1B2CB542",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketAccessLog1B2CB542",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketAccessLog1B2CB542",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "s3:PutObject",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucket1CBD1EBB",
+                      "Arn",
+                    ],
+                  },
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId",
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "logging.s3.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketAccessLog1B2CB542",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucketPolicyDF3305F5": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucket1CBD1EBB",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucket1CBD1EBB",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebDistributionAdminUIDistributionToS3CloudfrontLoggingBucket1CBD1EBB",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "WebDistributionAdminUIDistributionToS3S3BucketBEF73512": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "S3_BUCKET_LOGGING_ENABLED",
+          ],
+        },
+      },
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "NoncurrentVersionTransitions": [
+                {
+                  "StorageClass": "GLACIER",
+                  "TransitionInDays": 90,
+                },
+              ],
+              "Status": "Enabled",
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:cr-owned:ec92ed08",
+            "Value": "true",
+          },
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "WebDistributionAdminUIDistributionToS3S3BucketPolicy1B0745FE": {
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "F16",
+              "reason": "Public website bucket policy requires a wildcard principal",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "Bucket": {
+          "Ref": "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "s3:GetObject",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":distribution/",
+                        {
+                          "Ref": "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+                        },
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
+                        "Arn",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "WebDistributionAdminUIDistributionToS3S3LoggingBucket6996968F": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W35",
+              "reason": "This S3 bucket is used as the access logging bucket for another bucket",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "WebDistributionAdminUIDistributionToS3S3LoggingBucketPolicyF77AA8A6": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "WebDistributionAdminUIDistributionToS3S3LoggingBucket6996968F",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebDistributionAdminUIDistributionToS3S3LoggingBucket6996968F",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebDistributionAdminUIDistributionToS3S3LoggingBucket6996968F",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

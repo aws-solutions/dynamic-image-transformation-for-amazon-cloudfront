@@ -30,12 +30,22 @@ prepare_jest_coverage_report() {
   mv coverage $coverage_report_path
 }
 
+# container tests need permission to pull amazon linux base image
+aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+
 headline "[Setup] Configure paths"
 template_dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cdk_dir="$template_dir/../source/constructs"
 image_handler_dir="$template_dir/../source/image-handler"
 custom_resource_dir="$template_dir/../source/custom-resource"
 metrics_utils_dir="$template_dir/../source/metrics-utils"
+data_models_dir="$template_dir/../source/data-models"
+management_lambda_dir="$template_dir/../source/management-lambda"
+utility_lambda_dir="$template_dir/../source/utility-lambda"
+container_dir="$template_dir/../source/container"
+admin_ui_dir="$template_dir/../source/admin-ui"
+v8_custom_resource_dir="$template_dir/../source/v8-custom-resource"
+solution_utils_dir="$template_dir/../source/solution-utils"
 coverage_reports_top_path="$template_dir/../source/test/coverage-reports"
 
 headline "[Tests] Run unit tests"
@@ -44,6 +54,13 @@ declare -a packages=(
   "$image_handler_dir"
   "$custom_resource_dir"
   "$metrics_utils_dir"
+  "$data_models_dir"
+  "$management_lambda_dir"
+  "$utility_lambda_dir"
+  "$container_dir"
+  "$admin_ui_dir"
+  "$v8_custom_resource_dir"
+  "$solution_utils_dir"
 )
 for package in "${packages[@]}"; do
   cd "$package"

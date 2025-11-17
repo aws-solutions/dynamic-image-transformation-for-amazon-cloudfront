@@ -57,4 +57,16 @@ export class CDKAssetPackager {
       // remove cdk prepended string "asset.*"
     }
   }
+
+  /**
+   * @description moves jsons to staging output directory in internal pipelines
+   * @param outputPath
+   */
+  async moveJsons(outputPath: string) {
+    const allFiles = await readdir(this.assetFolderPath);
+    const allJsonPaths = allFiles.filter((file) => path.extname(file) === ".json");
+    for (const jsonPath of allJsonPaths) {
+      await rename(path.join(this.assetFolderPath, jsonPath), path.join(outputPath, jsonPath.split("asset.").pop()!));
+    }
+  }
 }

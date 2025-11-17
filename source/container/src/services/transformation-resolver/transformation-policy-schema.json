@@ -1,0 +1,286 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Image Transformation Policy",
+  "type": "object",
+  "properties": {
+    "output": {
+      "type": "object",
+      "properties": {
+        "quality": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["static", "auto"]
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                }
+              ]
+            },
+            "default": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": ["type"],
+          "allOf": [
+            {
+              "if": {
+                "properties": {"type": {"const": "static"}}
+              },
+              "then": {
+                "properties": {"value": {"type": "number", "minimum": 0, "maximum": 100}},
+                "required": ["value"],
+                "not": {"required": ["default"]}
+              }
+            },
+            {
+              "if": {
+                "properties": {"type": {"const": "auto"}}
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    }
+                  }
+                },
+                "required": ["value", "default"]
+              }
+            }
+          ],
+          "additionalProperties": false
+        },
+        "format": {
+          "type": "string",
+          "enum": ["auto", "jpg", "jpeg", "heic", "png", "raw", "tiff", "webp", "gif", "avif"]
+        },
+        "autosize": {
+          "type": "object",
+          "properties": {
+            "breakpoints": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "required": ["breakpoints"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "transformations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "transformation": {
+            "type": "string",
+            "enum": ["height", "width", "fit", "rotate", "flip", "flop", "greyscale", "animated", "background_color", "blur", "fill", "convolution", "crop", "equalize", "grayscale", "no_upscale", "proportion", "rgb", "sharpen", "smart_crop", "stretch", "strip_exif", "strip_icc", "upscale", "watermark"]
+          },
+          "value": {},
+          "condition": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "value": {
+                "oneOf": [
+                  {"type": "string"},
+                  {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                ]
+              }
+            },
+            "required": ["field", "value"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["transformation"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {"transformation": {"enum": ["height", "width", "rotate"]}}
+            },
+            "then": {
+              "properties": {"value": {"type": "integer"}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "fit"}}
+            },
+            "then": {
+              "properties": {"value": {"type": "string", "enum": ["cover", "contain", "fill", "inside", "outside"]}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"enum": ["flip", "flop", "greyscale", "animated"]}}
+            },
+            "then": {
+              "properties": {"value": {"type": "boolean"}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"enum": ["equalize", "grayscale", "no_upscale", "stretch", "strip_exif", "strip_icc", "upscale"]}}
+            },
+            "then": {
+              "anyOf": [
+                {"not": {"required": ["value"]}},
+                {"properties": {"value": {"type": "boolean"}}}
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"enum": ["background_color", "fill"]}}
+            },
+            "then": {
+              "properties": {"value": {"type": "string"}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "crop"}}
+            },
+            "then": {
+              "properties": {"value": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "rgb"}}
+            },
+            "then": {
+              "properties": {"value": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "proportion"}}
+            },
+            "then": {
+              "properties": {"value": {"type": "number", "minimum": 0, "maximum": 1}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "convolution"}}
+            },
+            "then": {
+              "properties": {"value": {
+                "type": "array",
+                "items": [
+                  {"type": "array", "items": {"type": "number"}},
+                  {"type": "integer", "minimum": 1},
+                  {"type": "boolean"}
+                ],
+                "minItems": 3,
+                "maxItems": 3
+              }},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "blur"}}
+            },
+            "then": {
+              "properties": {"value": {"type": "number"}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "sharpen"}}
+            },
+            "then": {
+              "properties": {"value": {
+                "type": "array",
+                "items": [
+                  {"type": "number", "minimum": 0, "maximum": 10},
+                  {"type": "number", "minimum": 0, "maximum": 2},
+                  {"type": "boolean"}
+                ],
+                "minItems": 3,
+                "maxItems": 3
+              }},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "smart_crop"}}
+            },
+            "then": {
+              "properties": {"value": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}},
+              "required": ["value"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"transformation": {"const": "watermark"}}
+            },
+            "then": {
+              "properties": {"value": {
+                "type": "array",
+                "items": [
+                  {"type": "string"},
+                  {"type": "number"},
+                  {"type": "number"},
+                  {"type": "number", "minimum": 0, "maximum": 100},
+                  {"type": "number", "minimum": 0, "maximum": 1},
+                  {"type": "number", "minimum": 0, "maximum": 1}
+                ],
+                "minItems": 6,
+                "maxItems": 6
+              }},
+              "required": ["value"]
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

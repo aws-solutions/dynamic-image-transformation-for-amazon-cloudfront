@@ -1,6 +1,6 @@
 {
   "name": "source",
-  "version": "7.0.8",
+  "version": "8.0.0",
   "private": true,
   "description": "ESLint and prettier dependencies to be used within the solution",
   "license": "Apache-2.0",
@@ -8,6 +8,10 @@
     "name": "Amazon Web Services",
     "url": "https://aws.amazon.com/solutions"
   },
+  "workspaces": [
+    "container",
+    "data-models"
+  ],
   "scripts": {
     "lint": "npx eslint . --ext .ts --fix",
     "prettier-format": "npx prettier --config .prettierrc.yml '**/*.ts' --write",
@@ -15,7 +19,12 @@
     "install:image-handler": "cd ./image-handler && npm run clean && npm ci",
     "install:demo-ui": "cd ./demo-ui && npm run clean && npm ci",
     "install:metrics-utils": "cd ./metrics-utils && npm ci",
-    "install:dependencies": "npm run install:metrics-utils && npm run install:custom-resource && npm run install:image-handler && npm run install:demo-ui",
+    "install:data-models": "cd ./data-models && npm ci",
+    "install:management-lambda": "cd ./management-lambda && npm ci",
+    "install:utility-lambda": "cd ./utility-lambda && npm ci",
+    "install:admin-ui": "cd ./admin-ui && npm ci && npm run build",
+    "install:v8-custom-resource": "cd ./v8-custom-resource && npm run clean && npm ci",
+    "install:dependencies": "npm run install:metrics-utils && npm run install:custom-resource && npm run install:image-handler && npm run install:demo-ui && npm run install:data-models && npm run install:management-lambda && npm run install:utility-lambda && npm run install:admin-ui && npm run install:v8-custom-resource",
     "bump-version": "npm version $(cat ../VERSION.txt) --allow-same-version && npm run bump-child-version",
     "bump-child-version": " npm --prefix ./image-handler run bump-version && npm --prefix ./custom-resource run bump-version && npm --prefix ./constructs run bump-version && npm --prefix ./solution-utils run bump-version && npm --prefix ./demo-ui run bump-version && npm --prefix ./metrics-utils run bump-version"
   },
@@ -31,6 +40,7 @@
     "eslint-plugin-jsdoc": "^46.8.2",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^4.2.1",
-    "prettier": "~2.8.8"
+    "prettier": "~2.8.8",
+    "prettier-plugin-organize-imports": "^4.2.0"
   }
 }

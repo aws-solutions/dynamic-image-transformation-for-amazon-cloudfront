@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "sourceMap": true,
+    "types": ["node", "jest"],
+    "strictFunctionTypes": true,
+    "baseUrl": ".",
+    "paths": {
+      "@dit/data-models": ["../data-models"],
+      "@dit/data-models/*": ["../data-models/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "coverage",
+    "jest.config.js",
+    "docker-compose.yml",
+    "Dockerfile"
+  ],
+  "ts-node": {
+    "esm": false,
+    "experimentalSpecifierResolution": "node",
+    "require": ["tsconfig-paths/register"]
+  }
+}

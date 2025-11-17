@@ -1,0 +1,50 @@
+{
+  "name": "admin-ui-tests",
+  "version": "1.0.0",
+  "description": "End to end tests for admin UI",
+  "main": "index.js",
+  "scripts": {
+    "clean": "rm -rf build dist node_modules",
+    "test:solutions": "jest -- dist/test/solutions.test.js",
+    "test": "jest --runInBand",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "cypress:run:smoke": "cypress run --env TAGS=@smoke",
+    "cypress:run:auth": "cypress run --env TAGS=@auth",
+    "prebuild": "npm run lint",
+    "build": "tsc",
+    "lint": "echo Test",
+    "release": "npm run build && cp -r configuration/aws_lambda build"
+  },
+  "files": [
+    "dist",
+    "jest.config.json"
+  ],
+  "dependencies": {
+    "@aws-sdk/client-cloudformation": "^3.731.1",
+    "@aws-sdk/client-cognito-identity-provider": "^3.0.0",
+    "@aws-sdk/client-lambda": "^3.360.0",
+    "@aws-sdk/client-sts": "^3.623.0",
+    "aws4-axios": "^3.3.8",
+    "axios": "^1.7.3",
+    "jest": "^29.0.0",
+    "cypress": "^15.5.0"
+
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^16.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "eslint": "^8.22.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-import": "^2.25.3",
+    "eslint-plugin-jsdoc": "^37.2.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.0.0",
+    "ts-jest": "^29.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.0"
+  }
+}

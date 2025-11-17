@@ -1,0 +1,39 @@
+{
+  "name": "utility-lambda",
+  "version": "8.0.0",
+  "scripts": {
+    "test": "jest --coverage",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ecs": "^3.0.0",
+    "@aws-sdk/client-cloudwatch": "^3.0.0",
+    "@types/aws-lambda": "^8.10.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^18.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/test"
+    ],
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "coverageReporters": [
+      "text",
+      [
+        "lcov",
+        {
+          "projectRoot": "../"
+        }
+      ]
+    ]
+  }
+}

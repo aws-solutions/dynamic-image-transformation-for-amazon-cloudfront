@@ -28,6 +28,7 @@
     "no-unused-vars": ["off"],
     "no-useless-constructor": ["off"],
     "no-throw-literal": ["off"],
+    "no-new": ["off"], // (new) needed with CfnOutuput definitions
 
     "header/header": ["error", "line", [" Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.", " SPDX-License-Identifier: Apache-2.0"], 2],
 
@@ -39,6 +40,8 @@
     "jsdoc/require-param-type": ["off"],
     "jsdoc/require-returns-type": ["off"],
     "jsdoc/newline-after-description": ["off"],
+    "jsdoc/require-returns": ["off"], // supressing, returns and params add unnecessary comments
+    "jsdoc/require-param" : ["off"],
 
     "import/no-unresolved": 1, // warn only on Unable to resolve path import/no-unresolved
     "dot-notation": "off"

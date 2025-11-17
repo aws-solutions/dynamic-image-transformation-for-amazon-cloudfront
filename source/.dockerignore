@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+*/node_modules
+**/node_modules
+
+# Build outputs
+dist
+build
+*.tsbuildinfo
+cdk.out
+staging
+
+# CDK
+.cdk.staging
+cdk.context.json
+
+# Tests
+test
+coverage
+**/__snapshots__
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# Misc
+.DS_Store
+
+# Exclude everything except what's needed
+admin-ui
+constructs
+custom-resource
+demo-ui
+image-handler
+management-lambda
+metrics-utils
+solution-utils
+utility-lambda

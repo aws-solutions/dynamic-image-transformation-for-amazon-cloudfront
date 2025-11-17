@@ -79,7 +79,11 @@ export async function handler(event: CustomResourceRequest, context: LambdaConte
   try {
     switch (ResourceProperties.CustomAction) {
       case CustomResourceActions.SEND_ANONYMOUS_METRIC: {
-        const requestProperties: SendMetricsRequestProperties = ResourceProperties as SendMetricsRequestProperties;
+        const requestProperties: SendMetricsRequestProperties = {
+          ...ResourceProperties,
+          AccountId: event.StackId.split(':')[4],
+          StackId: event.StackId,
+        } as SendMetricsRequestProperties;
         if (requestProperties.AnonymousData === "Yes") {
           response.Data = await sendAnonymousMetric(requestProperties, RequestType);
         }
@@ -297,6 +301,8 @@ async function sendAnonymousMetric(
       Version: SOLUTION_VERSION,
       UUID: requestProperties.UUID,
       TimeStamp: moment.utc().format("YYYY-MM-DD HH:mm:ss.S"),
+      AccountId: requestProperties.AccountId,
+      StackId: requestProperties.StackId,
       Data: {
         Region: AWS_REGION,
         Type: requestType,

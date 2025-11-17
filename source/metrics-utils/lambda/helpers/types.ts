@@ -35,6 +35,7 @@ export interface SolutionsMetricProps {
   metricDataProps?: MetricDataProps[];
   queryProps?: QueryDefinitionProps[];
   executionDay?: string;
+  configTableArn?: string;
 }
 
 export interface SQSEventBody {
@@ -57,6 +58,8 @@ export interface MetricPayload {
   Version: string;
   UUID: string;
   TimeStamp: string;
+  AccountId: string;
+  StackId: string;
   Data: MetricPayloadData;
 }
 

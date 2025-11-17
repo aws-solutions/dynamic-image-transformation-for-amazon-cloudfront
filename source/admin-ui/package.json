@@ -1,0 +1,71 @@
+{
+  "name": "admin-ui-dynamic-image-transformation-for-amazon-cloudfront",
+  "version": "8.0.0",
+  "description": "Admin UI - Dynamic Image Transformation for Amazon CloudFront",
+  "author": {
+    "name": "Amazon Web Services",
+    "url": "https://aws.amazon.com/solutions",
+    "organization": true
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@aws-amplify/ui-react": "^6.12.0",
+    "@cloudscape-design/collection-hooks": "^1.0.74",
+    "@cloudscape-design/component-toolkit": "^1.0.0-beta.119",
+    "@cloudscape-design/components": "^3.0.1089",
+    "@cloudscape-design/global-styles": "^1.0.45",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "aws-amplify": "^6.15.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/eslint__js": "^8.42.3",
+    "@types/node": "^24.2.1",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "cross-env": "^10.0.0",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "jsdom": "^26.1.0",
+    "msw": "^2.6.4",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.1",
+    "vite": "^6.3.6",
+    "vitest": "^3.2.4"
+  },
+  "scripts": {
+    "dev": "cross-env VITE_USE_MSW=true vite",
+    "build": "cross-env VITE_USE_MSW=false vite build",
+    "preview": "vite preview",
+    "start": "cross-env VITE_USE_MSW=true vite",
+    "clean": "rm -rf node_modules/ dist/ coverage/",
+    "pretest": "npm run clean && npm ci",
+    "test": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}

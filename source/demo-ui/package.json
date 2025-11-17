@@ -1,6 +1,6 @@
 {
     "name": "demo-ui",
-    "version": "7.0.8",
+    "version": "8.0.0",
     "private": true,
     "description": "Dynamic Image Transformation for Amazon CloudFront demo ui",
     "license": "Apache-2.0",

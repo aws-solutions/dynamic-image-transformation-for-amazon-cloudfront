@@ -26,7 +26,31 @@ export function addCfnSuppressRules(resource: Resource | CfnResource | undefined
     resource.addMetadata("cfn_nag", { rules_to_suppress: rules });
   }
 }
+interface CfnGuardSuppressRule {
+  id: string;
+  reason: string;
+}
 
+/**
+ * Adds CFN Guard suppress rules to the CDK resource.
+ * @param resource The CDK resource.
+ * @param rules The CFN Guard suppress rules.
+ */
+export function addCfnGuardSuppressRules(resource: Resource | CfnResource | undefined, rules: CfnGuardSuppressRule[]) {
+  if (typeof resource === "undefined") return;
+
+  if (resource instanceof Resource) {
+    resource = resource.node.defaultChild as CfnResource;
+  }
+
+  const ruleNames = rules.map(rule => rule.id);
+
+  if (resource.cfnOptions.metadata?.guard?.SuppressedRules) {
+    resource.cfnOptions.metadata.guard.SuppressedRules.push(...ruleNames);
+  } else {
+    resource.addMetadata("guard", { SuppressedRules: ruleNames });
+  }
+}
 /**
  * Adds CDK condition to the CDK resource.
  * @param resource The CDK resource.

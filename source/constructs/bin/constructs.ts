@@ -3,6 +3,7 @@
 
 import { App, DefaultStackSynthesizer } from "aws-cdk-lib";
 import { ServerlessImageHandlerStack } from "../lib/serverless-image-stack";
+import { ManagementStack, ManagementStackProps } from "../lib/v8/stacks";
 
 // CDK and default deployment
 let synthesizer = new DefaultStackSynthesizer({
@@ -10,7 +11,8 @@ let synthesizer = new DefaultStackSynthesizer({
 });
 
 // Solutions pipeline deployment
-const { DIST_OUTPUT_BUCKET, SOLUTION_NAME, VERSION } = process.env;
+const { DIST_OUTPUT_BUCKET, SOLUTION_NAME, VERSION, SOLUTION_ID } = process.env;
+const { PUBLIC_ECR_REGISTRY } = process.env;
 if (DIST_OUTPUT_BUCKET && SOLUTION_NAME && VERSION)
   synthesizer = new DefaultStackSynthesizer({
     generateBootstrapVersionRule: false,
@@ -18,15 +20,31 @@ if (DIST_OUTPUT_BUCKET && SOLUTION_NAME && VERSION)
     bucketPrefix: `${SOLUTION_NAME}/${VERSION}/`,
   });
 
-const app = new App();
+const app = new App({
+  context: {
+    productionImageUri: PUBLIC_ECR_REGISTRY ? `${PUBLIC_ECR_REGISTRY}/${SOLUTION_NAME}:${VERSION}` : undefined,
+  },
+});
+
 const solutionDisplayName = "Dynamic Image Transformation for Amazon CloudFront";
 const solutionVersion = VERSION ?? app.node.tryGetContext("solutionVersion");
-const description = `(${app.node.tryGetContext("solutionId")}) - ${solutionDisplayName}. Version ${solutionVersion}`;
-// eslint-disable-next-line no-new
-new ServerlessImageHandlerStack(app, "ServerlessImageHandlerStack", {
+const solutionName = SOLUTION_NAME ?? app.node.tryGetContext("solutionName");
+const solutionId = SOLUTION_ID ?? app.node.tryGetContext("solutionId");
+const description = `(${solutionId}) - ${solutionDisplayName}. Version ${solutionVersion}`;
+
+new ServerlessImageHandlerStack(app, "v7-Stack", {
   synthesizer,
   description,
-  solutionId: app.node.tryGetContext("solutionId"),
+  solutionId,
   solutionVersion,
-  solutionName: app.node.tryGetContext("solutionName"),
+  solutionName,
 });
+
+const managementStackProps: ManagementStackProps = {
+  synthesizer,
+  solutionId,
+  solutionName,
+  solutionVersion,
+  description,
+};
+new ManagementStack(app, "v8-Stack", managementStackProps);

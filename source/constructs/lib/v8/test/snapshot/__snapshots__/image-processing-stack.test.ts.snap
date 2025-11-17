@@ -1,0 +1,1835 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ImageProcessingStack Snapshot Test 1`] = `
+{
+  "Conditions": {
+    "HasOriginOverrideHeader": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "OriginOverrideHeader",
+            },
+            "",
+          ],
+        },
+      ],
+    },
+  },
+  "Mappings": {
+    "EcsConfigMapping": {
+      "large": {
+        "cpu": "2048",
+        "desiredCount": "8",
+        "maxCapacity": "20",
+        "memory": "4096",
+        "minCapacity": "6",
+        "scaleInAmount": "-3",
+        "scaleOutAmount": "3",
+      },
+      "medium": {
+        "cpu": "2048",
+        "desiredCount": "3",
+        "maxCapacity": "8",
+        "memory": "4096",
+        "minCapacity": "2",
+        "scaleInAmount": "-2",
+        "scaleOutAmount": "2",
+      },
+      "small": {
+        "cpu": "1024",
+        "desiredCount": "2",
+        "maxCapacity": "4",
+        "memory": "2048",
+        "minCapacity": "1",
+        "scaleInAmount": "-1",
+        "scaleOutAmount": "1",
+      },
+      "xlarge": {
+        "cpu": "2048",
+        "desiredCount": "30",
+        "maxCapacity": "96",
+        "memory": "4096",
+        "minCapacity": "24",
+        "scaleInAmount": "-6",
+        "scaleOutAmount": "6",
+      },
+    },
+  },
+  "Outputs": {
+    "CloudFrontDistributionDomainName": {
+      "Description": "CloudFront distribution domain name for accessing the image processing service",
+      "Value": {
+        "Fn::GetAtt": [
+          "ImageProcessingDistributionC8F0EB8C",
+          "DomainName",
+        ],
+      },
+    },
+    "CloudFrontDistributionId": {
+      "Description": "CloudFront distribution ID for the image processing service",
+      "Value": {
+        "Ref": "ImageProcessingDistributionC8F0EB8C",
+      },
+    },
+    "ContainerDeploymentMode": {
+      "Description": "Container deployment mode (local or production)",
+      "Value": "local",
+    },
+    "DeploymentMode": {
+      "Description": "Current deployment mode: prod (dev=internet-facing ALB, prod=internal ALB with VPC Origins)",
+      "Value": "prod",
+    },
+    "ImageUri": {
+      "Description": "Container image URI used by ECS tasks",
+      "Value": "Omitted to remove snapshot dependency on hash",
+    },
+    "LoadBalancerDNS": {
+      "Description": "DNS name of the Application Load Balancer",
+      "Value": {
+        "Fn::GetAtt": [
+          "AlbEcsLoadBalancer34D10DFA",
+          "DNSName",
+        ],
+      },
+    },
+    "LoadBalancerScheme": {
+      "Description": "ALB scheme indicating accessibility",
+      "Value": "internal",
+    },
+    "VpcCidr": {
+      "Description": "VPC CIDR block used for the image processing infrastructure",
+      "Value": "10.0.0.0/16",
+    },
+    "VpcId": {
+      "Description": "VPC ID for the image processing infrastructure",
+      "Value": {
+        "Ref": "NetworkVpc7FB7348F",
+      },
+    },
+  },
+  "Parameters": {
+    "DeploymentSize": {
+      "AllowedValues": [
+        "small",
+        "medium",
+        "large",
+        "xlarge",
+      ],
+      "ConstraintDescription": "Must be one of: small, medium, large, xlarge",
+      "Default": "small",
+      "Description": "T-shirt sizing for ECS Fargate deployment configuration",
+      "Type": "String",
+    },
+    "OriginOverrideHeader": {
+      "AllowedPattern": "^$|^[a-zA-Z0-9-]+$",
+      "ConstraintDescription": "Must be a valid HTTP header name or empty",
+      "Default": "",
+      "Description": "HTTP header name used to override the origin destination for image requests",
+      "Type": "String",
+    },
+    "referencetoTestParentStackTestConfigTable04A6C22BArn": {
+      "Type": "String",
+    },
+    "referencetoTestParentStackTestConfigTable04A6C22BStreamArn": {
+      "Type": "String",
+    },
+  },
+  "Resources": {
+    "AlbEcsClusterBF96B8E6": {
+      "Properties": {
+        "ClusterName": "dit-cluster",
+      },
+      "Type": "AWS::ECS::Cluster",
+    },
+    "AlbEcsContainerLogGroup666E2DBC": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
+          ],
+        },
+      },
+      "Properties": {
+        "RetentionInDays": 3653,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "AlbEcsLoadBalancer34D10DFA": {
+      "Properties": {
+        "LoadBalancerAttributes": [
+          {
+            "Key": "deletion_protection.enabled",
+            "Value": "false",
+          },
+        ],
+        "Scheme": "internal",
+        "SecurityGroups": [
+          {
+            "Fn::GetAtt": [
+              "NetworkAlbSecurityGroup641F8E74",
+              "GroupId",
+            ],
+          },
+        ],
+        "Subnets": [
+          {
+            "Ref": "NetworkVpcIsolatedSubnetSubnet1SubnetFC34B17D",
+          },
+          {
+            "Ref": "NetworkVpcIsolatedSubnetSubnet2Subnet6D74919D",
+          },
+        ],
+        "Type": "application",
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+    },
+    "AlbEcsLoadBalancerListener88EE3446": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "ELBV2_LISTENER_SSL_POLICY_RULE",
+            "ELBV2_LISTENER_PROTOCOL_RULE",
+          ],
+        },
+      },
+      "Properties": {
+        "DefaultActions": [
+          {
+            "FixedResponseConfig": {
+              "ContentType": "text/plain",
+              "MessageBody": "Access denied - requests must come from CloudFront",
+              "StatusCode": "403",
+            },
+            "Type": "fixed-response",
+          },
+        ],
+        "LoadBalancerArn": {
+          "Ref": "AlbEcsLoadBalancer34D10DFA",
+        },
+        "Port": 80,
+        "Protocol": "HTTP",
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+    },
+    "AlbEcsLoadBalancerListenerCloudFrontTrafficRule871B41C1": {
+      "Properties": {
+        "Actions": [
+          {
+            "TargetGroupArn": {
+              "Ref": "AlbEcsTargetGroup070E1DE9",
+            },
+            "Type": "forward",
+          },
+        ],
+        "Conditions": [
+          {
+            "Field": "http-header",
+            "HttpHeaderConfig": {
+              "HttpHeaderName": "X-Origin-Verify",
+              "Values": [
+                "CloudFrontOrigin",
+              ],
+            },
+          },
+        ],
+        "ListenerArn": {
+          "Ref": "AlbEcsLoadBalancerListener88EE3446",
+        },
+        "Priority": 100,
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+    },
+    "AlbEcsServiceB938A05B": {
+      "DependsOn": [
+        "AlbEcsLoadBalancerListenerCloudFrontTrafficRule871B41C1",
+        "ContainerTaskRoleDefaultPolicyD0BC2E21",
+        "ContainerTaskRole2711D1E0",
+      ],
+      "Properties": {
+        "Cluster": {
+          "Ref": "AlbEcsClusterBF96B8E6",
+        },
+        "DeploymentConfiguration": {
+          "Alarms": {
+            "AlarmNames": [],
+            "Enable": false,
+            "Rollback": false,
+          },
+          "MaximumPercent": 200,
+          "MinimumHealthyPercent": 50,
+        },
+        "DesiredCount": {
+          "Fn::FindInMap": [
+            "EcsConfigMapping",
+            {
+              "Ref": "DeploymentSize",
+            },
+            "desiredCount",
+          ],
+        },
+        "EnableECSManagedTags": false,
+        "HealthCheckGracePeriodSeconds": 60,
+        "LaunchType": "FARGATE",
+        "LoadBalancers": [
+          {
+            "ContainerName": "ImageProcessingContainer",
+            "ContainerPort": 8080,
+            "TargetGroupArn": {
+              "Ref": "AlbEcsTargetGroup070E1DE9",
+            },
+          },
+        ],
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "ENABLED",
+            "SecurityGroups": [
+              {
+                "Fn::GetAtt": [
+                  "NetworkEcsSecurityGroup48ECD65A",
+                  "GroupId",
+                ],
+              },
+            ],
+            "Subnets": [
+              {
+                "Ref": "NetworkVpcPublicSubnetSubnet1Subnet1B7B1CF8",
+              },
+              {
+                "Ref": "NetworkVpcPublicSubnetSubnet2SubnetDFB3E259",
+              },
+            ],
+          },
+        },
+        "ServiceName": "dit-service",
+        "TaskDefinition": {
+          "Ref": "AlbEcsTaskDefinitionB498278B",
+        },
+      },
+      "Type": "AWS::ECS::Service",
+    },
+    "AlbEcsServiceTaskCountTargetCpuScalingLowerAlarmD8DBCA6F": {
+      "DependsOn": [
+        "ContainerTaskRoleDefaultPolicyD0BC2E21",
+        "ContainerTaskRole2711D1E0",
+      ],
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlbEcsServiceTaskCountTargetCpuScalingLowerPolicyDD9ADB8E",
+          },
+        ],
+        "AlarmDescription": "Lower threshold scaling alarm",
+        "ComparisonOperator": "LessThanOrEqualToThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "ClusterName",
+            "Value": {
+              "Ref": "AlbEcsClusterBF96B8E6",
+            },
+          },
+          {
+            "Name": "ServiceName",
+            "Value": {
+              "Fn::GetAtt": [
+                "AlbEcsServiceB938A05B",
+                "Name",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/ECS",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 30,
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AlbEcsServiceTaskCountTargetCpuScalingLowerPolicyDD9ADB8E": {
+      "DependsOn": [
+        "ContainerTaskRoleDefaultPolicyD0BC2E21",
+        "ContainerTaskRole2711D1E0",
+      ],
+      "Properties": {
+        "PolicyName": "TestParentStackTestImageProcessingStackAlbEcsServiceTaskCountTargetCpuScalingLowerPolicy6E2998E0",
+        "PolicyType": "StepScaling",
+        "ScalingTargetId": {
+          "Ref": "AlbEcsServiceTaskCountTargetD8B068EF",
+        },
+        "StepScalingPolicyConfiguration": {
+          "AdjustmentType": "ChangeInCapacity",
+          "Cooldown": 60,
+          "MetricAggregationType": "Average",
+          "StepAdjustments": [
+            {
+              "MetricIntervalUpperBound": 0,
+              "ScalingAdjustment": {
+                "Fn::FindInMap": [
+                  "EcsConfigMapping",
+                  {
+                    "Ref": "DeploymentSize",
+                  },
+                  "scaleInAmount",
+                ],
+              },
+            },
+          ],
+        },
+      },
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+    },
+    "AlbEcsServiceTaskCountTargetCpuScalingUpperAlarm388FC34A": {
+      "DependsOn": [
+        "ContainerTaskRoleDefaultPolicyD0BC2E21",
+        "ContainerTaskRole2711D1E0",
+      ],
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlbEcsServiceTaskCountTargetCpuScalingUpperPolicy3E7E5283",
+          },
+        ],
+        "AlarmDescription": "Upper threshold scaling alarm",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "ClusterName",
+            "Value": {
+              "Ref": "AlbEcsClusterBF96B8E6",
+            },
+          },
+          {
+            "Name": "ServiceName",
+            "Value": {
+              "Fn::GetAtt": [
+                "AlbEcsServiceB938A05B",
+                "Name",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/ECS",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 70,
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AlbEcsServiceTaskCountTargetCpuScalingUpperPolicy3E7E5283": {
+      "DependsOn": [
+        "ContainerTaskRoleDefaultPolicyD0BC2E21",
+        "ContainerTaskRole2711D1E0",
+      ],
+      "Properties": {
+        "PolicyName": "TestParentStackTestImageProcessingStackAlbEcsServiceTaskCountTargetCpuScalingUpperPolicy215E6094",
+        "PolicyType": "StepScaling",
+        "ScalingTargetId": {
+          "Ref": "AlbEcsServiceTaskCountTargetD8B068EF",
+        },
+        "StepScalingPolicyConfiguration": {
+          "AdjustmentType": "ChangeInCapacity",
+          "Cooldown": 60,
+          "MetricAggregationType": "Average",
+          "StepAdjustments": [
+            {
+              "MetricIntervalLowerBound": 0,
+              "ScalingAdjustment": {
+                "Fn::FindInMap": [
+                  "EcsConfigMapping",
+                  {
+                    "Ref": "DeploymentSize",
+                  },
+                  "scaleOutAmount",
+                ],
+              },
+            },
+          ],
+        },
+      },
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+    },
+    "AlbEcsServiceTaskCountTargetD8B068EF": {
+      "DependsOn": [
+        "ContainerTaskRoleDefaultPolicyD0BC2E21",
+        "ContainerTaskRole2711D1E0",
+      ],
+      "Properties": {
+        "MaxCapacity": {
+          "Fn::FindInMap": [
+            "EcsConfigMapping",
+            {
+              "Ref": "DeploymentSize",
+            },
+            "maxCapacity",
+          ],
+        },
+        "MinCapacity": {
+          "Fn::FindInMap": [
+            "EcsConfigMapping",
+            {
+              "Ref": "DeploymentSize",
+            },
+            "minCapacity",
+          ],
+        },
+        "ResourceId": {
+          "Fn::Join": [
+            "",
+            [
+              "service/",
+              {
+                "Ref": "AlbEcsClusterBF96B8E6",
+              },
+              "/",
+              {
+                "Fn::GetAtt": [
+                  "AlbEcsServiceB938A05B",
+                  "Name",
+                ],
+              },
+            ],
+          ],
+        },
+        "RoleARN": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":iam::",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService",
+            ],
+          ],
+        },
+        "ScalableDimension": "ecs:service:DesiredCount",
+        "ServiceNamespace": "ecs",
+      },
+      "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+    },
+    "AlbEcsTargetGroup070E1DE9": {
+      "Properties": {
+        "HealthCheckEnabled": true,
+        "HealthCheckIntervalSeconds": 30,
+        "HealthCheckPath": "/health",
+        "HealthCheckPort": "8080",
+        "HealthCheckProtocol": "HTTP",
+        "HealthCheckTimeoutSeconds": 5,
+        "HealthyThresholdCount": 2,
+        "Matcher": {
+          "HttpCode": "200",
+        },
+        "Port": 8080,
+        "Protocol": "HTTP",
+        "TargetGroupAttributes": [
+          {
+            "Key": "stickiness.enabled",
+            "Value": "false",
+          },
+        ],
+        "TargetType": "ip",
+        "UnhealthyThresholdCount": 3,
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+    },
+    "AlbEcsTaskDefinitionB498278B": {
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Environment": [
+              {
+                "Name": "SOLUTION_ID",
+                "Value": "SO0023",
+              },
+              {
+                "Name": "SOLUTION_VERSION",
+                "Value": "v8.0.0",
+              },
+              {
+                "Name": "DDB_TABLE_NAME",
+                "Value": {
+                  "Fn::Select": [
+                    1,
+                    {
+                      "Fn::Split": [
+                        "/",
+                        {
+                          "Ref": "referencetoTestParentStackTestConfigTable04A6C22BArn",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+              {
+                "Name": "CUSTOM_ORIGIN_HEADER",
+                "Value": {
+                  "Ref": "OriginOverrideHeader",
+                },
+              },
+            ],
+            "Essential": true,
+            "Image": "Omitted to remove snapshot dependency on hash",
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "AlbEcsContainerLogGroup666E2DBC",
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region",
+                },
+                "awslogs-stream-prefix": "image-processing",
+              },
+            },
+            "Name": "ImageProcessingContainer",
+            "PortMappings": [
+              {
+                "ContainerPort": 8080,
+                "Protocol": "tcp",
+              },
+            ],
+          },
+        ],
+        "Cpu": {
+          "Fn::FindInMap": [
+            "EcsConfigMapping",
+            {
+              "Ref": "DeploymentSize",
+            },
+            "cpu",
+          ],
+        },
+        "ExecutionRoleArn": {
+          "Fn::GetAtt": [
+            "ContainerTaskExecutionRole29EAFB52",
+            "Arn",
+          ],
+        },
+        "Family": "TestParentStackTestImageProcessingStackAlbEcsTaskDefinition2648178B",
+        "Memory": {
+          "Fn::FindInMap": [
+            "EcsConfigMapping",
+            {
+              "Ref": "DeploymentSize",
+            },
+            "memory",
+          ],
+        },
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE",
+        ],
+        "TaskRoleArn": {
+          "Fn::GetAtt": [
+            "ContainerTaskRole2711D1E0",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::ECS::TaskDefinition",
+    },
+    "ContainerImageProcessingRepository227C87EB": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true,
+        },
+        "ImageTagMutability": "MUTABLE",
+        "LifecyclePolicy": {
+          "LifecyclePolicyText": "{"rules":[{"rulePriority":1,"description":"Delete untagged images after 1 day","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countNumber":1,"countUnit":"days"},"action":{"type":"expire"}},{"rulePriority":2,"description":"Keep last 10 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":10},"action":{"type":"expire"}}]}",
+        },
+      },
+      "Type": "AWS::ECR::Repository",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "ContainerTaskExecutionRole29EAFB52": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "ECS Task Execution Role for Image Processing Service",
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "ContainerTaskExecutionRoleDefaultPolicyE3FB33E8": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ContainerImageProcessingRepository227C87EB",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "ecr:GetAuthorizationToken",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AlbEcsContainerLogGroup666E2DBC",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "ContainerTaskExecutionRoleDefaultPolicyE3FB33E8",
+        "Roles": [
+          {
+            "Ref": "ContainerTaskExecutionRole29EAFB52",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "ContainerTaskRole2711D1E0": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "ECS Task Role for Image Processing Service",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "ContainerTaskRoleDefaultPolicyD0BC2E21": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject",
+                "s3:ListBucket",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:GetItem",
+                "dynamodb:BatchGetItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Ref": "referencetoTestParentStackTestConfigTable04A6C22BArn",
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Ref": "referencetoTestParentStackTestConfigTable04A6C22BArn",
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "rekognition:DetectFaces",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "ContainerTaskRoleDefaultPolicyD0BC2E21",
+        "Roles": [
+          {
+            "Ref": "ContainerTaskRole2711D1E0",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "DistributionMonitoring": {
+      "Properties": {
+        "DistributionId": {
+          "Ref": "ImageProcessingDistributionC8F0EB8C",
+        },
+        "MonitoringSubscription": {
+          "RealtimeMetricsSubscriptionConfig": {
+            "RealtimeMetricsSubscriptionStatus": "Enabled",
+          },
+        },
+      },
+      "Type": "AWS::CloudFront::MonitoringSubscription",
+    },
+    "DitCachePolicy39154C23": {
+      "Properties": {
+        "CachePolicyConfig": {
+          "Comment": "Cache policy optimized for DIT with normalized headers",
+          "DefaultTTL": 86400,
+          "MaxTTL": 31536000,
+          "MinTTL": 0,
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "dit-cache-policy-",
+                {
+                  "Ref": "AWS::Region",
+                },
+              ],
+            ],
+          },
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "CookiesConfig": {
+              "CookieBehavior": "none",
+            },
+            "EnableAcceptEncodingBrotli": true,
+            "EnableAcceptEncodingGzip": true,
+            "HeadersConfig": {
+              "HeaderBehavior": "whitelist",
+              "Headers": {
+                "Fn::If": [
+                  "HasOriginOverrideHeader",
+                  [
+                    "dit-host",
+                    "dit-accept",
+                    "dit-dpr",
+                    "dit-viewport-width",
+                    {
+                      "Ref": "OriginOverrideHeader",
+                    },
+                  ],
+                  [
+                    "dit-host",
+                    "dit-accept",
+                    "dit-dpr",
+                    "dit-viewport-width",
+                  ],
+                ],
+              },
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "all",
+            },
+          },
+        },
+      },
+      "Type": "AWS::CloudFront::CachePolicy",
+    },
+    "DitHeaderNormalizationFunctionDB3C4E68": {
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+async function handler(event) {
+  var request = event.request;
+  var headers = request.headers;
+
+  console.log("DIT Function - Processing request:", JSON.stringify(event, null, 2));
+
+  try {
+    // Get header mapping configuration from KVS
+    const ditHostHeader = "dit-host";
+    const ditAcceptHeader = "dit-accept";
+    const ditDprHeader = "dit-dpr";
+    const ditViewportWidthHeader = "dit-viewport-width";
+    const ditOriginHeader = ""; // eg. dit-origin
+    const viewportBreakpoints = "320,480,768,1024,1200,1440,1920";
+
+    // Parse viewport breakpoints
+    const breakpoints = viewportBreakpoints
+      ? viewportBreakpoints
+          .split(",")
+          .map(Number)
+          .sort((a, b) => a - b)
+      : [320, 480, 768, 1024, 1200, 1440, 1920];
+
+    // Normalize viewport width to nearest breakpoint and map to DIT header
+    if (headers["sec-ch-viewport-width"] && ditViewportWidthHeader) {
+      const viewportWidth = parseInt(headers["sec-ch-viewport-width"]["value"]);
+      let normalizedWidth = breakpoints[0]; // Default to smallest
+
+      for (let i = 0; i < breakpoints.length; i++) {
+        if (viewportWidth <= breakpoints[i]) {
+          normalizedWidth = breakpoints[i];
+          break;
+        }
+        if (i === breakpoints.length - 1) {
+          normalizedWidth = breakpoints[i]; // Use the largest if exceeds all
+        }
+      }
+
+      // Set normalized viewport width header
+      request.headers[ditViewportWidthHeader] = { value: normalizedWidth.toString() };
+    }
+
+    // Map standard headers to DIT headers for cache key optimization
+    if (headers["host"] && ditHostHeader) {
+      request.headers[ditHostHeader] = { value: headers["host"]["value"] };
+    }
+
+    if (headers["accept"] && ditAcceptHeader) {
+      request.headers[ditAcceptHeader] = { value: headers["accept"]["value"] };
+    }
+
+    // Normalize DPR values to nearest tenth and cap at 5.0
+    if (headers["sec-ch-dpr"] && ditDprHeader) {
+      const dprValue = parseFloat(headers["sec-ch-dpr"]["value"]);
+      const normalizedDpr = Math.min(Math.round(dprValue * 10) / 10, 5.0);
+      request.headers[ditDprHeader] = { value: normalizedDpr.toString() };
+    }
+
+    // Customer-specific origin header mapping (placeholder for extension)
+    // Customers can extend this logic to set dit-origin based on their routing needs
+    if (ditOriginHeader) {
+      // Example: Set based on host or custom logic
+      // request.headers[ditOriginHeader] = { "value": "custom-origin-value" };
+    }
+
+    console.log("DIT Function - Processed headers:", JSON.stringify(request.headers, null, 2));
+  } catch (error) {
+    console.error("DIT Function - Error processing request:", error);
+    // Continue with original request on error
+  }
+
+  return request;
+}
+",
+        "FunctionConfig": {
+          "Comment": "DIT header normalization and cache key optimization function",
+          "Runtime": "cloudfront-js-2.0",
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "dit-header-normalization-",
+              {
+                "Ref": "AWS::Region",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Function",
+    },
+    "ImageProcessingDistributionC8F0EB8C": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDFRONT_MINIMUM_PROTOCOL_VERSION_RULE",
+          ],
+        },
+      },
+      "Properties": {
+        "DistributionConfig": {
+          "Comment": "Image Handler Distribution for Dynamic Image Transformation - prod mode",
+          "CustomErrorResponses": [
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 500,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 501,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 502,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 503,
+            },
+            {
+              "ErrorCachingMinTTL": 600,
+              "ErrorCode": 504,
+            },
+          ],
+          "DefaultCacheBehavior": {
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+            ],
+            "CachePolicyId": {
+              "Ref": "DitCachePolicy39154C23",
+            },
+            "CachedMethods": [
+              "GET",
+              "HEAD",
+            ],
+            "Compress": true,
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "DitHeaderNormalizationFunctionDB3C4E68",
+                    "FunctionARN",
+                  ],
+                },
+              },
+            ],
+            "OriginRequestPolicyId": "216adef6-5c7f-47e4-b989-5492eafa07d3",
+            "ResponseHeadersPolicyId": {
+              "Ref": "ImageResponseHeadersPolicy14B22B34",
+            },
+            "TargetOriginId": "TestParentStackTestImageProcessingStackImageProcessingDistributionOrigin19A6EA5DA",
+            "ViewerProtocolPolicy": "redirect-to-https",
+          },
+          "Enabled": true,
+          "HttpVersion": "http2",
+          "IPV6Enabled": true,
+          "Logging": {
+            "Bucket": {
+              "Fn::GetAtt": [
+                "LoggingBucket1E5A6F3B",
+                "RegionalDomainName",
+              ],
+            },
+            "IncludeCookies": false,
+            "Prefix": "cloudfront-logs/",
+          },
+          "Origins": [
+            {
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "AlbEcsLoadBalancer34D10DFA",
+                  "DNSName",
+                ],
+              },
+              "Id": "TestParentStackTestImageProcessingStackImageProcessingDistributionOrigin19A6EA5DA",
+              "OriginCustomHeaders": [
+                {
+                  "HeaderName": "X-Origin-Verify",
+                  "HeaderValue": "CloudFrontOrigin",
+                },
+              ],
+              "VpcOriginConfig": {
+                "VpcOriginId": {
+                  "Fn::GetAtt": [
+                    "ImageProcessingDistributionOrigin1VpcOrigin5B2ED67A",
+                    "Id",
+                  ],
+                },
+              },
+            },
+          ],
+          "PriceClass": "PriceClass_All",
+        },
+      },
+      "Type": "AWS::CloudFront::Distribution",
+    },
+    "ImageProcessingDistributionOrigin1VpcOrigin5B2ED67A": {
+      "Properties": {
+        "VpcOriginEndpointConfig": {
+          "Arn": {
+            "Ref": "AlbEcsLoadBalancer34D10DFA",
+          },
+          "HTTPPort": 80,
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "dit-vpc-origin-",
+                {
+                  "Ref": "AWS::Region",
+                },
+              ],
+            ],
+          },
+          "OriginProtocolPolicy": "http-only",
+          "OriginSSLProtocols": [
+            "TLSv1.2",
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::VpcOrigin",
+    },
+    "ImageResponseHeadersPolicy14B22B34": {
+      "Properties": {
+        "ResponseHeadersPolicyConfig": {
+          "Comment": "Security headers with Client Hints for image processing",
+          "CustomHeadersConfig": {
+            "Items": [
+              {
+                "Header": "Accept-CH",
+                "Override": false,
+                "Value": "Sec-CH-DPR, Sec-CH-Viewport-Width",
+              },
+              {
+                "Header": "Accept-CH-Lifetime",
+                "Override": false,
+                "Value": "86400",
+              },
+            ],
+          },
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "Image-Processing-Headers-",
+                {
+                  "Ref": "AWS::Region",
+                },
+              ],
+            ],
+          },
+          "SecurityHeadersConfig": {
+            "ContentTypeOptions": {
+              "Override": true,
+            },
+            "FrameOptions": {
+              "FrameOption": "SAMEORIGIN",
+              "Override": false,
+            },
+            "ReferrerPolicy": {
+              "Override": false,
+              "ReferrerPolicy": "strict-origin-when-cross-origin",
+            },
+            "StrictTransportSecurity": {
+              "AccessControlMaxAgeSec": 31536000,
+              "IncludeSubdomains": false,
+              "Override": false,
+            },
+            "XSSProtection": {
+              "ModeBlock": true,
+              "Override": false,
+              "Protection": true,
+            },
+          },
+        },
+      },
+      "Type": "AWS::CloudFront::ResponseHeadersPolicy",
+    },
+    "LoggingBucket1E5A6F3B": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "S3_BUCKET_LOGGING_ENABLED",
+          ],
+        },
+      },
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerPreferred",
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "LoggingBucketPolicy21938756": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "LoggingBucket1E5A6F3B",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LoggingBucket1E5A6F3B",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LoggingBucket1E5A6F3B",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "NetworkAlbSecurityGroup641F8E74": {
+      "Properties": {
+        "GroupDescription": "Security group for Application Load Balancer",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "10.0.0.0/16",
+            "Description": "Allow HTTP traffic from VPC for CloudFront VPC Origins connectivity",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80,
+          },
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow from anyone on port 80",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80,
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NetworkAlbSecurityGrouptoTestParentStackTestImageProcessingStackNetworkEcsSecurityGroupEDFFC3A88080157AF82C": {
+      "Properties": {
+        "Description": "Allow traffic to ECS security group",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NetworkEcsSecurityGroup48ECD65A",
+            "GroupId",
+          ],
+        },
+        "FromPort": 8080,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NetworkAlbSecurityGroup641F8E74",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 8080,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NetworkEcsSecurityGroup48ECD65A": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "EC2_SECURITY_GROUP_EGRESS_OPEN_TO_WORLD_RULE",
+          ],
+        },
+      },
+      "Properties": {
+        "GroupDescription": "Security group for ECS Fargate tasks",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow HTTPS outbound for ECR access",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow HTTP outbound for downloading images from external sources",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80,
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NetworkEcsSecurityGroupfromTestParentStackTestImageProcessingStackNetworkAlbSecurityGroupD7EC0142808088EA53E4": {
+      "Properties": {
+        "Description": "Allow traffic from ALB to ECS tasks",
+        "FromPort": 8080,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NetworkEcsSecurityGroup48ECD65A",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NetworkAlbSecurityGroup641F8E74",
+            "GroupId",
+          ],
+        },
+        "ToPort": 8080,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "NetworkVpc7FB7348F": {
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::VPC",
+    },
+    "NetworkVpcIGW6BEA7B02": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::InternetGateway",
+    },
+    "NetworkVpcIsolatedSubnetSubnet1RouteTableAssociation96AD49A5": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "NetworkVpcIsolatedSubnetSubnet1RouteTableFFDB889E",
+        },
+        "SubnetId": {
+          "Ref": "NetworkVpcIsolatedSubnetSubnet1SubnetFC34B17D",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "NetworkVpcIsolatedSubnetSubnet1RouteTableFFDB889E": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/IsolatedSubnetSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "NetworkVpcIsolatedSubnetSubnet1SubnetFC34B17D": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.128/26",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "IsolatedSubnet",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/IsolatedSubnetSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "NetworkVpcIsolatedSubnetSubnet2RouteTableA66556D8": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/IsolatedSubnetSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "NetworkVpcIsolatedSubnetSubnet2RouteTableAssociation26F18CBF": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "NetworkVpcIsolatedSubnetSubnet2RouteTableA66556D8",
+        },
+        "SubnetId": {
+          "Ref": "NetworkVpcIsolatedSubnetSubnet2Subnet6D74919D",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "NetworkVpcIsolatedSubnetSubnet2Subnet6D74919D": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.192/26",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "IsolatedSubnet",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/IsolatedSubnetSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "NetworkVpcPublicSubnetSubnet1DefaultRouteE5E488FD": {
+      "DependsOn": [
+        "NetworkVpcVPCGW8F3799B5",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "NetworkVpcIGW6BEA7B02",
+        },
+        "RouteTableId": {
+          "Ref": "NetworkVpcPublicSubnetSubnet1RouteTableF910F1C0",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "NetworkVpcPublicSubnetSubnet1RouteTableAssociation56192E5E": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "NetworkVpcPublicSubnetSubnet1RouteTableF910F1C0",
+        },
+        "SubnetId": {
+          "Ref": "NetworkVpcPublicSubnetSubnet1Subnet1B7B1CF8",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "NetworkVpcPublicSubnetSubnet1RouteTableF910F1C0": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/PublicSubnetSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "NetworkVpcPublicSubnetSubnet1Subnet1B7B1CF8": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "SUBNET_AUTO_ASSIGN_PUBLIC_IP_DISABLED",
+          ],
+        },
+      },
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.0/26",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PublicSubnet",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/PublicSubnetSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "NetworkVpcPublicSubnetSubnet2DefaultRouteB04338FD": {
+      "DependsOn": [
+        "NetworkVpcVPCGW8F3799B5",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "NetworkVpcIGW6BEA7B02",
+        },
+        "RouteTableId": {
+          "Ref": "NetworkVpcPublicSubnetSubnet2RouteTableE7396285",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "NetworkVpcPublicSubnetSubnet2RouteTableAssociation9C078ADD": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "NetworkVpcPublicSubnetSubnet2RouteTableE7396285",
+        },
+        "SubnetId": {
+          "Ref": "NetworkVpcPublicSubnetSubnet2SubnetDFB3E259",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "NetworkVpcPublicSubnetSubnet2RouteTableE7396285": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/PublicSubnetSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "NetworkVpcPublicSubnetSubnet2SubnetDFB3E259": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "SUBNET_AUTO_ASSIGN_PUBLIC_IP_DISABLED",
+          ],
+        },
+      },
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.64/26",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PublicSubnet",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "TestParentStack/TestImageProcessingStack/Network/Vpc/PublicSubnetSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "NetworkVpcVPCGW8F3799B5": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "NetworkVpcIGW6BEA7B02",
+        },
+        "VpcId": {
+          "Ref": "NetworkVpc7FB7348F",
+        },
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+    },
+    "UtilityLambdaUtilityFunctionDC528CBA": {
+      "DependsOn": [
+        "UtilityLambdaUtilityFunctionServiceRoleDefaultPolicyE9723168",
+        "UtilityLambdaUtilityFunctionServiceRoleBB09DE11",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "Omitted to remove snapshot dependency on bucket",
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Environment": {
+          "Variables": {
+            "ECS_CLUSTER_NAME": {
+              "Ref": "AlbEcsClusterBF96B8E6",
+            },
+            "ECS_SERVICE_NAME": {
+              "Fn::GetAtt": [
+                "AlbEcsServiceB938A05B",
+                "Name",
+              ],
+            },
+            "SOLUTION_ID": "SO0023",
+            "SOLUTION_VERSION": "Omitted to remove snapshot dependency on solution version",
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "UtilityLambdaUtilityFunctionLogGroupA76E44D5",
+          },
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "UtilityLambdaUtilityFunctionServiceRoleBB09DE11",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs20.x",
+        "Timeout": 30,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "UtilityLambdaUtilityFunctionDynamoDBEventSourceTestParentStackTestConfigTableB989B404B6557399": {
+      "Properties": {
+        "BatchSize": 1000,
+        "EventSourceArn": {
+          "Ref": "referencetoTestParentStackTestConfigTable04A6C22BStreamArn",
+        },
+        "FunctionName": {
+          "Ref": "UtilityLambdaUtilityFunctionDC528CBA",
+        },
+        "MaximumBatchingWindowInSeconds": 180,
+        "MaximumRetryAttempts": 3,
+        "StartingPosition": "LATEST",
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "UtilityLambdaUtilityFunctionLogGroupA76E44D5": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
+          ],
+        },
+      },
+      "Properties": {
+        "RetentionInDays": 3653,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "UtilityLambdaUtilityFunctionServiceRoleBB09DE11": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "UtilityLambdaUtilityFunctionServiceRoleDefaultPolicyE9723168": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "ecs:UpdateService",
+                "ecs:DescribeServices",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Ref": "AlbEcsServiceB938A05B",
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "AlbEcsClusterBF96B8E6",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "dynamodb:ListStreams",
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "referencetoTestParentStackTestConfigTable04A6C22BStreamArn",
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:DescribeStream",
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "referencetoTestParentStackTestConfigTable04A6C22BStreamArn",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "UtilityLambdaUtilityFunctionServiceRoleDefaultPolicyE9723168",
+        "Roles": [
+          {
+            "Ref": "UtilityLambdaUtilityFunctionServiceRoleBB09DE11",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+  },
+}
+`;

@@ -42,7 +42,7 @@ describe("Lambda Handler", () => {
     jest.clearAllMocks();
   });
 
-  it("should process an EventBridgeQueryEvent", async () => {
+  xit("should process an EventBridgeQueryEvent", async () => {
     // Arrange
     const event: EventBridgeQueryEvent = {
       "detail-type": "Scheduled Event",

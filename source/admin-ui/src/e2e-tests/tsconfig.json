@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "declarationDir": "./dist/types",
+    "declaration": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "sourceMap": false,
+    "typeRoots": ["./node_modules/@types", "./typings"]
+  },
+  "include": ["./cypress/**/*.ts", "./cypress.config.ts"],
+  "exclude": ["build", "node_modules", "dist"]
+}

@@ -1,6 +1,6 @@
 {
   "name": "image-handler",
-  "version": "7.0.8",
+  "version": "8.0.0",
   "private": true,
   "description": "A Lambda function for performing on-demand image edits and manipulations.",
   "license": "Apache-2.0",

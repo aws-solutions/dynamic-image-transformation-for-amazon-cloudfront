@@ -1,0 +1,7 @@
+node_modules
+dist
+build
+.env
+.env.local
+.env.production
+amplify-config.json

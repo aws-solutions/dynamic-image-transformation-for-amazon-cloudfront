@@ -26,20 +26,29 @@ For more information and a detailed deployment guide, visit the [Dynamic Image T
 
 # Architecture Diagram
 
-Dynamic Image Transformation for Amazon CloudFront supports two architectures, one using an Amazon API Gateway REST API, and another using S3 Object Lambda. The Amazon API Gateway REST API architecture maintains the structure used in v6.3.3 and below of the Dynamic Image Transformation for Amazon CloudFront. **The S3 Object Lambda architecture has been deprecated and will no longer be open to new customers starting on November 7, 2025. If you were not an existing user of S3 Object Lambda before November 7, 2025, select ‘No“ for EnableS3ObjectLambdaParameter. For more information, please visit https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html.** The S3 Object Lambda architecture maintains very similar functionality, while also allowing for images larger than 6 MB to be returned. For more information, refer to the [Architecture Overview](https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/architecture-overview.html) in the implementation guide.
+Dynamic Image Transformation for Amazon CloudFront supports two architectures: 
 
-The AWS CloudFormation template deploys an Amazon CloudFront distribution, Amazon API Gateway REST API/S3 Object Lambda, and an AWS Lambda function. Amazon CloudFront provides a caching layer to reduce the cost of image processing and the latency of subsequent image delivery. The Amazon API Gateway/S3 Object Lambda provides endpoint resources and triggers the AWS Lambda function. The AWS Lambda function retrieves the image from the customer's Amazon Simple Storage Service (Amazon S3) bucket and uses Sharp to return a modified version of the image. Additionally, the solution generates a CloudFront domain name that provides cached access to the image handler API. There is limited use of CloudFront functions for consistency and cache hit rate purposes.
+## ECS Architecture
 
-## Default Architecture
+One click deployment - https://solutions-reference.s3.us-east-1.amazonaws.com/dynamic-image-transformation-for-amazon-cloudfront/latest/dynamic-image-transformation-for-amazon-cloudfront-ecs.template
 
-![Architecture Diagram (Default Architecture)](./default_architecture.png)
+![ecs-architecture](./ecs-architecture.png)
+
+## Lambda Architecture
+
+One click deployment - https://solutions-reference.s3.us-east-1.amazonaws.com/dynamic-image-transformation-for-amazon-cloudfront/latest/dynamic-image-transformation-for-amazon-cloudfront-lambda.template
+
+![lambda-architecture](./lambda-architecture.png)
+_The Amazon API Gateway REST API architecture maintains the structure used in v6.3.3 and below of the Dynamic Image Transformation for Amazon CloudFront._
 
 ## S3 Object Lambda Architecture (DEPRECATED)
 
-**⚠️ DEPRECATED: This architecture has been deprecated and should not be used for new deployments. Use the Default Architecture instead.**
+**⚠️ DEPRECATED: This architecture has been deprecated and should not be used for new deployments. Use the ECS Architecture instead.**
 
 ![Architecture Diagram (S3 Object Lambda Architecture)](./object_lambda_architecture.png)
+> **The S3 Object Lambda architecture has been deprecated and will no longer be open to new customers starting on November 7, 2025. If you were not an existing user of S3 Object Lambda before November 7, 2025, select ‘No“ for EnableS3ObjectLambdaParameter. For more information, please visit https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html.**  
 
+The S3 Object Lambda architecture maintains very similar functionality, while also allowing for images larger than 6 MB to be returned. For more information, refer to the [Architecture Overview](https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/architecture-overview.html) in the implementation guide.
 
 # AWS CDK and Solutions Constructs
 
@@ -80,19 +89,25 @@ chmod +x run-unit-tests.sh && ./run-unit-tests.sh
 cd $MAIN_DIRECTORY/source/constructs
 npm run clean:install
 overrideWarningsEnabled=false npx cdk bootstrap --profile <PROFILE_NAME>
-overrideWarningsEnabled=false npx cdk deploy\
+
+## deploy lambda architecture stack
+overrideWarningsEnabled=false npx cdk deploy v7-Stack\
  --parameters DeployDemoUIParameter=Yes\
   --parameters SourceBucketsParameter=<MY_BUCKET>\
    --profile <PROFILE_NAME>
+
+## deploy ecs architecture stack (see ./source/constructs/lib/v8/README.md)
+overrideWarningsEnabled=false npx cdk deploy v8-Stack --parameters AdminEmail=<MY_EMAIL>
 ```
 
 _Note:_
 - **MY_BUCKET**: name of an existing bucket or the list of comma-separated bucket names in your account
 - **PROFILE_NAME**: name of an AWS CLI profile that has appropriate credentials for deploying in your preferred region
+- **MY_EMAIL**: email for the admin user who can configure origins, transformation policies and mappings
 
 # Collection of operational metrics
 
-This solution collects anonymous operational metrics to help AWS improve the quality and features of the solution. For more information, including how to disable this capability, please see the [implementation guide](https://docs.aws.amazon.com/solutions/latest/serverless-image-handler/reference.html#anonymized-data-collection).
+This solution sends operational metrics to AWS (the “Data”) about the use of this solution. We use this Data to better understand how customers use this solution and related services and products. AWS’s collection of this Data is subject to the [AWS Privacy Notice](https://aws.amazon.com/privacy/).
 
 # External Contributors
 

@@ -1,0 +1,38 @@
+{
+  "private": true,
+  "description": "Lambda function to provide management API operations",
+  "scripts": {
+    "pretest": "npm ci",
+    "test": "jest --config jest.unit.config.js --coverage",
+    "test:e2e": "jest --config jest.e2e.config.js --testPathIgnorePatterns=throttling.test.ts",
+    "test:e2e:throttling": "jest --config jest.e2e.config.js --testNamePattern='throttling'"
+  },
+  "author": {
+    "name": "Amazon Web Services",
+    "url": "https://aws.amazon.com/solutions"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@aws-lambda-powertools/logger": "^2.28.1",
+    "@middy/core": "^6.4.2",
+    "@middy/http-cors": "^6.4.3",
+    "@middy/http-header-normalizer": "^6.4.2",
+    "@middy/http-json-body-parser": "^6.4.2",
+    "@middy/http-router": "^6.4.2",
+    "@middy/http-security-headers": "^6.4.3",
+    "zod": "^4.0.14"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-cloudformation": "^3.879.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.865.0",
+    "@aws-sdk/client-dynamodb": "^3.859.0",
+    "@aws-sdk/lib-dynamodb": "^3.859.0",
+    "@types/aws-lambda": "^8.10.145",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.2.0",
+    "aws-amplify": "^6.15.5",
+    "jest": "^30.0.5",
+    "ts-jest": "^29.4.1",
+    "typescript": "^5.9.2"
+  }
+}

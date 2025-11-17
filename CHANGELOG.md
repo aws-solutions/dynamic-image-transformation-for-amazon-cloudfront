@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.0] - 2025-11-17
+
+### Added
+
+#### Admin UI and Configuration Management
+- Admin UI built with React and TypeScript for configuration management
+- CRUD operations for Origins, Transformation Policies, and Mappings
+- Authentication integration with Amazon Cognito User Pools
+- Real-time form validation and AWS Cloudscape Design System components
+
+#### Management API and Backend Services
+- RESTful management API using Amazon API Gateway
+- DynamoDB integration with single-table design for configuration storage
+- Lambda-based management functions with AWS SDK v3 integration
+- OpenAPI specification for API documentation
+- Comprehensive error handling and structured logging
+- Pagination support on list APIs
+
+#### ECS-Based Container Architecture for Image Processing Engine
+- Amazon ECS Fargate-based image processing engine
+- Express.js-based REST API server with Docker containerization
+- Auto-scaling capabilities and t-shirt sizing deployment options (Small, Medium, Large, X-Large)
+- Container health check endpoints
+- CloudFront Function for header normalization to improve cache hit ratio
+- URL validation and sanitization
+- Caching policy with DIT specific custom cache keys (`dit-host`, `dit-accept`, `dit-dpr`, `dit-viewport-width`)
+
+#### Origin
+- Support for S3 and external HTTPS image sources
+- S3 URL helper utilities for secure access
+- Connection management for external origin sources
+- Origin validation and error handling
+
+#### Transformation Policy
+- Declarative transformation policy system with schema validation
+- Support for **one** default transformation policy as fallback
+- Auto-optimization based on client hints (`Sec-ch-viewport-width`, `Sec-ch-dpr`, `Accept` headers)
+- Conditional transformations based on request headers and query parameters
+- Policy and transformation override capabilities via query string in request
+
+#### Mapping (Routing Rules)
+- Path-based mapping to route based on request path
+- Host header-based mapping for multi-tenant support and routing on host-header
+- Support for configuring policy with the mappings/routing rules
+
+#### Data Models and Validation
+- Comprehensive TypeScript data models using Zod for runtime validation
+- Strict type safety across all configuration entities
+- Request validation and sanitization
+
 ## [7.0.8] - 2025-10-07
 
 ### Added

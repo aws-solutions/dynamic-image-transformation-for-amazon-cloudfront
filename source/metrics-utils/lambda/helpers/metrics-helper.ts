@@ -18,6 +18,7 @@ import {
   StartQueryCommandInput,
   QueryDefinition,
 } from "@aws-sdk/client-cloudwatch-logs";
+import { DynamoDBClient, ScanCommand } from '@aws-sdk/client-dynamodb';
 import {
   EventBridgeQueryEvent,
   MetricPayload,
@@ -38,9 +39,83 @@ const { EXECUTION_DAY } = process.env;
 
 export class MetricsHelper {
   private clientHelper: ClientHelper;
+  private dynamoDbClient?: DynamoDBClient;
 
   constructor() {
     this.clientHelper = new ClientHelper();
+  }
+
+  getDynamoDbClient(): DynamoDBClient {
+    if (!this.dynamoDbClient) {
+      this.dynamoDbClient = new DynamoDBClient({});
+    }
+    return this.dynamoDbClient;
+  }
+
+  async scanConfigTable(): Promise<MetricData> {
+    const { CONFIG_TABLE_ARN } = process.env;
+    if (!CONFIG_TABLE_ARN) return {};
+
+    const tableName = CONFIG_TABLE_ARN.split('/')[1];
+    const command = new ScanCommand({ TableName: tableName });
+    const response = await this.getDynamoDbClient().send(command);
+
+    const policies: any[] = [];
+    const analysisOutput: MetricData = {};
+    let originMappingCount = 0;
+
+    response.Items?.forEach((item) => {
+      const gsi1pk = item.GSI1PK?.S || '';
+      if (gsi1pk === 'POLICY') {
+        policies.push(item);
+      }
+      if (gsi1pk === 'ORIGIN') originMappingCount++;
+    });
+
+    analysisOutput['DynamoDB/TransformationPolicyCount'] = policies.length;
+    analysisOutput['DynamoDB/OriginMappingCount'] = originMappingCount;
+
+    this.analyzePolicies(policies, analysisOutput);
+
+    return analysisOutput;
+  }
+
+  private analyzePolicies(policies: any[], output: MetricData): void {
+    let qualityStatic = 0, qualityAuto = 0, qualityDisabled = 0;
+    let formatStatic = 0, formatAuto = 0, formatDisabled = 0;
+    let autosizeEnabled = 0, autosizeDisabled = 0;
+
+    policies.forEach((policy) => {
+      const policyJSON = JSON.parse(policy.Data?.M?.policyJSON?.S || '{}');
+      const outputs = policyJSON.outputs || [];
+
+      const quality = outputs.find((o: any) => o.type === 'quality');
+      const format = outputs.find((o: any) => o.type === 'format');
+      const autosize = outputs.find((o: any) => o.type === 'autosize');
+
+      if (quality) {
+        Array.isArray(quality.value) && quality.value.length === 1 ? qualityStatic++ : qualityAuto++;
+      } else {
+        qualityDisabled++;
+      }
+
+      if (format) {
+        format.value === 'auto' ? formatAuto++ : formatStatic++;
+      } else {
+        formatDisabled++;
+      }
+
+      autosize ? autosizeEnabled++ : autosizeDisabled++;
+    });
+
+    output['DynamoDB/QualityStatic'] = qualityStatic;
+    output['DynamoDB/QualityAuto'] = qualityAuto;
+    output['DynamoDB/QualityDisabled'] = qualityDisabled;
+    output['DynamoDB/FormatStatic'] = formatStatic;
+    output['DynamoDB/FormatAuto'] = formatAuto;
+    output['DynamoDB/FormatDisabled'] = formatDisabled;
+    output['DynamoDB/AutosizeEnabled'] = autosizeEnabled;
+    output['DynamoDB/AutosizeDisabled'] = autosizeDisabled;
   }
 
   async getMetricsData(event: EventBridgeQueryEvent): Promise<MetricData> {
@@ -71,7 +146,30 @@ export class MetricsHelper {
       results = { ...results, ...(await this.fetchMetricsData(cloudFrontInput, region)) };
     }
 
+    this.calculateCloudFrontCacheMetrics(results);
+
     return results;
+  }
+
+  private calculateCloudFrontCacheMetrics(results: MetricData): void {
+    const totalRequests = this.sumMetricValues(results['CloudFront/Requests']);
+    const cacheHitRate = this.averageMetricValues(results['CloudFront/CacheHitRate']);
+
+    if (totalRequests > 0 && cacheHitRate !== null) {
+      results['CloudFront/CacheHits'] = Math.round(totalRequests * (cacheHitRate / 100));
+      results['CloudFront/CacheMisses'] = Math.round(totalRequests * (1 - cacheHitRate / 100));
+    }
+  }
+
+  private sumMetricValues(value: string | number | number[] | undefined): number {
+    if (!value || typeof value === 'string') return 0;
+    return Array.isArray(value) ? value.reduce((sum, val) => sum + val, 0) : value;
+  }
+
+  private averageMetricValues(value: string | number | number[] | undefined): number | null {
+    if (!value || typeof value === 'string') return null;
+    if (!Array.isArray(value)) return value;
+    return value.length > 0 ? value.reduce((sum, val) => sum + val, 0) / value.length : null;
   }
 
   private async fetchMetricsData(input: GetMetricDataCommandInput, region: string): Promise<MetricData> {
@@ -163,6 +261,9 @@ export class MetricsHelper {
       ...queryProp,
     };
 
+    console.debug(`Starting CloudWatch Logs Insights query: ${input.queryString}`);
+    console.debug(`Query details: ${JSON.stringify({ logGroupNames: input.logGroupNames, startTime: new Date(input.startTime!), endTime: new Date(input.endTime!) })}`);
+
     const command = new StartQueryCommand(input);
     const response = await this.clientHelper.getCwLogsClient().send(command);
     if (response.queryId) {
@@ -205,12 +306,14 @@ export class MetricsHelper {
     };
 
     try {
-      const { SOLUTION_ID, SOLUTION_VERSION, UUID } = process.env;
+      const { SOLUTION_ID, SOLUTION_VERSION, UUID, AWS_ACCOUNT_ID, AWS_STACK_ID } = process.env;
       const payload: MetricPayload = {
         Solution: SOLUTION_ID as string,
         Version: SOLUTION_VERSION as string,
         UUID: UUID as string,
         TimeStamp: new Date().toISOString().replace("T", " ").replace("Z", ""),
+        AccountId: AWS_ACCOUNT_ID as string,
+        StackId: AWS_STACK_ID as string,
         Data: {
           DataStartTime: startTime.toISOString().replace("T", " ").replace("Z", ""),
           DataEndTime: endTime.toISOString().replace("T", " ").replace("Z", ""),
@@ -234,7 +337,7 @@ export class MetricsHelper {
 
       result.Message = "Anonymous data was sent successfully.";
     } catch (err) {
-      console.error("Error sending anonymous metric");
+      console.error("Error sending anonymous metric.");
       console.error(err);
 
       result.Message = "Anonymous data sending failed.";

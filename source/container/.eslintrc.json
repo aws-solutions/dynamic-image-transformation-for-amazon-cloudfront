@@ -1,0 +1,46 @@
+{
+  "root": true,
+  "env": {
+    "jest": true,
+    "node": true
+  },
+  "plugins": ["@typescript-eslint", "import", "header"],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "project": "**/tsconfig.json"
+  },
+  "ignorePatterns": ["**/*.js", "**/node_modules/**"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:import/recommended",
+    "plugin:import/typescript",
+    "standard",
+    "plugin:jsdoc/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "rules": {
+    "arrow-body-style": ["warn", "as-needed"],
+    "prefer-arrow-callback": ["warn"],
+    "no-inferrable-types": ["off", "ignore-params"],
+    "no-unused-vars": ["off"],
+    "no-useless-constructor": ["off"],
+    "no-throw-literal": ["off"],
+
+    "header/header": ["error", "line", [" Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.", " SPDX-License-Identifier: Apache-2.0"], 2],
+
+    "@typescript-eslint/no-inferrable-types": ["off", { "ignoreParameters": true, "ignoreProperties": true }],
+    "@typescript-eslint/no-useless-constructor": ["off"],
+    "@typescript-eslint/no-unused-vars": ["error", { "args": "none", "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-throw-literal": ["error"],
+
+    "jsdoc/require-param-type": ["off"],
+    "jsdoc/require-returns-type": ["off"],
+    "jsdoc/newline-after-description": ["off"],
+
+    "import/no-unresolved": 1, // warn only on Unable to resolve path import/no-unresolved
+    "dot-notation": "off"
+  }
+}

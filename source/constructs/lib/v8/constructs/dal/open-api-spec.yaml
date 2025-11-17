@@ -1,0 +1,1048 @@
+---
+openapi: 3.0.3
+info:
+  title: Dynamic Image Transformation Management API
+  version: 8.0.0
+  description: API for managing image transformation policies, origins, and mappings for the Dynamic Image Transformation service.
+tags:
+  - name: Transformation Policies
+    description: Endpoints for managing image transformation policies
+  - name: Origins
+    description: Endpoints for managing origin configurations
+  - name: Mappings
+    description: Endpoints for managing origin mappings (both path and host-header based)
+paths:
+  /policies:
+    get:
+      tags:
+        - Transformation Policies
+      summary: List all transformation policies
+      parameters:
+        - in: query
+          name: nextToken
+          schema:
+            type: string
+          description: Token for pagination
+      responses:
+        "200":
+          description: A paginated list of transformation policies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPolicyResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    post:
+      tags:
+        - Transformation Policies
+      summary: Create a new transformation policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransformationPolicyCreate"
+      responses:
+        "201":
+          description: Policy created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransformationPolicy"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+  "/policies/{policyId}":
+    get:
+      tags:
+        - Transformation Policies
+      summary: Get details of a specific transformation policy
+      parameters:
+        - in: path
+          name: policyId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the transformation policy
+      responses:
+        "200":
+          description: Policy found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransformationPolicy"
+        "400":
+          description: Invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Policy not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    put:
+      tags:
+        - Transformation Policies
+      summary: Update an existing transformation policy
+      parameters:
+        - in: path
+          name: policyId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the transformation policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransformationPolicyUpdate"
+      responses:
+        "200":
+          description: Policy updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransformationPolicy"
+        "400":
+          description: Validation error or invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Policy not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    delete:
+      tags:
+        - Transformation Policies
+      summary: Delete a specific transformation policy
+      parameters:
+        - in: path
+          name: policyId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the transformation policy
+      responses:
+        "204":
+          description: Policy deleted
+        "400":
+          description: Policy is referenced by mappings or invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Policy not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+  /origins:
+    get:
+      tags:
+        - Origins
+      summary: List all origins
+      parameters:
+        - in: query
+          name: nextToken
+          schema:
+            type: string
+          description: Token for pagination
+      responses:
+        "200":
+          description: A paginated list of origins
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedOriginResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    post:
+      tags:
+        - Origins
+      summary: Create a new origin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OriginCreate"
+      responses:
+        "201":
+          description: Origin created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Origin"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+  "/origins/{originId}":
+    get:
+      tags:
+        - Origins
+      summary: Get details of a specific origin
+      parameters:
+        - in: path
+          name: originId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the origin
+      responses:
+        "200":
+          description: Origin found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Origin"
+        "400":
+          description: Invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Origin not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    put:
+      tags:
+        - Origins
+      summary: Update an existing origin
+      parameters:
+        - in: path
+          name: originId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the origin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OriginUpdate"
+      responses:
+        "200":
+          description: Origin updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Origin"
+        "400":
+          description: Validation error or invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Origin not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    delete:
+      tags:
+        - Origins
+      summary: Delete a specific origin
+      parameters:
+        - in: path
+          name: originId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the origin
+      responses:
+        "204":
+          description: Origin deleted
+        "400":
+          description: Origin is referenced by mappings or invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Origin not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+  /mappings:
+    get:
+      tags:
+        - Mappings
+      summary: List all mappings (both path and host-header based)
+      parameters:
+        - in: query
+          name: nextToken
+          schema:
+            type: string
+          description: Token for pagination
+      responses:
+        "200":
+          description: A paginated list of mappings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMappingResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    post:
+      tags:
+        - Mappings
+      summary: Create a new mapping (path or host-header based)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MappingCreate"
+      responses:
+        "201":
+          description: Mapping created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mapping"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Referenced origin or policy not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+  "/mappings/{mappingId}":
+    get:
+      tags:
+        - Mappings
+      summary: Get details of a specific mapping
+      parameters:
+        - in: path
+          name: mappingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the mapping
+      responses:
+        "200":
+          description: Mapping found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mapping"
+        "400":
+          description: Invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Mapping not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    put:
+      tags:
+        - Mappings
+      summary: Update an existing mapping
+      parameters:
+        - in: path
+          name: mappingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the mapping
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MappingUpdate"
+      responses:
+        "200":
+          description: Mapping updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mapping"
+        "400":
+          description: Validation error or invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Mapping, origin, or policy not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+    delete:
+      tags:
+        - Mappings
+      summary: Delete a specific mapping
+      parameters:
+        - in: path
+          name: mappingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the mapping
+      responses:
+        "204":
+          description: Mapping deleted
+        "400":
+          description: Invalid UUID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Mapping not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: management_lambda
+components:
+  schemas:
+    # Error response schema
+    Error:
+      type: object
+      required:
+        - errorCode
+        - message
+      properties:
+        errorCode:
+          type: string
+          description: Error code identifier
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+
+    # Pagination schemas
+    PaginatedPolicyResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransformationPolicy"
+        nextToken:
+          type: string
+          description: Token for next page of results
+
+    PaginatedOriginResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+        nextToken:
+          type: string
+          description: Token for next page of results
+
+    PaginatedMappingResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mapping"
+        nextToken:
+          type: string
+          description: Token for next page of results
+
+    # Transformation Policy schemas
+    TransformationPolicy:
+      type: object
+      required:
+        - policyId
+        - policyName
+        - policyJSON
+        - isDefault
+        - createdAt
+      properties:
+        policyId:
+          type: string
+          format: uuid
+          description: Unique identifier for the policy (UUID v4)
+        policyName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the policy (alphanumeric, spaces, underscore, hyphen only)
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Optional description of the policy
+        policyJSON:
+          type: object
+          description: JSON object containing transformation and output configurations
+          properties:
+            transformations:
+              type: array
+              minItems: 0
+              maxItems: 100
+              items:
+                $ref: "#/components/schemas/Transformation"
+            outputs:
+              type: array
+              items:
+                $ref: "#/components/schemas/OutputOptimization"
+        isDefault:
+          type: boolean
+          description: Whether this is the default policy
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the policy was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the policy was last updated
+
+    TransformationPolicyCreate:
+      type: object
+      required:
+        - policyName
+        - policyJSON
+      properties:
+        policyName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the policy (alphanumeric, spaces, underscore, hyphen only)
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Optional description of the policy
+        policyJSON:
+          type: object
+          description: JSON object containing transformation and output configurations
+          properties:
+            transformations:
+              type: array
+              minItems: 0
+              maxItems: 100
+              items:
+                $ref: "#/components/schemas/Transformation"
+            outputs:
+              type: array
+              items:
+                $ref: "#/components/schemas/OutputOptimization"
+        isDefault:
+          type: boolean
+          default: false
+          description: Whether this is the default policy
+
+    TransformationPolicyUpdate:
+      type: object
+      minProperties: 1
+      description: At least one field must be provided for update
+      properties:
+        policyName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the policy (alphanumeric, spaces, underscore, hyphen only)
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Optional description of the policy
+        policyJSON:
+          type: object
+          description: JSON object containing transformation and output configurations
+          properties:
+            transformations:
+              type: array
+              minItems: 0
+              maxItems: 100
+              items:
+                $ref: "#/components/schemas/Transformation"
+            outputs:
+              type: array
+              items:
+                $ref: "#/components/schemas/OutputOptimization"
+        isDefault:
+          type: boolean
+          description: Whether this is the default policy
+
+    # Transformation and Output schemas
+    Transformation:
+      type: object
+      required:
+        - transformation
+        - value
+      properties:
+        transformation:
+          type: string
+          enum:
+            [
+              "animated",
+              "blur",
+              "convolve",
+              "extract",
+              "normalize",
+              "normalise",
+              "grayscale",
+              "greyscale",
+              "resize",
+              "format",
+              "quality",
+              "rotate",
+              "sharpen",
+              "smartCrop",
+              "stripExif",
+              "stripIcc",
+              "flip",
+              "flop",
+              "tint",
+              "flatten",
+              "watermark",
+            ]
+          description: Type of transformation to apply
+        value:
+          oneOf:
+            - type: boolean
+            - type: number
+            - type: string
+            - type: object
+            - type: array
+          description: Transformation-specific configuration value
+        condition:
+          type: object
+          description: Optional condition for applying the transformation
+          properties:
+            field:
+              type: string
+            value:
+              oneOf:
+                - type: string
+                - type: number
+                - type: array
+
+    OutputOptimization:
+      type: object
+      required:
+        - type
+        - value
+      properties:
+        type:
+          type: string
+          enum: ["quality", "format", "autosize"]
+          description: Type of output optimization
+        value:
+          oneOf:
+            - type: string
+            - type: array
+          description: Optimization-specific configuration value
+
+    # Origin schemas
+    Origin:
+      type: object
+      required:
+        - originId
+        - originName
+        - originDomain
+        - createdAt
+      properties:
+        originId:
+          type: string
+          format: uuid
+          description: Unique identifier for the origin (UUID v4)
+        originName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the origin (alphanumeric, spaces, underscore, hyphen only)
+        originDomain:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: Domain name for the origin (e.g., example.com)
+        originPath:
+          type: string
+          minLength: 2
+          maxLength: 2048
+          description: Optional path prefix for the origin (must start with /, cannot be a file)
+        originHeaders:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+            maxLength: 1000
+          description: Optional headers to send to the origin
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the origin was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the origin was last updated
+
+    OriginCreate:
+      type: object
+      required:
+        - originName
+        - originDomain
+      properties:
+        originName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the origin (alphanumeric, spaces, underscore, hyphen only)
+        originDomain:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: Domain name for the origin (e.g., example.com)
+        originPath:
+          type: string
+          minLength: 2
+          maxLength: 2048
+          description: Optional path prefix for the origin (must start with /, cannot be a file)
+        originHeaders:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+            maxLength: 1000
+          description: Optional headers to send to the origin
+
+    OriginUpdate:
+      type: object
+      minProperties: 1
+      description: At least one field must be provided for update
+      properties:
+        originName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the origin (alphanumeric, spaces, underscore, hyphen only)
+        originDomain:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: Domain name for the origin (e.g., example.com)
+        originPath:
+          type: string
+          minLength: 2
+          maxLength: 2048
+          description: Optional path prefix for the origin (must start with /, cannot be a file)
+        originHeaders:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+            maxLength: 1000
+          description: Optional headers to send to the origin
+
+    # Mapping schemas
+    Mapping:
+      type: object
+      required:
+        - mappingId
+        - mappingName
+        - originId
+        - createdAt
+      properties:
+        mappingId:
+          type: string
+          format: uuid
+          description: Unique identifier for the mapping (UUID v4)
+        mappingName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the mapping (alphanumeric, spaces, underscore, hyphen only)
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Optional description of the mapping
+        hostHeaderPattern:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: Host header pattern (e.g., example.com or *.example.com) - mutually exclusive with pathPattern
+        pathPattern:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Path pattern (e.g., /api/* or /images/thumbnails) - mutually exclusive with hostHeaderPattern
+        originId:
+          type: string
+          format: uuid
+          description: UUID of the associated origin
+        policyId:
+          type: string
+          format: uuid
+          description: Optional UUID of the associated transformation policy
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the mapping was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the mapping was last updated
+
+    MappingCreate:
+      type: object
+      required:
+        - mappingName
+        - originId
+      description: Exactly one of hostHeaderPattern or pathPattern must be provided
+      properties:
+        mappingName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the mapping (alphanumeric, spaces, underscore, hyphen only)
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Optional description of the mapping
+        hostHeaderPattern:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: Host header pattern (e.g., example.com or *.example.com) - mutually exclusive with pathPattern
+        pathPattern:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Path pattern (e.g., /api/* or /images/thumbnails) - mutually exclusive with hostHeaderPattern
+        originId:
+          type: string
+          format: uuid
+          description: UUID of the associated origin
+        policyId:
+          type: string
+          format: uuid
+          description: Optional UUID of the associated transformation policy
+
+    MappingUpdate:
+      type: object
+      minProperties: 1
+      description: At least one field must be provided for update. Cannot have both hostHeaderPattern and pathPattern
+      properties:
+        mappingName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable name for the mapping (alphanumeric, spaces, underscore, hyphen only)
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Optional description of the mapping
+        hostHeaderPattern:
+          type: string
+          minLength: 1
+          maxLength: 253
+          description: Host header pattern (e.g., example.com or *.example.com) - mutually exclusive with pathPattern
+        pathPattern:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Path pattern (e.g., /api/* or /images/thumbnails) - mutually exclusive with hostHeaderPattern
+        originId:
+          type: string
+          format: uuid
+          description: UUID of the associated origin
+        policyId:
+          type: string
+          format: uuid
+          description: Optional UUID of the associated transformation policy
