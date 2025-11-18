@@ -576,6 +576,73 @@ describe("setup", () => {
       });
       expect(imageRequestInfo).toEqual(expectedResult);
     });
+
+    it("Should handle SVG image with undefined edits", async () => {
+      // Arrange
+      const event = {
+        path: "/image.svg",
+      };
+
+      // Mock - create an imageRequest that will have undefined edits
+      mockS3Commands.getObject.mockResolvedValue({
+        ContentType: "image/svg+xml",
+        Body: mockImageBody,
+      });
+
+      // Act
+      const imageRequest = new ImageRequest(s3Client, secretProvider);
+      const imageRequestInfo = await imageRequest.setup(event);
+      const expectedResult = {
+        requestType: "Thumbor",
+        bucket: "validBucket",
+        key: "image.svg",
+        edits: {},
+        originalImage: mockImage,
+        cacheControl: "max-age=31536000,public",
+        contentType: "image/svg+xml",
+      };
+
+      // Assert
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
+        Bucket: "validBucket",
+        Key: "image.svg",
+      });
+      expect(imageRequestInfo).toEqual(expectedResult);
+    });
+
+    it("Should handle SVG image with edits object but no toFormat property", async () => {
+      // Arrange - create request with edits that has other properties but no toFormat
+      const event = {
+        path: "/filters:grayscale()/image.svg",
+      };
+
+      // Mock
+      mockS3Commands.getObject.mockResolvedValue({
+        ContentType: "image/svg+xml",
+        Body: mockImageBody,
+      });
+
+      // Act
+      const imageRequest = new ImageRequest(s3Client, secretProvider);
+      const imageRequestInfo = await imageRequest.setup(event);
+      const expectedResult = {
+        requestType: "Thumbor",
+        bucket: "validBucket",
+        key: "image.svg",
+        edits: { grayscale: true },
+        outputFormat: "png",
+        originalImage: mockImage,
+        cacheControl: "max-age=31536000,public",
+        contentType: "image/png",
+      };
+
+      // Assert
+      expect(mockS3Commands.getObject).toHaveBeenCalledWith({
+        Bucket: "validBucket",
+        Key: "image.svg",
+      });
+      expect(imageRequestInfo).toEqual(expectedResult);
+    });
   });
 
   it("Should pass and return the customer headers if custom headers are provided", async () => {
