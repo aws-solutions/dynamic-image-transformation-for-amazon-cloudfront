@@ -132,6 +132,37 @@ describe("setup", () => {
     expect(imageRequestInfo).toEqual(expectedResult);
   });
 
+  it("Should pass when a default image request with TIF format is provided and populate the ImageRequest object with the proper values", async () => {
+    // Arrange
+    const event = {
+      path: "/eyJidWNrZXQiOiJ2YWxpZEJ1Y2tldCIsImtleSI6InZhbGlkS2V5IiwiZWRpdHMiOnsidG9Gb3JtYXQiOiJ0aWYifX0=",
+    };
+    process.env.SOURCE_BUCKETS = "validBucket, validBucket2";
+
+    // Mock
+    mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody });
+
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const imageRequestInfo = await imageRequest.setup(event);
+    const expectedResult = {
+      requestType: "Default",
+      bucket: "validBucket",
+      key: "validKey",
+      edits: { toFormat: "tif" },
+      outputFormat: "tif",
+      originalImage: mockImage,
+      cacheControl: "max-age=31536000,public",
+      contentType: "image/tiff",
+    };
+    // Assert
+    expect(mockS3Commands.getObject).toHaveBeenCalledWith({
+      Bucket: "validBucket",
+      Key: "validKey",
+    });
+    expect(imageRequestInfo).toEqual(expectedResult);
+  });
+
   it("Should pass when a thumbor image request is provided and populate the ImageRequest object with the proper values", async () => {
     // Arrange
     const event = { path: "/filters:grayscale()/test-image-001.jpg" };

@@ -175,7 +175,7 @@ exports[`Dynamic Image Transformation for Amazon CloudFront Stack Snapshot 1`] =
   "Mappings": {
     "Solution": {
       "Config": {
-        "AnonymousUsage": "Yes",
+        "AnonymousUsage": "No",
         "DeployCloudWatchDashboard": "Yes",
         "SharpSizeLimit": "",
         "SolutionId": "S0ABC",
