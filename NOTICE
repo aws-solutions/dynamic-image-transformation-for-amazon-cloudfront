@@ -1285,12 +1285,101 @@ xstate under the MIT license.
 yoctocolors-cjs under the MIT license.
 zod under the MIT license.
 amazonlinux/amazonlinux under the GPLv2 license.
+@aws-sdk/client-lambda under the Apache-2.0 license.
+@cypress/request under the Apache-2.0 license.
+@cypress/xvfb under the MIT license.
+@img/sharp-libvips-linux-riscv64 under the LGPL-3.0-or-later license.
+@img/sharp-linux-riscv64 under the Apache-2.0 license.
+@types/sizzle under the MIT license.
+@types/tmp under the MIT license.
+@types/yauzl under the MIT license.
+@vitest/coverage-v8 under the MIT license.
+aggregate-error under the MIT license.
+ansi-colors under the MIT license.
+arch under the MIT license.
+asn1 under the MIT license.
+assert-plus under the MIT license.
+ast-v8-to-istanbul under the MIT license.
+at-least-node under the ISC license.
+aws-sign2 under the Apache-2.0 license.
+aws4 under the MIT license.
+aws4-axios under the MIT license.
+bcrypt-pbkdf under the BSD-3-Clause license.
+blob-util under the Apache-2.0 license.
+bluebird under the MIT license.
+buffer-crc32 under the MIT license.
+cachedir under the MIT license.
+caseless under the Apache-2.0 license.
+clean-stack under the MIT license.
+cli-cursor under the MIT license.
+cli-table3 under the MIT license.
+cli-truncate under the MIT license.
+colorette under the MIT license.
+colors under the MIT license.
+commander under the MIT license.
+common-tags under the MIT license.
+cypress under the MIT license.
+dashdash under the MIT license.
+ecc-jsbn under the MIT license.
+end-of-stream under the MIT license.
+enquirer under the MIT license.
+eventemitter2 under the MIT license.
+executable under the MIT license.
+extend under the MIT license.
+extract-zip under the BSD-2-Clause license.
+extsprintf under the MIT license.
+fd-slicer under the MIT license.
+figures under the MIT license.
+forever-agent under the Apache-2.0 license.
+generator-function under the MIT license.
+getpass under the MIT license.
+global-dirs under the MIT license.
+hasha under the MIT license.
+http-signature under the MIT license.
+ini under the ISC license.
+is-installed-globally under the MIT license.
+is-typedarray under the MIT license.
+is-unicode-supported under the MIT license.
+isstream under the MIT license.
+jsbn under the MIT license.
+json-schema under the (AFL-2.1 OR BSD-3-Clause) license.
+json-stringify-safe under the ISC license.
+jsprim under the MIT license.
+listr2 under the MIT license.
+lodash.once under the MIT license.
+log-symbols under the MIT license.
+log-update under the MIT license.
+magicast under the MIT license.
+ospath under the MIT license.
+p-map under the MIT license.
+pend under the MIT license.
+performance-now under the MIT license.
+pify under the MIT license.
+pretty-bytes under the MIT license.
+pump under the MIT license.
+regextras under the MIT license.
+request-progress under the MIT license.
+restore-cursor under the MIT license.
+rfdc under the MIT license.
+sshpk under the MIT license.
+systeminformation under the MIT license.
+throttleit under the MIT license.
+through under the MIT license.
+tmp under the MIT license.
+tree-kill under the MIT license.
+tsx under the MIT license.
+tunnel-agent under the Apache-2.0 license.
+tweetnacl under the Unlicense license.
+untildify under the MIT license.
+verror under the MIT license.
+yauzl under the MIT license.
 
 ********************
 OPEN SOURCE LICENSES
 ********************
 
 0BSD - http://landley.net/toybox/license.html
+AFL-2.1 - https://opensource.org/licenses/AFL-2.1
 Apache-2.0 - https://www.apache.org/licenses/LICENSE-2.0
 BSD-2-Clause - https://opensource.org/licenses/BSD-2-Clause
 BSD-3-Clause - https://opensource.org/licenses/BSD-3-Clause
@@ -1305,5 +1394,6 @@ DynamoDB Local License - https://aws.amazon.com/dynamodb/dynamodblocallicense/
 GNU-2.0 - https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 MIT-0 - https://opensource.org/licenses/MIT-0
 BlueOak-1.0.0 - https://opensource.org/licenses/BlueOak-1.0.0
+Unlicense - https://unlicense.org/
 
 

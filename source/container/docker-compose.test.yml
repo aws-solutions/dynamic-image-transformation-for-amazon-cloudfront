@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   dynamodb-local:
-    image: amazon/dynamodb-local:latest
+    image: dynamodb-local-patched:latest
     ports:
       - "8000:8000"
     command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]

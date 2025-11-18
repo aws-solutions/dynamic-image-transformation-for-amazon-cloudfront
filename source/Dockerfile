@@ -11,8 +11,8 @@ RUN dnf update -y && \
 
 # Copy workspace configuration
 COPY package.json package-lock.json* ./
-COPY container/package.json container/package-lock.json ./container/
-COPY data-models/package.json data-models/package-lock.json* ./data-models/
+COPY container/package.json ./container/
+COPY data-models/package.json ./data-models/
 
 
 # Install all workspace dependencies
@@ -40,7 +40,7 @@ RUN dnf update -y && \
 
 # Install production dependencies with workspace structure
 COPY package.json package-lock.json* ./
-COPY container/package.json container/package-lock.json ./container/
+COPY container/package.json ./container/
 COPY data-models/ ./data-models/
 RUN npm ci --workspaces --omit=dev --no-audit --no-fund && \
     npm rebuild sharp && \

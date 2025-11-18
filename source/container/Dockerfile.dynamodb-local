@@ -1,0 +1,22 @@
+FROM amazon/dynamodb-local:latest
+
+USER root
+
+# Fix setuptools CVEs (2022-40897, 2024-6345, 2025-47273)
+# Requires setuptools >= 75.6.0
+RUN pip3 install --upgrade "setuptools>=75.6.0" || \
+    python3 -m pip install --upgrade "setuptools>=75.6.0" || \
+    echo "No pip available, setuptools may not be patchable"
+
+# Fix Netty CVEs (2025-55163, 2025-59419)
+# Requires netty 4.2.7.Final
+WORKDIR /home/dynamodblocal
+RUN rm -f DynamoDBLocal_lib/netty-codec-http2-*.jar && \
+    curl -L -o DynamoDBLocal_lib/netty-codec-http2-4.2.7.Final.jar \
+    https://repo1.maven.org/maven2/io/netty/netty-codec-http2/4.2.7.Final/netty-codec-http2-4.2.7.Final.jar && \
+    rm -f DynamoDBLocal_lib/netty-codec-smtp-*.jar && \
+    curl -L -o DynamoDBLocal_lib/netty-codec-smtp-4.2.7.Final.jar \
+    https://repo1.maven.org/maven2/io/netty/netty-codec-smtp/4.2.7.Final/netty-codec-smtp-4.2.7.Final.jar
+
+USER dynamodblocal
+WORKDIR /home/dynamodblocal
