@@ -6,7 +6,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { Construct } from "constructs";
-import { DITNodejsFunction } from "../common";
+import { DITNodejsFunction, LOG_RETENTION_DAYS } from "../common";
 import { addCfnGuardSuppressRules } from "../../../../utils/utils";
 
 export interface CSPUpdaterConstructProps {
@@ -83,6 +83,7 @@ export class CSPUpdaterConstruct extends Construct {
 
     const provider = new Provider(this, "CSPUpdaterProvider", {
       onEventHandler: cspUpdaterFunction,
+      logRetention: LOG_RETENTION_DAYS,
     });
 
     new CustomResource(this, "CSPUpdaterCustomResource", {

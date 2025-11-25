@@ -707,6 +707,29 @@ Temporary Password: <strong>{####}</strong>
       },
       "Type": "AWS::Lambda::Function",
     },
+    "CSPUpdaterCSPUpdaterProviderframeworkonEventLogRetention609BA59B": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "CSPUpdaterCSPUpdaterProviderframeworkonEventE7D5E323",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 3653,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
+    },
     "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRole9DF2EE66": {
       "Properties": {
         "AssumeRolePolicyDocument": {
@@ -914,6 +937,29 @@ Temporary Password: <strong>{####}</strong>
         "Timeout": 900,
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CLogRetention1948627D": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 3653,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
     },
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265": {
       "Properties": {

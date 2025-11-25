@@ -10,6 +10,7 @@ import { AuthConstruct, WebDistributionConstruct } from "../constructs/frontend"
 import { CSPUpdaterConstruct } from "../constructs/frontend/csp-updater-construct";
 import { MetricsConstruct } from "../constructs/metrics";
 import { ImageProcessingStack } from "./image-processing-stack";
+import { LOG_RETENTION_DAYS } from "../constructs/common";
 
 export interface ManagementStackProps extends StackProps {
   solutionId: string;
@@ -98,6 +99,7 @@ export class ManagementStack extends Stack {
       ],
       destinationBucket: webConstruct.bucket,
       prune: true,
+      logRetention: LOG_RETENTION_DAYS,
     });
 
 
