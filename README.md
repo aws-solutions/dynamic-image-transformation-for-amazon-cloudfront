@@ -2,6 +2,35 @@
 
 **Note**: If you want to use the solution without building from source, navigate to [Solution Landing Page](https://aws.amazon.com/solutions/implementations/dynamic-image-transformation-for-amazon-cloudfront/).
 
+> **⚠️ FORK NOTICE ⚠️**:
+>
+> This is a fork of the [original AWS solution](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront) with additional features not available in the official release.
+
+## Additional Features
+
+### Custom S3 Behaviors for Non-Image Content
+
+Serve static files (PDFs, documents, videos, etc.) directly from S3 through CloudFront alongside image processing. Configure via [CDK context](source/constructs/cdk.json):
+
+```json
+{
+  "context": {
+    "customBehaviors": [
+      {
+        "pathPattern": "*.pdf",
+        "s3BucketName": "my-bucket"
+      },{
+        "pathPattern": "*.mp4",
+        "s3BucketName": "my-bucket",
+        "description": "Serve MP4 files directly from S3",
+        "allowedOrigins": ["*"],
+        "cacheTtlDays": 1
+      }
+    ]
+  }
+}
+```
+
 ## Table of Content
 
 - [Solution Overview](#solution-overview)
