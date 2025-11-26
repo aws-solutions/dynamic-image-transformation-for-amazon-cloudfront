@@ -13,6 +13,7 @@ import {
   NestedStack,
   NestedStackProps,
 } from "aws-cdk-lib";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import { TableV2 } from "aws-cdk-lib/aws-dynamodb";
@@ -137,6 +138,8 @@ export class ImageProcessingStack extends NestedStack {
     let loggingBucket: s3.Bucket | undefined;
     let ditCachePolicy: cloudfront.CachePolicy | undefined;
     let ditFunction: cloudfront.Function | undefined;
+    let configuredDomainNames: string[] | undefined;
+    let configuredCertificate: acm.ICertificate | undefined;
 
     if (!isDevMode) {
       loggingBucket = new s3.Bucket(this, "LoggingBucket", {
@@ -315,9 +318,41 @@ export class ImageProcessingStack extends NestedStack {
         };
       });
 
+      // Get custom domain configuration from CDK context
+      // Note: Must use CDK context (not CloudFormation parameters) because
+      // domain names and certificate need to be set at synthesis time
+      const contextDomainNames = this.node.tryGetContext("customDomainNames");
+      const contextCertificateArn = this.node.tryGetContext("acmCertificateArn");
+
+      let domainNames: string[] | undefined;
+      let certificate: acm.ICertificate | undefined;
+
+      if (contextCertificateArn && contextDomainNames) {
+        // Parse domain names (can be string or array)
+        let domainsStr: string;
+        if (Array.isArray(contextDomainNames)) {
+          domainsStr = contextDomainNames.join(",");
+        } else {
+          domainsStr = contextDomainNames;
+        }
+
+        // Parse comma-separated domains and trim whitespace
+        const domains = domainsStr.split(",").map(d => d.trim()).filter(d => d.length > 0);
+
+        if (domains.length > 0) {
+          domainNames = domains;
+          certificate = acm.Certificate.fromCertificateArn(this, "CustomDomainCertificate", contextCertificateArn);
+          // Save for outputs
+          configuredDomainNames = domains;
+          configuredCertificate = certificate;
+        }
+      }
+
       distribution = new cloudfront.Distribution(this, "ImageProcessingDistribution", {
         comment: `Image Handler Distribution for Dynamic Image Transformation - ${deploymentMode} mode`,
         priceClass: cloudfront.PriceClass.PRICE_CLASS_ALL,
+        domainNames,
+        certificate,
         defaultBehavior: {
           origin: vpcOrigin!,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -358,13 +393,16 @@ export class ImageProcessingStack extends NestedStack {
       });
 
       // Add CFN Guard suppression for CloudFront Distribution TLS version requirement
-      addCfnGuardSuppressRules(cfnDistribution, [
-        {
-          id: "CLOUDFRONT_MINIMUM_PROTOCOL_VERSION_RULE",
-          reason:
-            "Not creating custom certificate and using the default CloudFront certificate that doesn't use TLS 1.2",
-        },
-      ]);
+      // Only suppress when NOT using a custom certificate
+      if (!certificate) {
+        addCfnGuardSuppressRules(cfnDistribution, [
+          {
+            id: "CLOUDFRONT_MINIMUM_PROTOCOL_VERSION_RULE",
+            reason:
+              "Not creating custom certificate and using the default CloudFront certificate that doesn't use TLS 1.2",
+          },
+        ]);
+      }
     }
 
     new Utility(this, "UtilityLambda", {
@@ -477,6 +515,19 @@ export class ImageProcessingStack extends NestedStack {
         value: distribution.distributionDomainName,
         description: "CloudFront distribution domain name for accessing the image processing service",
       });
+
+      // Output custom domain names if configured
+      if (configuredDomainNames && configuredDomainNames.length > 0 && configuredCertificate) {
+        new CfnOutput(this, "ConfiguredCustomDomains", {
+          value: configuredDomainNames.join(", "),
+          description: "Custom domain names configured for the CloudFront distribution",
+        });
+
+        new CfnOutput(this, "ConfiguredCertificateArn", {
+          value: configuredCertificate.certificateArn,
+          description: "ACM certificate ARN used for custom domain names",
+        });
+      }
     }
 
     if (isDevMode) {
