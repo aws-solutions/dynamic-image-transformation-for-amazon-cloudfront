@@ -47,4 +47,5 @@ const managementStackProps: ManagementStackProps = {
   solutionVersion,
   description,
 };
-new ManagementStack(app, "v8-Stack", managementStackProps);
+const stackName = app.node.tryGetContext("stackName") || "v8-Stack";
+new ManagementStack(app, stackName, managementStackProps);
