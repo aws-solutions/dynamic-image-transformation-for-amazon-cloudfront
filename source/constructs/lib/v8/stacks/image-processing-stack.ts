@@ -234,6 +234,11 @@ export class ImageProcessingStack extends NestedStack {
               value: "86400",
               override: false,
             },
+            {
+              header: "Cross-Origin-Resource-Policy",
+              value: "cross-origin",
+              override: true,
+            },
           ],
         },
       });
