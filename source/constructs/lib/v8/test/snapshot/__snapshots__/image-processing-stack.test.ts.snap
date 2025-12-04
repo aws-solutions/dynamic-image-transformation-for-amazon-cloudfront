@@ -1135,6 +1135,11 @@ async function handler(event) {
                 "Override": false,
                 "Value": "86400",
               },
+              {
+                "Header": "Cross-Origin-Resource-Policy",
+                "Override": true,
+                "Value": "cross-origin",
+              },
             ],
           },
           "Name": {
