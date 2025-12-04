@@ -36,7 +36,7 @@ export class OriginFetcher {
       throw new ImageProcessingError(400, 'InvalidUrl', 'Unsupported URL protocol');
     }
 
-    this.validateImageMagicNumbers(result.buffer, result.contentType);
+    this.validateImageMagicNumbers(result.buffer, result.contentType, url);
     const fetchDurationMs = Date.now() - startTime;
     
     console.log(JSON.stringify({
@@ -157,12 +157,14 @@ export class OriginFetcher {
     return validTypes.some(type => contentType.toLowerCase().includes(type));
   }
 
-  private validateImageMagicNumbers(buffer: Buffer, contentType?: string): void {
+  private validateImageMagicNumbers(buffer: Buffer, contentType?: string, url?: string): void {
     // Where applicable the first 4 bytes are checked against that formats starting sequence.
     // For formats with inconsistent or non-existant starting sequences(av1, raw, etc) this validation is skipped.
 
+    const urlInfo = url ? ` from: ${this.sanitizeUrl(url)}` : '';
+
     if (buffer.length < 4) {
-      throw new ImageProcessingError(415, 'InvalidImage', 'File too small to be a valid image');
+      throw new ImageProcessingError(415, 'InvalidImage', `File too small to be a valid image${urlInfo}`);
     }
 
     const magicToFormat = {
@@ -198,10 +200,10 @@ export class OriginFetcher {
       // If no expectedFormat found, skip magic number validation
       if (expectedFormat) {
         if (!detectedFormat) {
-          throw new ImageProcessingError(415, 'InvalidImage', `Invalid or corrupted ${expectedFormat} file`);
+          throw new ImageProcessingError(415, 'InvalidImage', `Invalid or corrupted ${expectedFormat} file${urlInfo}`);
         }
         if (expectedFormat !== detectedFormat) {
-          throw new ImageProcessingError(415, 'InvalidImage', `Content-Type ${contentType} does not match detected format ${detectedFormat}`);
+          throw new ImageProcessingError(415, 'InvalidImage', `Content-Type ${contentType} does not match detected format ${detectedFormat}${urlInfo}`);
         }
       }
     }

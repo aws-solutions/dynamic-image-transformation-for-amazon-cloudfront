@@ -47,7 +47,7 @@ describe('OriginFetcher', () => {
   describe('validateImageMagicNumbers', () => {
     it('should reject files under 4 bytes', () => {
       const smallBuffer = Buffer.from([0xFF, 0xD8]);
-      expect(() => fetcher['validateImageMagicNumbers'](smallBuffer)).toThrow('File too small to be a valid image');
+      expect(() => fetcher['validateImageMagicNumbers'](smallBuffer)).toThrow(/File too small to be a valid image/);
     });
 
     it('should accept valid JPEG with magic numbers', () => {
@@ -83,7 +83,7 @@ describe('OriginFetcher', () => {
     it('should reject content-type mismatch', () => {
       const pngBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47]);
       expect(() => fetcher['validateImageMagicNumbers'](pngBuffer, 'image/jpeg'))
-        .toThrow('Content-Type image/jpeg does not match detected format png');
+        .toThrow(/Content-Type image\/jpeg does not match detected format png/);
     });
 
     it('should allow unknown content-type with detected format', () => {
@@ -99,7 +99,14 @@ describe('OriginFetcher', () => {
     it('should reject malformed magic numbers with content-type', () => {
       const malformedPngBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x46]); // Should be 0x47, not 0x46
       expect(() => fetcher['validateImageMagicNumbers'](malformedPngBuffer, 'image/png'))
-        .toThrow('Invalid or corrupted png file');
+        .toThrow(/Invalid or corrupted png file/);
+    });
+
+    it('should include URL in error message when provided', () => {
+      const pngBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47]);
+      const url = 'https://example.com/image.png';
+      expect(() => fetcher['validateImageMagicNumbers'](pngBuffer, 'image/jpeg', url))
+        .toThrow(/Content-Type image\/jpeg does not match detected format png from: https:\/\/example\.com\/image\.png/);
     });
   });
 
