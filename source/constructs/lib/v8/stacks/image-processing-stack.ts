@@ -13,6 +13,7 @@ import {
   NestedStack,
   NestedStackProps,
 } from "aws-cdk-lib";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import { TableV2 } from "aws-cdk-lib/aws-dynamodb";
@@ -23,6 +24,19 @@ import { addCfnGuardSuppressRules } from "../../../utils/utils";
 import { Utility } from "../constructs/common";
 import { AlbEcsConstruct, ContainerConstruct, EcsConfig, NetworkConstruct } from "../constructs/processor";
 import { SolutionsMetrics, ExecutionDay } from "metrics-utils";
+
+/**
+ * Configuration for custom S3 origins and behaviors
+ * This allows serving non-image content (PDFs, documents, etc.) directly from S3
+ */
+interface CustomBehaviorConfig {
+  pathPattern: string;
+  s3BucketName: string;
+  s3BucketRegion?: string;
+  description: string;
+  allowedOrigins?: string[]; // For CORS configuration
+  cacheTtl?: Duration;
+}
 
 interface ImageProcessingStackProps extends NestedStackProps {
   configTable: TableV2;
@@ -93,6 +107,17 @@ export class ImageProcessingStack extends NestedStack {
     const deploymentMode = this.node.tryGetContext("deploymentMode") || "prod";
     const isDevMode = deploymentMode === "dev";
 
+    const customBehaviorsData = this.node.tryGetContext("customBehaviors") || [];
+
+    const customBehaviors: CustomBehaviorConfig[] = customBehaviorsData.map((behavior: any) => ({
+      pathPattern: behavior.pathPattern,
+      s3BucketName: behavior.s3BucketName,
+      s3BucketRegion: behavior.s3BucketRegion || Aws.REGION,
+      description: behavior.description,
+      allowedOrigins: behavior.allowedOrigins || ["*"],
+      cacheTtl: Duration.days(behavior.cacheTtlDays || 1),
+    }));
+
     let vpcOrigin: origins.VpcOrigin | undefined;
     if (!isDevMode) {
       vpcOrigin = origins.VpcOrigin.withApplicationLoadBalancer(albEcsConstruct.loadBalancer, {
@@ -113,6 +138,8 @@ export class ImageProcessingStack extends NestedStack {
     let loggingBucket: s3.Bucket | undefined;
     let ditCachePolicy: cloudfront.CachePolicy | undefined;
     let ditFunction: cloudfront.Function | undefined;
+    let configuredDomainNames: string[] | undefined;
+    let configuredCertificate: acm.ICertificate | undefined;
 
     if (!isDevMode) {
       loggingBucket = new s3.Bucket(this, "LoggingBucket", {
@@ -207,13 +234,130 @@ export class ImageProcessingStack extends NestedStack {
               value: "86400",
               override: false,
             },
+            {
+              header: "Cross-Origin-Resource-Policy",
+              value: "cross-origin",
+              override: true,
+            },
           ],
         },
       });
 
+      const corsResponseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, "CorsResponseHeadersPolicy", {
+        responseHeadersPolicyName: `CORS-S3-Content-${Aws.REGION}`,
+        comment: "CORS headers for serving non-image content from S3 origins",
+        corsBehavior: {
+          accessControlAllowCredentials: false,
+          accessControlAllowHeaders: ["*"],
+          accessControlAllowMethods: ["GET", "HEAD", "OPTIONS"],
+          accessControlAllowOrigins: ["*"], // Will be customized per behavior if needed
+          accessControlMaxAge: Duration.seconds(600),
+          originOverride: true,
+        },
+        securityHeadersBehavior: {
+          strictTransportSecurity: {
+            accessControlMaxAge: Duration.seconds(31536000),
+            includeSubdomains: false,
+            override: true,
+          },
+          contentTypeOptions: {
+            override: true,
+          },
+          frameOptions: {
+            frameOption: cloudfront.HeadersFrameOption.DENY,
+            override: true,
+          },
+          referrerPolicy: {
+            referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+            override: true,
+          },
+          xssProtection: {
+            modeBlock: true,
+            protection: true,
+            override: true,
+          },
+        },
+      });
+
+      // Create additional behaviors for S3 origins
+      const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {};
+
+      // Cache for S3 origins to avoid creating duplicates for the same bucket
+      const s3OriginCache = new Map<string, cloudfront.IOrigin>();
+
+      customBehaviors.forEach((behaviorConfig, index) => {
+        let s3Origin = s3OriginCache.get(behaviorConfig.s3BucketName);
+
+        if (!s3Origin) {
+          // First time seeing this bucket - create the origin
+          const s3Bucket = s3.Bucket.fromBucketName(
+            this,
+            `CustomS3Origin-${behaviorConfig.s3BucketName}`,
+            behaviorConfig.s3BucketName
+          );
+          s3Origin = origins.S3BucketOrigin.withOriginAccessControl(s3Bucket);
+          s3OriginCache.set(behaviorConfig.s3BucketName, s3Origin);
+        }
+
+        const s3CachePolicy = new cloudfront.CachePolicy(this, `S3CachePolicy${index}`, {
+          cachePolicyName: `s3-content-cache-${index}-${Aws.REGION}`,
+          comment: behaviorConfig.description,
+          defaultTtl: behaviorConfig.cacheTtl || Duration.days(1),
+          maxTtl: Duration.days(365),
+          minTtl: Duration.seconds(0),
+          headerBehavior: cloudfront.CacheHeaderBehavior.none(),
+          queryStringBehavior: cloudfront.CacheQueryStringBehavior.none(),
+          cookieBehavior: cloudfront.CacheCookieBehavior.none(),
+          enableAcceptEncodingGzip: true,
+          enableAcceptEncodingBrotli: true,
+        });
+
+        additionalBehaviors[behaviorConfig.pathPattern] = {
+          origin: s3Origin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: s3CachePolicy,
+          responseHeadersPolicy: corsResponseHeadersPolicy,
+          compress: true,
+        };
+      });
+
+      // Get custom domain configuration from CDK context
+      // Note: Must use CDK context (not CloudFormation parameters) because
+      // domain names and certificate need to be set at synthesis time
+      const contextDomainNames = this.node.tryGetContext("customDomainNames");
+      const contextCertificateArn = this.node.tryGetContext("acmCertificateArn");
+
+      let domainNames: string[] | undefined;
+      let certificate: acm.ICertificate | undefined;
+
+      if (contextCertificateArn && contextDomainNames) {
+        // Parse domain names (can be string or array)
+        let domainsStr: string;
+        if (Array.isArray(contextDomainNames)) {
+          domainsStr = contextDomainNames.join(",");
+        } else {
+          domainsStr = contextDomainNames;
+        }
+
+        // Parse comma-separated domains and trim whitespace
+        const domains = domainsStr.split(",").map(d => d.trim()).filter(d => d.length > 0);
+
+        if (domains.length > 0) {
+          domainNames = domains;
+          certificate = acm.Certificate.fromCertificateArn(this, "CustomDomainCertificate", contextCertificateArn);
+          // Save for outputs
+          configuredDomainNames = domains;
+          configuredCertificate = certificate;
+        }
+      }
+
       distribution = new cloudfront.Distribution(this, "ImageProcessingDistribution", {
         comment: `Image Handler Distribution for Dynamic Image Transformation - ${deploymentMode} mode`,
         priceClass: cloudfront.PriceClass.PRICE_CLASS_ALL,
+        domainNames,
+        certificate,
         defaultBehavior: {
           origin: vpcOrigin!,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -229,6 +373,7 @@ export class ImageProcessingStack extends NestedStack {
             },
           ],
         },
+        additionalBehaviors, // Add custom S3 behaviors
         logBucket: loggingBucket,
         logFilePrefix: "cloudfront-logs/",
         logIncludesCookies: false,
@@ -253,13 +398,16 @@ export class ImageProcessingStack extends NestedStack {
       });
 
       // Add CFN Guard suppression for CloudFront Distribution TLS version requirement
-      addCfnGuardSuppressRules(cfnDistribution, [
-        {
-          id: "CLOUDFRONT_MINIMUM_PROTOCOL_VERSION_RULE",
-          reason:
-            "Not creating custom certificate and using the default CloudFront certificate that doesn't use TLS 1.2",
-        },
-      ]);
+      // Only suppress when NOT using a custom certificate
+      if (!certificate) {
+        addCfnGuardSuppressRules(cfnDistribution, [
+          {
+            id: "CLOUDFRONT_MINIMUM_PROTOCOL_VERSION_RULE",
+            reason:
+              "Not creating custom certificate and using the default CloudFront certificate that doesn't use TLS 1.2",
+          },
+        ]);
+      }
     }
 
     new Utility(this, "UtilityLambda", {
@@ -372,12 +520,42 @@ export class ImageProcessingStack extends NestedStack {
         value: distribution.distributionDomainName,
         description: "CloudFront distribution domain name for accessing the image processing service",
       });
+
+      // Output custom domain names if configured
+      if (configuredDomainNames && configuredDomainNames.length > 0 && configuredCertificate) {
+        new CfnOutput(this, "ConfiguredCustomDomains", {
+          value: configuredDomainNames.join(", "),
+          description: "Custom domain names configured for the CloudFront distribution",
+        });
+
+        new CfnOutput(this, "ConfiguredCertificateArn", {
+          value: configuredCertificate.certificateArn,
+          description: "ACM certificate ARN used for custom domain names",
+        });
+      }
     }
 
     if (isDevMode) {
       new CfnOutput(this, "ALBEndpoint", {
         value: `http://${albEcsConstruct.getAlbDnsName()}`,
         description: "Direct ALB endpoint for development mode (bypasses CloudFront)",
+      });
+    }
+
+    // Output custom behaviors information
+    if (!isDevMode && customBehaviors.length > 0) {
+      const behaviorsInfo = customBehaviors
+        .map(b => `${b.pathPattern} -> ${b.s3BucketName}`)
+        .join(", ");
+
+      new CfnOutput(this, "CustomBehaviors", {
+        value: behaviorsInfo,
+        description: "Custom CloudFront behaviors for S3 content (path pattern -> S3 bucket)",
+      });
+
+      new CfnOutput(this, "CustomBehaviorsCount", {
+        value: customBehaviors.length.toString(),
+        description: "Number of custom S3 behaviors configured",
       });
     }
   }
