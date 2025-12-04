@@ -161,7 +161,13 @@ export class OriginFetcher {
     // Where applicable the first 4 bytes are checked against that formats starting sequence.
     // For formats with inconsistent or non-existant starting sequences(av1, raw, etc) this validation is skipped.
 
-    const urlInfo = url ? ` from: ${this.sanitizeUrl(url)}` : '';
+    let urlInfo = '';
+    if (url) {
+      const sanitized = this.sanitizeUrl(url);
+      // Extract only the path, removing protocol and host for security
+      const pathOnly = sanitized.replace(/^https?:\/\/[^/]+/, '') || sanitized.split('/').slice(1).join('/');
+      urlInfo = ` from: ${pathOnly}`;
+    }
 
     if (buffer.length < 4) {
       throw new ImageProcessingError(415, 'InvalidImage', `File too small to be a valid image${urlInfo}`);

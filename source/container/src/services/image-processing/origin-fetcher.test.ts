@@ -102,11 +102,11 @@ describe('OriginFetcher', () => {
         .toThrow(/Invalid or corrupted png file/);
     });
 
-    it('should include URL in error message when provided', () => {
+    it('should include URL path in error message when provided', () => {
       const pngBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47]);
-      const url = 'https://example.com/image.png';
+      const url = 'https://example.com/path/to/image.png';
       expect(() => fetcher['validateImageMagicNumbers'](pngBuffer, 'image/jpeg', url))
-        .toThrow(/Content-Type image\/jpeg does not match detected format png from: https:\/\/example\.com\/image\.png/);
+        .toThrow(/Content-Type image\/jpeg does not match detected format png from: \/path\/to\/image\.png/);
     });
   });
 
