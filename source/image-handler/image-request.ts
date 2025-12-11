@@ -69,6 +69,7 @@ export class ImageRequest {
         ImageFormatTypes.TIFF,
         ImageFormatTypes.HEIF,
         ImageFormatTypes.GIF,
+        ImageFormatTypes.AVIF,
       ];
 
       imageRequestInfo.contentType = `image/${imageRequestInfo.outputFormat}`;
