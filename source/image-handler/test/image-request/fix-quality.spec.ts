@@ -100,4 +100,18 @@ describe("fixQuality", () => {
     // Assert
     expect(imageRequestInfo.edits).toEqual(expect.objectContaining({ png: { quality: 80 } }));
   });
+
+  it("Should map correct edits with quality key to avif if output format is AVIF", () => {
+    // Arrange
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    imageRequestInfo.outputFormat = ImageFormatTypes.AVIF;
+    imageRequestInfo.requestType = RequestTypes.THUMBOR;
+
+    // Act
+    imageRequest["fixQuality"](imageRequestInfo);
+
+    // Assert
+    expect(imageRequestInfo.edits).toEqual(expect.objectContaining({ avif: { quality: 80 } }));
+    expect(imageRequestInfo.edits.png).toBe(undefined);
+  });
 });

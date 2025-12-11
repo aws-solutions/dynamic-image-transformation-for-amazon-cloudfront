@@ -152,4 +152,27 @@ describe("modifyImageOutput", () => {
     expect(webpSpy).toHaveBeenCalledWith({ effort: request.effort });
     expect(resultFormat).toEqual(ImageFormatTypes.WEBP);
   });
+
+  it("Should return an image in AVIF format when outputFormat is AVIF", async () => {
+    // Arrange
+    const request: ImageRequestInfo = {
+      requestType: RequestTypes.DEFAULT,
+      bucket: "sample-bucket",
+      key: "sample-image-001.png",
+      edits: { grayscale: true },
+      outputFormat: ImageFormatTypes.AVIF,
+      originalImage: image,
+    };
+    const sharpImage = sharp(request.originalImage, { failOnError: false }).withMetadata();
+    const imageHandler = new ImageHandler(s3Client, rekognitionClient);
+    const toFormatSpy = jest.spyOn(sharp.prototype, "toFormat");
+
+    // Act
+    const result = await imageHandler["modifyImageOutput"](sharpImage, request).toBuffer();
+    const resultFormat = (await sharp(result).metadata()).format;
+
+    // Assert
+    expect(toFormatSpy).toHaveBeenCalledWith("avif");
+    expect(resultFormat).toEqual("heif");
+  });
 });
