@@ -11,7 +11,7 @@
   - [Prerequisites for Customization](#prerequisites-for-customization)
     - [1. Clone the repository](#1-clone-the-repository)
     - [2. Unit Test](#2-unit-test)
-    - [3. Build & Deploy](#3-build-and-deploy)
+    - [3. Build and Deploy (updated by BW)](#3-build-and-deploy-updated-by-bw)
 - [Collection of operational metrics](#collection-of-operational-metrics)
 - [External Contributors](#external-contributors)
 - [License](#license)
@@ -62,12 +62,6 @@ After making changes, run unit tests to make sure added customization passes the
 ```bash
 cd $MAIN_DIRECTORY/deployment
 chmod +x run-unit-tests.sh && ./run-unit-tests.sh
-```
-
-BW NOTE: we did not update tests after adding support to EFS (checked that before that all passed), the current results of running tests are:
-```bash
-Test Suites: 1 failed, 32 passed, 33 total
-Tests:       7 failed, 277 passed, 284 total
 ```
 
 ### 3. Build and Deploy (updated by BW)
