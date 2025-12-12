@@ -156,6 +156,8 @@ describe("setup", () => {
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image",
+      useEfs: false,
+      headers: undefined,
     };
 
     // Assert
@@ -195,6 +197,8 @@ describe("setup", () => {
       cacheControl: "max-age=31536000,public",
       outputFormat: "png",
       contentType: "image/png",
+      useEfs: false,
+      headers: undefined,
     };
 
     // Assert
@@ -245,6 +249,8 @@ describe("setup", () => {
       contentType: "custom-type",
       expires: "Tue, 24 Dec 2019 13:46:28 GMT",
       lastModified: "Sat, 19 Dec 2009 16:30:47 GMT",
+      useEfs: false,
+      headers: undefined,
     };
 
     // Assert
@@ -295,6 +301,8 @@ describe("setup", () => {
       contentType: "custom-type",
       expires: "Tue, 24 Dec 2019 13:46:28 GMT",
       lastModified: "Sat, 19 Dec 2009 16:30:47 GMT",
+      useEfs: false,
+      headers: undefined,
     };
 
     // Assert
@@ -528,6 +536,8 @@ describe("setup", () => {
         originalImage: Buffer.from("SampleImageContent\n"),
         cacheControl: "max-age=31536000,public",
         contentType: "image/svg+xml",
+        useEfs: false,
+        headers: undefined,
       };
 
       // Assert
@@ -566,6 +576,8 @@ describe("setup", () => {
         originalImage: Buffer.from("SampleImageContent\n"),
         cacheControl: "max-age=31536000,public",
         contentType: "image/png",
+        useEfs: false,
+        headers: undefined,
       };
 
       // Assert
@@ -604,6 +616,8 @@ describe("setup", () => {
         originalImage: Buffer.from("SampleImageContent\n"),
         cacheControl: "max-age=31536000,public",
         contentType: "image/jpeg",
+        useEfs: false,
+        headers: undefined,
       };
 
       // Assert
