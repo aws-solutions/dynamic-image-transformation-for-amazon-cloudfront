@@ -72,10 +72,11 @@ NOTES:
 3. --profile param is optional, AWS credentials will be picked up from env vars if omitted
 
 ```bash
+cd $MAIN_DIRECTORY
 # 1. Build assets:
-./bw_build.sh --stack_name BW-Serverless-Image-Handler--staging --profile bw
+chmod +x bw_build.sh && ./bw_build.sh --stack_name BW-Serverless-Image-Handler--staging --profile bw
 # 2. Deploy/update stack:
-./bw_deploy.sh --stack_name BW-Serverless-Image-Handler--staging --source_buckets bwpaperclip-bwlevelstaging,bwpaperclip-bwstaging --profile bw
+chmod +x bw_deploy.sh && ./bw_deploy.sh --stack_name BW-Serverless-Image-Handler--staging --source_buckets bwpaperclip-bwlevelstaging,bwpaperclip-bwstaging --profile bw
 ```
 
 # Collection of operational metrics
