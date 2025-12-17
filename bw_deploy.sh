@@ -27,6 +27,10 @@ if [ -z ${SOURCE_BUCKETS+x} ]; then
 fi
 
 cd ./source/constructs
+
+# Clean CDK output to force fresh bundling
+rm -rf cdk.out
+
 STACK_NAME=$STACK_NAME overrideWarningsEnabled=false npx cdk deploy\
   --parameters DeployDemoUIParameter=No\
   --parameters SourceBucketsParameter=$SOURCE_BUCKETS\

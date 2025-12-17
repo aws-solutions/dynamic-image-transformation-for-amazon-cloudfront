@@ -114,16 +114,20 @@ export class BackEnd extends Construct {
       },
       bundling: {
         externalModules: ["sharp"],
-        nodeModules: ["sharp"],
         commandHooks: {
-          beforeBundling(inputDir: string, outputDir: string): string[] {
+          beforeBundling(): string[] {
             return [];
           },
-          beforeInstall(inputDir: string, outputDir: string): string[] {
+          beforeInstall(): string[] {
             return [];
           },
-          afterBundling(inputDir: string, outputDir: string): string[] {
-            return [`cd ${outputDir}`, "rm -rf node_modules/sharp && npm install --arch=x64 --platform=linux sharp"];
+          afterBundling(_inputDir: string, outputDir: string): string[] {
+            return [
+              // Install sharp with all its dependencies (--force for cross-platform)
+              `npm install --force --prefix ${outputDir} sharp`,
+              // Override with Linux x64 binaries for Lambda
+              `npm install --force --prefix ${outputDir} @img/sharp-linux-x64 @img/sharp-libvips-linux-x64`,
+            ];
           },
         },
       },
