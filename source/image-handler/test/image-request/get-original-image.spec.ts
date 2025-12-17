@@ -24,10 +24,13 @@ describe("getOriginalImage", () => {
   });
 
   it("Should pass if the proper bucket name and key are supplied, simulating an image file that can be retrieved", async () => {
-    // Mock
+    // Mock - using JPEG signature bytes followed by sample content
+    const jpegSignature = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+    const sampleContent = Buffer.from("SampleImageContent\n");
+    const imageBuffer = Buffer.concat([jpegSignature, sampleContent]);
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: imageBuffer });
       },
     }));
 
@@ -40,7 +43,8 @@ describe("getOriginalImage", () => {
       Bucket: "validBucket",
       Key: "validKey",
     });
-    expect(result.originalImage).toEqual(Buffer.from("SampleImageContent\n"));
+    expect(result.originalImage).toEqual(imageBuffer);
+    expect(result.contentType).toEqual("image/jpeg");
   });
 
   it("Should throw an error if an invalid bucket or key name is provided, simulating a non-existent original image", async () => {

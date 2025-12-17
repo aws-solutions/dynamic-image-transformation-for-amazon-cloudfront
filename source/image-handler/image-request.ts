@@ -55,6 +55,10 @@ export class ImageRequest {
     } else if (outputFormat) {
       imageRequestInfo.outputFormat = outputFormat;
     }
+
+    if (imageRequestInfo.edits?.avif) {
+      imageRequestInfo.outputFormat = ImageFormatTypes.AVIF;
+    }
   }
 
   /**
@@ -188,7 +192,7 @@ export class ImageRequest {
           result.contentType = originalImage.ContentType;
         }
       } else {
-        result.contentType = "image";
+        result.contentType = this.inferImageType(imageBuffer);
       }
 
       if (originalImage.Expires) {

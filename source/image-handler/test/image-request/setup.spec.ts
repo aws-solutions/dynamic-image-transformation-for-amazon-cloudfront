@@ -37,7 +37,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/jpeg" });
       },
     }));
 
@@ -73,7 +73,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/jpeg" });
       },
     }));
 
@@ -108,7 +108,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/png" });
       },
     }));
 
@@ -141,7 +141,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/jpeg" });
       },
     }));
 
@@ -155,7 +155,7 @@ describe("setup", () => {
       edits: { grayscale: true },
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
-      contentType: "image",
+      contentType: "image/jpeg",
       useEfs: false,
       headers: undefined,
     };
@@ -178,7 +178,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/jpeg" });
       },
     }));
 
@@ -351,7 +351,7 @@ describe("setup", () => {
       // Mock
       mockAwsS3.getObject.mockImplementationOnce(() => ({
         promise() {
-          return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+          return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/png" });
         },
       }));
       mockAwsSecretManager.getSecretValue.mockImplementationOnce(() => ({
@@ -639,7 +639,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/jpeg" });
       },
     }));
 
@@ -674,7 +674,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/png" });
       },
     }));
 
@@ -710,7 +710,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/png" });
       },
     }));
 
@@ -746,7 +746,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/png" });
       },
     }));
 
@@ -782,7 +782,7 @@ describe("setup", () => {
     // Mock
     mockAwsS3.getObject.mockImplementationOnce(() => ({
       promise() {
-        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n") });
+        return Promise.resolve({ Body: Buffer.from("SampleImageContent\n"), ContentType: "image/png" });
       },
     }));
 
