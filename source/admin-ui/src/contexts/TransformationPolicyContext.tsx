@@ -107,7 +107,7 @@ export const TransformationPolicyProvider: React.FC<TransformationPolicyProvider
   const fetchPolicies = async (nextToken?: string, append = false) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const result = await TransformationPolicyService.list(nextToken);
+      const result = await TransformationPolicyService.list({ nextToken });
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch policies');
       }
@@ -183,7 +183,7 @@ export const TransformationPolicyProvider: React.FC<TransformationPolicyProvider
       let nextToken: string | undefined;
 
       do {
-        const result = await TransformationPolicyService.list(nextToken);
+        const result = await TransformationPolicyService.list({ nextToken });
         if (!result.success || !result.data) {
           throw new Error(result.error || 'Failed to fetch policies');
         }

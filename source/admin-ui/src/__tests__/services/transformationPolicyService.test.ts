@@ -51,6 +51,27 @@ describe('TransformationPolicyService', () => {
       expect(result.success).toBe(true);
       expect(result.data).toHaveProperty('items');
     });
+
+    it('should pass nextToken correctly as query parameter in API request', async () => {
+      // Create spy and subscribe to msw event loop
+      const requestSpy = vi.fn();
+      server.events.on('request:start', requestSpy);
+
+      await TransformationPolicyService.list({ nextToken: 'token123' });
+
+      // Validating network call for list api intercepted by msw server
+      expect(requestSpy).toHaveBeenCalledTimes(1);
+
+      // vitest stores arguments in mock.calls
+      // The first call's first argument ({ request })
+      const { request } = requestSpy.mock.calls[0][0];
+      const urlObject = new URL(request.url);
+
+      expect(urlObject.searchParams.get('nextToken')).toBe('token123');
+
+      // Cleanup
+      server.events.removeListener('request:start', requestSpy);
+    });
   });
 
   describe('get', () => {

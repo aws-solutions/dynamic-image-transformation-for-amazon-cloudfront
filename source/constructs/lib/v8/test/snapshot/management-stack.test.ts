@@ -6,6 +6,8 @@ import { Template } from "aws-cdk-lib/assertions";
 import { ManagementStack } from "../../stacks";
 import { cleanTemplateForSnapshot } from "./test-utils";
 
+const SUPPORTED_RUNTIMES = ["nodejs22.x", "python3.13"];
+
 describe("ManagementStack", () => {
   let app: App;
   let stack: ManagementStack;
@@ -30,5 +32,17 @@ describe("ManagementStack", () => {
 
     expect.assertions(1);
     expect(cleanedTemplate).toMatchSnapshot();
+  });
+
+  test("All Lambda functions should use Node.js 22 runtime", () => {
+    const lambdaFunctions = template.findResources("AWS::Lambda::Function");
+    const functionNames = Object.keys(lambdaFunctions);
+
+    expect(functionNames.length).toBeGreaterThan(0);
+
+    functionNames.forEach((functionName) => {
+      const runtime = lambdaFunctions[functionName].Properties.Runtime;
+      expect(SUPPORTED_RUNTIMES).toContain(runtime);
+    });
   });
 });

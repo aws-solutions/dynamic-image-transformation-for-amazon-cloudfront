@@ -1054,7 +1054,8 @@ dit-container under the Apache-2.0 license.
 dom-accessibility-api under the MIT license.
 dom-helpers under the MIT license.
 amazon/dynamodb-local under the DynamoDB Local License Agreement license.
-dynamodb-local under the DynamoDB Local License Agreement license.
+aws-dynamodb-local/aws-dynamodb-local under the DynamoDB Local License Agreement license.
+dynamodb-local-patched under the DynamoDB Local License Agreement license.
 eastasianwidth under the MIT license.
 ee-first under the MIT license.
 encode-utf8 under the MIT license.
@@ -1373,6 +1374,44 @@ tweetnacl under the Unlicense license.
 untildify under the MIT license.
 verror under the MIT license.
 yauzl under the MIT license.
+node-addon-api under the MIT license.
+prebuild-install under the MIT license.
+tar-fs under the MIT license.
+chownr under the ISC license.
+mkdirp-classic under the MIT license.
+tar-stream under the MIT license.
+bl under the MIT license.
+fs-constants under the MIT license.
+expand-template under the MIT license.
+github-from-package under the MIT license.
+napi-build-utils under the MIT license.
+node-abi under the MIT license.
+rc under the Apache-2.0 license.
+deep-extend under the MIT license.
+simple-get under the MIT license.
+decompress-response under the MIT license.
+mimic-response under the MIT license.
+simple-concat under the MIT license.
+b4a under the ISC license.
+fast-fifo under the MIT license.
+streamx under the MIT license.
+text-decoder under the Apache-2.0 license.
+bare-events under the Apache-2.0 license.
+bare-fs under the Apache-2.0 license.
+bare-path under the Apache-2.0 license.
+bare-os under the Apache-2.0 license.
+bare-stream under the Apache-2.0 license.
+sqlite4java/sqlite4java under the Apache-2.0 license.
+reactive-streams/reactive-streams under the MIT license.
+partiql-lang-kotlin/partiql-lang-kotlin under the Apache-2.0 license.
+partiql-ir-generator-runtime/partiql-ir-generator-runtime under the Apache-2.0 license.
+kotlin-stdlib-jdk8/kotlin-stdlib-jdk8 under the Apache-2.0 license.
+kotlin-stdlib-jdk7/kotlin-stdlib-jdk7 under the Apache-2.0 license.
+kotlin-stdlib-common/kotlin-stdlib-common under the Apache-2.0 license.
+kotlin-stdlib/kotlin-stdlib under the Apache-2.0 license.
+ion-element/ion-element under the Apache-2.0 license.
+checker-qual/checker-qual under the MIT license.
+com.amazon.ion.java/IonJava under the Apache-2.0 license.
 
 ********************
 OPEN SOURCE LICENSES

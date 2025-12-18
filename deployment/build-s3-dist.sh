@@ -32,9 +32,6 @@ mkdir -p "$template_dist_dir"
 rm -rf "$build_dist_dir"
 mkdir -p "$build_dist_dir"
 
-headline "[Init] Ensure package versions are updated"
-npm --prefix "$source_dir" run bump-version
-
 headline "[Build] Synthesize cdk template and assets"
 cd "$cdk_source_dir"
 npm run clean:install
@@ -81,3 +78,49 @@ cat > "$deployment_dir/ecr_image_tags.json" << EOF
   "dynamic-image-transformation-for-amazon-cloudfront": "v8.0-stable"
 }
 EOF
+
+echo "------------------------------------------------------------------------------"
+echo "[Packing] Launch Wizard Assets"
+echo "------------------------------------------------------------------------------"
+
+launch_wizard_base_dir="$deployment_dir/launch-wizard-assets"
+
+# Package ECS deployment versions
+if [ -d "${launch_wizard_base_dir}/ecs-deployment" ]; then
+  for version_dir in "${launch_wizard_base_dir}/ecs-deployment"/*; do
+    if [ -d "$version_dir" ]; then
+      version_name=$(basename "$version_dir")
+      echo "Processing ECS deployment version: ${version_name}"
+      
+      if [ -d "${version_dir}/helpPanels" ]; then
+        cd "${version_dir}/helpPanels"
+        zip -q -r9 "${version_dir}/helpPanels.zip" .
+        echo "Created helpPanels.zip for ECS version ${version_name}"
+      else
+        echo "helpPanels directory not found for ECS version ${version_name}, skipping..."
+      fi
+    fi
+  done
+else
+  echo "Launch wizard ECS deployment directory not found, skipping..."
+fi
+
+# Package Lambda deployment versions
+if [ -d "${launch_wizard_base_dir}/lambda-deployment" ]; then
+  for version_dir in "${launch_wizard_base_dir}/lambda-deployment"/*; do
+    if [ -d "$version_dir" ]; then
+      version_name=$(basename "$version_dir")
+      echo "Processing Lambda deployment version: ${version_name}"
+      
+      if [ -d "${version_dir}/helpPanels" ]; then
+        cd "${version_dir}/helpPanels"
+        zip -q -r9 "${version_dir}/helpPanels.zip" .
+        echo "Created helpPanels.zip for Lambda version ${version_name}"
+      else
+        echo "helpPanels directory not found for Lambda version ${version_name}, skipping..."
+      fi
+    fi
+  done
+else
+  echo "Launch wizard Lambda deployment directory not found, skipping..."
+fi

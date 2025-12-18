@@ -1,6 +1,5 @@
 {
   "name": "admin-ui-dynamic-image-transformation-for-amazon-cloudfront",
-  "version": "8.0.0",
   "description": "Admin UI - Dynamic Image Transformation for Amazon CloudFront",
   "author": {
     "name": "Amazon Web Services",

@@ -1,12 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Aws, CustomResource, Duration } from "aws-cdk-lib";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
-import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Aws, CustomResource } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as path from "path";
+import { DITNodejsFunction } from "../common";
+import {addCfnGuardSuppressRules} from "../../../../utils/utils";
 
 export interface MetricsConstructProps {
   readonly solutionId: string;
@@ -22,12 +21,9 @@ export class MetricsConstruct extends Construct {
   constructor(scope: Construct, id: string, props: MetricsConstructProps) {
     super(scope, id);
 
-    const customResourceLambda = new NodejsFunction(this, "CustomResourceLambda", {
-      runtime: Runtime.NODEJS_20_X,
+    const customResourceLambda = new DITNodejsFunction(this, "CustomResourceLambda", {
       handler: "handler",
       entry: path.join(__dirname, "../../../../../v8-custom-resource/index.ts"),
-      timeout: Duration.seconds(30),
-      logRetention: RetentionDays.ONE_WEEK,
       environment: {
         SOLUTION_ID: props.solutionId,
         SOLUTION_VERSION: props.solutionVersion,
@@ -53,5 +49,16 @@ export class MetricsConstruct extends Construct {
         DeploymentSize: props.deploymentSize,
       },
     });
+
+    addCfnGuardSuppressRules(customResourceLambda, [
+      {
+        id: "LAMBDA_INSIDE_VPC",
+        reason: "Lambda used for sending metrics.",
+      },
+      {
+        id: "LAMBDA_CONCURRENCY_CHECK",
+        reason: "Lambda used for sending metrics.",
+      },
+    ]);
   }
 }

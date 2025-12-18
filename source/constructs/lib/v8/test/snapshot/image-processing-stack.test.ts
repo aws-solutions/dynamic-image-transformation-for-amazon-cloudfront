@@ -43,4 +43,16 @@ describe("ImageProcessingStack", () => {
     expect.assertions(1);
     expect(cleanedTemplate).toMatchSnapshot();
   });
+
+  test("All Lambda functions should use Node.js 22 runtime", () => {
+    const lambdaFunctions = template.findResources("AWS::Lambda::Function");
+    const functionNames = Object.keys(lambdaFunctions);
+
+    expect(functionNames.length).toBeGreaterThan(0);
+
+    functionNames.forEach((functionName) => {
+      const runtime = lambdaFunctions[functionName].Properties.Runtime;
+        expect(runtime).toBe("nodejs22.x");
+    });
+  });
 });

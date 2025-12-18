@@ -20,8 +20,8 @@ describe("Transformation Policy Validation", () => {
               type: "quality",
               value: [
                 80, // default quality
-                [1.0, 2.0, 0.7], // 1x-2x DPR: 70% quality
-                [2.0, 3.0, 0.9], // 2x-3x DPR: 90% quality
+                [1.0, 2.0, 70], // 1x-2x DPR: 70% quality
+                [2.0, 3.0, 90], // 2x-3x DPR: 90% quality
               ],
             },
             {
@@ -300,33 +300,6 @@ describe("Transformation Policy Validation", () => {
       const result = validateTransformationPolicyCreate(policy);
       expect(result.success).toBe(true);
     });
-
-    it("should validate policy with multiple watermarks", () => {
-      const policy = {
-        policyName: "Multiple Watermarks Policy",
-        description: "Policy with multiple watermark overlays",
-        policyJSON: {
-          transformations: [
-            {
-              transformation: "resize",
-              value: { width: 1200, height: 800, fit: "contain" },
-            },
-            {
-              transformation: "watermark",
-              value: [
-                ["https://example.com/logo1.png", [5, 5, 0.2, 0.2]],
-                ["https://example.com/logo2.png", [100, 100, 0.2, 0.2]],
-                ["https://example.com/watermark.png", [50, 200, 0.2, 0.1]]
-              ],
-            },
-          ],
-        },
-        isDefault: false,
-      };
-
-      const result = validateTransformationPolicyCreate(policy);
-      expect(result.success).toBe(true);
-    });
   });
 
   describe("Policy validation edge cases", () => {
@@ -430,7 +403,7 @@ describe("Transformation Policy Validation", () => {
           outputs: [
             {
               type: "quality",
-              value: [80, [1.0, 2.0, 0.7]],
+              value: [80, [1.0, 2.0, 70]],
             },
             {
               type: "format",
@@ -464,7 +437,7 @@ describe("Transformation Policy Validation", () => {
           transformations: [
             {
               transformation: "watermark",
-              value: ["https://example.com/logo.png", [10, 10]],
+              value: ["https://example.com/logo.png", [10, 10, null, null, null]],
             },
           ],
         },
@@ -513,11 +486,106 @@ describe("Transformation Policy Validation", () => {
           outputs: [
             {
               type: "quality",
-              value: [85, [1.0, 2.0, 0.8], [2.0, 4.0, 0.6]],
+              value: [85, [1.0, 2.0, 80], [2.0, 4.0, 60]],
             },
             {
               type: "autosize",
               value: [480, 768, 1024, 1440],
+            },
+          ],
+        },
+        isDefault: false,
+      };
+
+      const result = validateTransformationPolicyCreate(policy);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("Quality Output Schema - Integer Validation", () => {
+    it("should accept integer quality values (1-100) for DPR rules", () => {
+      const policy = {
+        policyName: "Integer Quality Policy",
+        description: "Policy with integer quality values for DPR optimization",
+        policyJSON: {
+          outputs: [
+            {
+              type: "quality",
+              value: [80, [1, 1.5, 60], [2, 999, 90]],
+            },
+          ],
+        },
+        isDefault: false,
+      };
+
+      const result = validateTransformationPolicyCreate(policy);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject decimal quality values (0-1) for DPR rules", () => {
+      const policy = {
+        policyName: "Decimal Quality Policy",
+        description: "Policy with decimal quality values (old format)",
+        policyJSON: {
+          outputs: [
+            {
+              type: "quality",
+              value: [80, [1, 1.5, 0.6], [2, 999, 0.9]],
+            },
+          ],
+        },
+        isDefault: false,
+      };
+
+      const result = validateTransformationPolicyCreate(policy);
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0].message).toContain("Invalid input: expected int, received number");
+    });
+
+    it("should reject quality values outside 1-100 range", () => {
+      const policy = {
+        policyName: "Invalid Range Quality Policy",
+        policyJSON: {
+          outputs: [
+            {
+              type: "quality",
+              value: [80, [1, 1.5, 150], [2, 999, 0]],
+            },
+          ],
+        },
+        isDefault: false,
+      };
+
+      const result = validateTransformationPolicyCreate(policy);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept edge case quality values (1 and 100)", () => {
+      const policy = {
+        policyName: "Edge Case Quality Policy",
+        policyJSON: {
+          outputs: [
+            {
+              type: "quality",
+              value: [50, [1, 1.5, 1], [2, 999, 100]], // Min: 1, Max: 100
+            },
+          ],
+        },
+        isDefault: false,
+      };
+
+      const result = validateTransformationPolicyCreate(policy);
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept default quality only (no DPR rules)", () => {
+      const policy = {
+        policyName: "Default Quality Only Policy",
+        policyJSON: {
+          outputs: [
+            {
+              type: "quality",
+              value: [75],
             },
           ],
         },

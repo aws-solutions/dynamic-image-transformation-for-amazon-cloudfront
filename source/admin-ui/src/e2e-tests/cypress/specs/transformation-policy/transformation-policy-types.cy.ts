@@ -66,4 +66,26 @@ describe('Transformation Policy Types - Creation Tests', { tags: ['@smoke', '@cr
     cy.url().should('include', '/transformation-policies');
     cy.contains(policyData.name).should('be.visible');
   });
+
+  it('[@crud] should create a policy with watermark transformation', () => {
+    const policyData = TransformationPolicyFactory.createWatermarkPolicy();
+    
+    TransformationPolicyPage.clickCreatePolicy();
+    TransformationPolicyPage.fillPolicyForm(policyData);
+    TransformationPolicyPage.submitCreatePolicy();
+
+    cy.url().should('include', '/transformation-policies');
+    cy.contains(policyData.name).should('be.visible');
+  });
+
+  it('[@crud] should create a policy with watermark and resize transformations', () => {
+    const policyData = TransformationPolicyFactory.createWatermarkWithResizePolicy();
+    
+    TransformationPolicyPage.clickCreatePolicy();
+    TransformationPolicyPage.fillPolicyForm(policyData);
+    TransformationPolicyPage.submitCreatePolicy();
+
+    cy.url().should('include', '/transformation-policies');
+    cy.contains(policyData.name).should('be.visible');
+  });
 });

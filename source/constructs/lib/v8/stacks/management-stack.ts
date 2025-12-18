@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Aws, CfnOutput, CfnParameter, Stack, StackProps } from "aws-cdk-lib";
+import { Aws, CfnOutput, CfnParameter, Stack, StackProps, CfnResource } from "aws-cdk-lib";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
 import * as path from "path";
@@ -10,6 +10,8 @@ import { AuthConstruct, WebDistributionConstruct } from "../constructs/frontend"
 import { CSPUpdaterConstruct } from "../constructs/frontend/csp-updater-construct";
 import { MetricsConstruct } from "../constructs/metrics";
 import { ImageProcessingStack } from "./image-processing-stack";
+import { LOG_RETENTION_DAYS } from "../constructs/common";
+import { addCfnGuardSuppressRules } from "../../../utils/utils";
 
 export interface ManagementStackProps extends StackProps {
   solutionId: string;
@@ -98,8 +100,29 @@ export class ManagementStack extends Stack {
       ],
       destinationBucket: webConstruct.bucket,
       prune: true,
+      logRetention: LOG_RETENTION_DAYS
     });
 
+    // use the stack node and find all lambda functions in the construct tree
+    // s3deploy.BucketDeployment does not show nested lambda resources in its construct tree
+    const allChildren  = this.node.findAll();
+    const allFunctions = allChildren.filter((child) => child instanceof CfnResource && child.cfnResourceType === "AWS::Lambda::Function");
+    allFunctions.forEach(child => {
+        if (child.node.path.match(/Custom::CDKBucketDeployment.*Resource/) || child.node.path.match(/LogRetention.*Resource/)) {
+          addCfnGuardSuppressRules(child as CfnResource, [
+            {
+              id: "LAMBDA_INSIDE_VPC",
+              reason:
+                "No VPC requirement. Aligns with rest of lambda resource implementation.",
+            },
+            {
+              id: "LAMBDA_CONCURRENCY_CHECK",
+              reason:
+                "Reserved concurrency is not configured as this function is used for one-time deployment operations.",
+            },
+          ]);
+        }
+    })
 
     const metricsConstruct = new MetricsConstruct(this, "Metrics", {
       solutionId: props!.solutionId,

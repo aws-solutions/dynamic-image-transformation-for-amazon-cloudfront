@@ -26,5 +26,6 @@ export const AVAILABLE_TRANSFORMATIONS: TransformationOption[] = [
   { id: 'flatten', title: 'Flatten', description: 'Flatten image with background color', category: 'advanced' },
   { id: 'stripExif', title: 'Strip EXIF', description: 'Remove EXIF metadata', category: 'advanced' },
   { id: 'stripIcc', title: 'Strip ICC', description: 'Remove ICC color profile', category: 'advanced' },
-  { id: 'animated', title: 'Animated', description: 'Control animated image behavior', category: 'advanced' }
+  { id: 'animated', title: 'Animated', description: 'Control animated image behavior', category: 'advanced' },
+  { id: 'watermark', title: 'Watermark', description: 'Apply watermark overlay to image', category: 'advanced' }
 ];

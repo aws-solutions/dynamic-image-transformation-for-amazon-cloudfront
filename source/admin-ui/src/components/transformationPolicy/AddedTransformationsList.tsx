@@ -29,28 +29,13 @@ export const AddedTransformationsList: React.FC<AddedTransformationsListProps> =
       rotate: 'Rotate', grayscale: 'Grayscale', sharpen: 'Sharpen',
       smartCrop: 'Smart Crop', stripExif: 'Strip EXIF', stripIcc: 'Strip ICC',
       flip: 'Flip', flop: 'Flop', normalize: 'Normalize', animated: 'Animated',
-      tint: 'Tint', flatten: 'Flatten', convolve: 'Convolve', extract: 'Extract'
+      tint: 'Tint', flatten: 'Flatten', convolve: 'Convolve', extract: 'Extract',
+      watermark: 'Watermark'
     };
     return titles[transformation.transformation] || transformation.transformation;
   };
 
-  const getTransformationSummary = (transformation: Transformation) => {
-    switch (transformation.transformation) {
-      case 'quality':
-        return `Quality: ${transformation.value}`;
-      case 'format':
-        return `Format: ${transformation.value.toUpperCase()}`;
-      case 'resize':
-        const { width, height, fit } = transformation.value;
-        return `${width || 'auto'} × ${height || 'auto'} (${fit})`;
-      case 'blur':
-        return `Blur: ${transformation.value}`;
-      case 'rotate':
-        return `Rotate: ${transformation.value}°`;
-      default:
-        return 'Configured';
-    }
-  };
+
 
   const renderConfigDetails = (transformation: Transformation) => {
     const details = {

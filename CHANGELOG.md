@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.1] - 2025-12-18
+
+### Security
+
+- Bump `systeminformation` to mitigate [CVE-2025-68154](https://github.com/advisories/GHSA-wphj-fx3q-84ch)
+
+### Added
+
+- Support watermark with policy create/edit on web ui
+
+### Changed
+
+- upgrade lambda runtime to nodejs22 [#628](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/issues/628)
+- refactor log retention to default 10 years with all cw log groups [#620](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/pull/620)
+- fix output quality optimization to use integer values [#622](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/issues/622)
+- pass next token correctly for list policy operation on ui
+- move auto format selection to CF function and refactor `dit-accept` header normalization to improve cache hit
+- corrected auto-optimization logic for static optimization configuration
+- use dynamodb local image from public ecr for integration tests
+- fix backtracking prone regex in data-models
+
 ## [8.0.0] - 2025-11-17
 
 ### Added

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Aws, CustomResource, Duration } from "aws-cdk-lib";
+import { Aws, CfnResource, CustomResource, Duration } from "aws-cdk-lib";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Provider } from "aws-cdk-lib/custom-resources";
@@ -83,7 +83,22 @@ export class CSPUpdaterConstruct extends Construct {
 
     const provider = new Provider(this, "CSPUpdaterProvider", {
       onEventHandler: cspUpdaterFunction,
+      logGroup: cspUpdaterFunction.logGroup,
     });
+
+    const providerFunction = provider.node.findChild('framework-onEvent');
+    addCfnGuardSuppressRules(providerFunction.node.defaultChild as CfnResource, [
+      {
+        id: "LAMBDA_INSIDE_VPC",
+        reason:
+          "No VPC requirement. Aligns with the cspUpdaterFunction implementation which also does not use VPC.",
+      },
+      {
+        id: "LAMBDA_CONCURRENCY_CHECK",
+        reason:
+          "Reserved concurrency is not configured as this function is used for one-time deployment operations.",
+      },
+    ]);
 
     new CustomResource(this, "CSPUpdaterCustomResource", {
       serviceToken: provider.serviceToken,

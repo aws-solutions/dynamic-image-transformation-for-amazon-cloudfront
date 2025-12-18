@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Dynamic Image Transformation for Amazon CloudFront Stack Snapshot 1`] = `
+exports[`ServerlessImageHandlerStack Dynamic Image Transformation for Amazon CloudFront Stack Snapshot 1`] = `
 {
   "Conditions": {
     "BackEndDeployAPIGDistributionF4E75280": {
@@ -1974,7 +1974,7 @@ function processQueryParams(querystring) {
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Tags": [
           {
             "Key": "SolutionId",
@@ -2599,6 +2599,18 @@ function handler(event) {
               "id": "W92",
               "reason": "No need for ReservedConcurrentExecutions, does not support any application functional logic",
             },
+            {
+              "id": "W58",
+              "reason": "The function does have permission to write CloudWatch Logs.",
+            },
+            {
+              "id": "W89",
+              "reason": "The Lambda function does not require any VPC connection at all.",
+            },
+            {
+              "id": "W92",
+              "reason": "The Lambda function does not require ReservedConcurrentExecutions.",
+            },
           ],
         },
       },
@@ -2651,6 +2663,11 @@ function handler(event) {
           },
         },
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "BackEndSolutionMetricsMetricsLambdaLogGroup7A09CAFB",
+          },
+        },
         "MemorySize": 128,
         "Role": {
           "Fn::GetAtt": [
@@ -2669,29 +2686,27 @@ function handler(event) {
       },
       "Type": "AWS::Lambda::Function",
     },
-    "BackEndSolutionMetricsMetricsLambdaLogRetention6219944A": {
+    "BackEndSolutionMetricsMetricsLambdaLogGroup7A09CAFB": {
       "Condition": "SendAnonymousStatistics",
-      "Properties": {
-        "LogGroupName": {
-          "Fn::Join": [
-            "",
-            [
-              "/aws/lambda/",
-              {
-                "Ref": "BackEndSolutionMetricsMetricsLambdaF4FA4AF7",
-              },
-            ],
-          ],
-        },
-        "RetentionInDays": 7,
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
-            "Arn",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
           ],
         },
       },
-      "Type": "Custom::LogRetention",
+      "Properties": {
+        "RetentionInDays": 3653,
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "BackEndSolutionMetricsMetricsLambdaServiceRoleDefaultPolicyEBDDA47A": {
       "Condition": "SendAnonymousStatistics",
@@ -3083,7 +3098,7 @@ function handler(event) {
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Tags": [
           {
             "Key": "SolutionId",
@@ -4075,97 +4090,6 @@ function handler(event) {
         },
       },
       "Type": "AWS::S3::BucketPolicy",
-    },
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
-      "DependsOn": [
-        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
-        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
-      ],
-      "Properties": {
-        "Code": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
-          },
-          "S3Key": "Omitted to remove snapshot dependency on hash",
-        },
-        "Handler": "index.handler",
-        "Role": {
-          "Fn::GetAtt": [
-            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
-            "Arn",
-          ],
-        },
-        "Runtime": "nodejs22.x",
-        "Tags": [
-          {
-            "Key": "SolutionId",
-            "Value": "S0ABC",
-          },
-        ],
-        "Timeout": 900,
-      },
-      "Type": "AWS::Lambda::Function",
-    },
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "ManagedPolicyArns": [
-          {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                {
-                  "Ref": "AWS::Partition",
-                },
-                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-              ],
-            ],
-          },
-        ],
-        "Tags": [
-          {
-            "Key": "SolutionId",
-            "Value": "S0ABC",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "logs:PutRetentionPolicy",
-                "logs:DeleteRetentionPolicy",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
-        "Roles": [
-          {
-            "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
     },
     "OperationalInsightsDashboard00409C46": {
       "Condition": "DeployCloudWatchDashboard",

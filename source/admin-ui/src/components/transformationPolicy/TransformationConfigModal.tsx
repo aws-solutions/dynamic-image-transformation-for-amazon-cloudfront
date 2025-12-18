@@ -14,6 +14,7 @@ import {
 import { TransformationOption } from '../../types/interfaces';
 import { Transformation } from '@data-models';
 import { validateTransformationValue, getValidationConstraints } from '../../utils/transformationValidation';
+import { transformationSchemas } from '@data-models';
 
 // CSS to hide number input spinners
 const hideSpinnerStyles = `
@@ -48,6 +49,16 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [condition, setCondition] = useState<{field: string, value: string | number | (string | number)[]} | null>(null);
 
+  const parsePosition = (value: string): string | number => {
+    if (!value?.trim()) return value;
+  
+    if (value.endsWith('p')) {
+      return value;
+    }
+    const num = parseInt(value, 10);
+    return isNaN(num) ? value : num;
+  };
+
   // Pre-fill config when editing
   React.useEffect(() => {
     if (editingTransformation && visible) {
@@ -76,6 +87,17 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
         case 'flatten':
           setConfig({ [editingTransformation.transformation]: value });
           break;
+        case 'watermark':
+          const [url, [xOffset, yOffset, alpha, widthRatio, heightRatio]] = value;
+          setConfig({
+            watermarkUrl: url,
+            xOffset: xOffset?.toString() || '',
+            yOffset: yOffset?.toString() || '',
+            alpha,
+            widthRatio,
+            heightRatio
+          });
+          break;
         default:
           setConfig({});
       }
@@ -83,9 +105,15 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
       setConfig({});
       setCondition(null);
     }
+    
+    if (!visible) {
+      setErrors({});
+    }
   }, [editingTransformation, visible]);
 
   if (!transformation) return null;
+
+
 
   const validateColorField = (fieldName: string, value: string) => {
     if (value.trim()) {
@@ -108,6 +136,7 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
     }
   };
 
+
   const validateField = (field: string, value: any) => {
     if (!transformation) return;
     
@@ -123,7 +152,41 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
     }
   };
 
+  const validateWatermarkConfig = () => {
+    const watermarkValue = getConfigValue();
+    const result = transformationSchemas.watermark.safeParse(watermarkValue);
+    if (!result.success) {
+      const pathToField = {
+        '0': 'watermarkUrl',
+        '1': 'watermarkTuple',
+        '1.0': 'xOffset',
+        '1.1': 'yOffset',
+        '1.2': 'alpha',
+        '1.3': 'widthRatio',
+        '1.4': 'heightRatio'
+      } as const;
+
+      const errors: Record<string, string> = {};
+      
+      result.error.issues.forEach(issue => {
+        const path = issue.path.join('.');
+        const fieldName = pathToField[path as keyof typeof pathToField] || 'general';
+        errors[fieldName] = issue.message;
+      });
+      
+      setErrors(prev => ({ ...prev, ...errors }));
+      return false;
+    }
+    
+    return true;
+  };
+
   const handleAdd = () => {
+    // Watermark-specific validation
+    if (transformation.id === 'watermark' && !validateWatermarkConfig()) {
+      return;
+    }
+    
     const finalValue = getConfigValue();
     const result = validateTransformationValue(transformation.id, finalValue);
     
@@ -177,6 +240,18 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
         return config.tint || '';
       case 'flatten':
         return config.flatten || '';
+      case 'watermark': {
+        return [
+          config.watermarkUrl || '',
+          [
+            parsePosition(config.xOffset || ''),
+            parsePosition(config.yOffset || ''),
+            config.alpha,
+            config.widthRatio,
+            config.heightRatio
+          ]
+        ];
+      }
       case 'grayscale':
       case 'stripExif':
       case 'stripIcc':
@@ -546,6 +621,250 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
           </Box>
         );
 
+      case 'watermark':
+        return (
+          <SpaceBetween size="m">
+            <FormField
+              label="Watermark Source URL"
+              description="HTTPS URL of the watermark image (must match a configured origin)"
+              errorText={errors.watermarkUrl}
+            >
+              <Input
+                data-testid="watermark-url-input"
+                type="text"
+                value={config.watermarkUrl || ''}
+                onChange={({ detail }) => {
+                  setConfig({ ...config, watermarkUrl: detail.value });
+                  if (detail.value.trim()) {
+                    setErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.watermarkUrl;
+                      return newErrors;
+                    });
+                  }
+                }}
+                onBlur={() => {
+                  if (config.watermarkUrl?.trim()) {
+                    const urlSchema = transformationSchemas.watermark._def.items[0];
+                    const result = urlSchema.safeParse(config.watermarkUrl);
+                    if (!result.success) {
+                      setErrors(prev => ({ ...prev, watermarkUrl: result.error.issues[0]?.message || 'Invalid URL' }));
+                    }
+                  }
+                }}
+                placeholder="https://example.com/logo.png"
+                invalid={!!errors.watermarkUrl}
+              />
+            </FormField>
+
+            <SpaceBetween size="s" direction="horizontal">
+              <FormField 
+                label="X Offset" 
+                description="Integer or percentage (e.g., 10 or 50p)"
+                errorText={errors.xOffset}
+              >
+                <Input
+                  data-testid="watermark-x-offset-input"
+                  type="text"
+                  value={config.xOffset || ''}
+                  onChange={({ detail }) => {
+                    setConfig({ ...config, xOffset: detail.value });
+                    if (errors.xOffset) {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.xOffset;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  onBlur={() => {
+                    if (config.xOffset?.trim()) {
+                      const positionSchema = transformationSchemas.watermark._def.items[1]._def.items[0];
+                      const parsedValue = parsePosition(config.xOffset);
+                      const result = positionSchema.safeParse(parsedValue);
+                      if (!result.success) {
+                        setErrors(prev => ({ ...prev, xOffset: result.error.issues[0]?.message || 'Invalid position format' }));
+                      }
+                    }
+                  }}
+                  placeholder="10 or 50p"
+                  invalid={!!errors.xOffset}
+                />
+              </FormField>
+              <FormField 
+                label="Y Offset" 
+                description="Integer or percentage (e.g., 10 or 50p)"
+                errorText={errors.yOffset}
+              >
+                <Input
+                  data-testid="watermark-y-offset-input"
+                  type="text"
+                  value={config.yOffset || ''}
+                  onChange={({ detail }) => {
+                    setConfig({ ...config, yOffset: detail.value });
+                    if (errors.yOffset) {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.yOffset;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  onBlur={() => {
+                    if (config.yOffset?.trim()) {
+                      const positionSchema = transformationSchemas.watermark._def.items[1]._def.items[1];
+                      const parsedValue = parsePosition(config.yOffset);
+                      const result = positionSchema.safeParse(parsedValue);
+                      if (!result.success) {
+                        setErrors(prev => ({ ...prev, yOffset: result.error.issues[0]?.message || 'Invalid position format' }));
+                      }
+                    }
+                  }}
+                  placeholder="10 or 50p"
+                  invalid={!!errors.yOffset}
+                />
+              </FormField>
+            </SpaceBetween>
+
+            <SpaceBetween size="s" direction="horizontal">
+              <FormField 
+                label="Width Ratio" 
+                description="Width as ratio of base image (0-1)"
+                errorText={errors.widthRatio}
+              >
+                <Input
+                  data-testid="watermark-width-ratio-input"
+                  type="number"
+                  value={config.widthRatio?.toString() || ''}
+                  onKeyDown={(e) => {
+                    if (e.detail.key === 'e' || e.detail.key === 'E' || e.detail.key === '+') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={({ detail }) => {
+                    const value = detail.value === '' ? undefined : parseFloat(detail.value);
+                    setConfig({ ...config, widthRatio: value });
+                    if (errors.widthRatio || errors.watermarkTuple) {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.widthRatio;
+                        delete newErrors.heightRatio;
+                        delete newErrors.watermarkTuple;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  onBlur={() => {
+                    if (config.widthRatio !== undefined) {
+                      const ratioSchema = transformationSchemas.watermark._def.items[1]._def.items[3];
+                      const result = ratioSchema.safeParse(config.widthRatio);
+                      if (!result.success) {
+                        setErrors(prev => ({ ...prev, widthRatio: result.error.issues[0]?.message || 'Invalid width ratio' }));
+                      }
+                    }
+                  }}
+                  placeholder="0.2"
+                  step="0.1"
+                  invalid={!!errors.widthRatio}
+                />
+              </FormField>
+              <FormField 
+                label="Height Ratio" 
+                description="Height as ratio of base image (0-1)"
+                errorText={errors.heightRatio}
+              >
+                <Input
+                  data-testid="watermark-height-ratio-input"
+                  type="number"
+                  value={config.heightRatio?.toString() || ''}
+                  onKeyDown={(e) => {
+                    if (e.detail.key === 'e' || e.detail.key === 'E' || e.detail.key === '+') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={({ detail }) => {
+                    const value = detail.value === '' ? undefined : parseFloat(detail.value);
+                    setConfig({ ...config, heightRatio: value });
+                    if (errors.heightRatio || errors.watermarkTuple) {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.heightRatio;
+                        delete newErrors.widthRatio;
+                        delete newErrors.watermarkTuple;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  onBlur={() => {
+                    if (config.heightRatio !== undefined) {
+                      const ratioSchema = transformationSchemas.watermark._def.items[1]._def.items[4];
+                      const result = ratioSchema.safeParse(config.heightRatio);
+                      if (!result.success) {
+                        setErrors(prev => ({ ...prev, heightRatio: result.error.issues[0]?.message || 'Invalid height ratio' }));
+                      }
+                    }
+                  }}
+                  placeholder="0.2"
+                  step="0.1"
+                  invalid={!!errors.heightRatio}
+                />
+              </FormField>
+            </SpaceBetween>
+
+            {errors.watermarkTuple && (
+              <Box color="text-status-error" fontSize="body-s">
+                {errors.watermarkTuple}
+              </Box>
+            )}
+
+            <Box color="text-status-info" fontSize="body-s">
+              Note: At least one of Width Ratio or Height Ratio must be provided
+            </Box>
+
+            <div style={{ maxWidth: '50%' }}>
+              <FormField 
+                label="Opacity or Transparency (Optional)" 
+                description="0-1, where 1 is fully opaque"
+                errorText={errors.alpha}
+              >
+                <Input
+                  data-testid="watermark-opacity-input"
+                  type="number"
+                  value={config.alpha?.toString() || ''}
+                  onKeyDown={(e) => {
+                    if (e.detail.key === 'e' || e.detail.key === 'E' || e.detail.key === '+') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={({ detail }) => {
+                    const value = detail.value === '' ? undefined : parseFloat(detail.value);
+                    setConfig({ ...config, alpha: value });
+                    if (errors.alpha) {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.alpha;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  onBlur={() => {
+                    if (config.alpha !== undefined) {
+                      const alphaSchema = transformationSchemas.watermark._def.items[1]._def.items[2];
+                      const result = alphaSchema.safeParse(config.alpha);
+                      if (!result.success) {
+                        setErrors(prev => ({ ...prev, alpha: result.error.issues[0]?.message }));
+                      }
+                    }
+                  }}
+                  placeholder="0.8"
+                  step="0.1"
+                  invalid={!!errors.alpha}
+                />
+              </FormField>
+            </div>
+          </SpaceBetween>
+        );
+
       default:
         return (
           <FormField
@@ -572,7 +891,7 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
           <SpaceBetween direction="horizontal" size="xs">
             <Button onClick={onDismiss}>Cancel</Button>
             <Button onClick={onBack}>Back</Button>
-            <Button variant="primary" onClick={handleAdd}>
+            <Button data-testid="watermark-add-button" variant="primary" onClick={handleAdd}>
               Add to Policy
             </Button>
           </SpaceBetween>
@@ -614,10 +933,11 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
               <SpaceBetween size="s" direction="horizontal">
                 <FormField 
                   label="Field" 
-                  description="Request parameter to check"
+                  description="Request parameter"
                   stretch
                 >
                   <Input
+                    data-testid="watermark-condition-field-input"
                     value={condition?.field || ''}
                     onChange={({ detail }) => setCondition(prev => ({ 
                       field: detail.value,
@@ -628,10 +948,11 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
                 </FormField>
                 <FormField 
                   label="Value" 
-                  description="Expected value (comma-separated for multiple)"
+                  description="Expected value"
                   stretch
                 >
                   <Input
+                    data-testid="watermark-condition-value-input"
                     value={Array.isArray(condition?.value) ? condition.value.join(', ') : condition?.value?.toString() || ''}
                     onChange={({ detail }) => {
                       const value = detail.value;

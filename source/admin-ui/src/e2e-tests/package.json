@@ -1,6 +1,5 @@
 {
   "name": "admin-ui-tests",
-  "version": "1.0.0",
   "description": "End to end tests for admin UI",
   "main": "index.js",
   "scripts": {
@@ -46,5 +45,8 @@
     "ts-jest": "^29.0.0",
     "ts-node": "^10.9.1",
     "typescript": "^4.8.0"
+  },
+  "overrides": {
+    "systeminformation": ">=5.27.14"
   }
 }

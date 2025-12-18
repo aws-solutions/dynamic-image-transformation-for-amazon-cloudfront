@@ -21,18 +21,6 @@ export class TransformationPolicyFactory {
     };
   }
 
-  static createPolicyWithTransformationsOnly(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
-    return {
-      name: `Transform Only Policy ${Date.now()}`,
-      description: 'Policy with transformations but no output optimizations',
-      transformations: [
-        { type: 'quality', config: { quality: 75 } },
-        { type: 'resize', config: { width: 800, height: 600, fit: 'cover' } }
-      ],
-      ...overrides
-    };
-  }
-
   static createPolicyWithOutputsOnly(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
     return {
       name: 'Output Only Policy',
@@ -87,6 +75,67 @@ export class TransformationPolicyFactory {
         { type: 'stripExif' },
         { type: 'stripIcc' },
         { type: 'animated' }
+      ],
+      ...overrides
+    };
+  }
+
+  static createWatermarkPolicy(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
+    return {
+      name: 'Watermark Policy',
+      description: 'Policy with watermark transformation',
+      transformations: [
+        { 
+          type: 'watermark', 
+          config: { 
+            sourceUrl: 'https://example.com/watermark.png',
+            positionX: 10,
+            positionY: 10,
+            opacity: 0.8,
+            widthRatio: 0.2,
+            heightRatio: 0.2
+          } 
+        }
+      ],
+      ...overrides
+    };
+  }
+
+  static createWatermarkPolicyWithoutOpacityWidthRatio(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
+    return {
+      name: 'Watermark Policy No Opacity And Width',
+      description: 'Policy with watermark transformation',
+      transformations: [
+        { 
+          type: 'watermark', 
+          config: { 
+            sourceUrl: 'https://example.com/watermark.png',
+            positionX: 10,
+            positionY: 10,
+            heightRatio: 0.2
+          } 
+        }
+      ],
+      ...overrides
+    };
+  }
+
+  static createWatermarkWithResizePolicy(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
+    return {
+      name: 'Watermark Resize Policy',
+      description: 'Policy with watermark and resize transformations',
+      transformations: [
+        { type: 'resize', config: { width: 1200, height: 800 } },
+        { 
+          type: 'watermark', 
+          config: { 
+            sourceUrl: 'https://example.com/logo.png',
+            positionX: 20,
+            positionY: 20,
+            opacity: 0.5,
+            widthRatio: 0.15
+          } 
+        }
       ],
       ...overrides
     };

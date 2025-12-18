@@ -1,22 +1,26 @@
-FROM amazon/dynamodb-local:latest
+FROM public.ecr.aws/aws-dynamodb-local/aws-dynamodb-local:latest
 
 USER root
 
-# Fix setuptools CVEs (2022-40897, 2024-6345, 2025-47273)
+# Install pip and fix setuptools CVEs (2022-40897, 2024-6345, 2025-47273)
 # Requires setuptools >= 75.6.0
-RUN pip3 install --upgrade "setuptools>=75.6.0" || \
-    python3 -m pip install --upgrade "setuptools>=75.6.0" || \
-    echo "No pip available, setuptools may not be patchable"
+RUN yum install -y python3-pip && \
+    pip3 install --upgrade "setuptools>=75.6.0"
 
-# Fix Netty CVEs (2025-55163, 2025-59419)
+# Fix Netty CVEs (2025-55163, 2025-59419, 2025-58056, 2025-58057)
 # Requires netty 4.2.7.Final
+# Fix apache commons-lang3 CVE (2025-48924), note saved as prior version, due to ddb-local classpath referencing hardcoded version
 WORKDIR /home/dynamodblocal
-RUN rm -f DynamoDBLocal_lib/netty-codec-http2-*.jar && \
+RUN rm -f DynamoDBLocal_lib/netty-*.jar DynamoDBLocal_lib/commons-lang3-*.jar && \
     curl -L -o DynamoDBLocal_lib/netty-codec-http2-4.2.7.Final.jar \
     https://repo1.maven.org/maven2/io/netty/netty-codec-http2/4.2.7.Final/netty-codec-http2-4.2.7.Final.jar && \
-    rm -f DynamoDBLocal_lib/netty-codec-smtp-*.jar && \
     curl -L -o DynamoDBLocal_lib/netty-codec-smtp-4.2.7.Final.jar \
-    https://repo1.maven.org/maven2/io/netty/netty-codec-smtp/4.2.7.Final/netty-codec-smtp-4.2.7.Final.jar
-
+    https://repo1.maven.org/maven2/io/netty/netty-codec-smtp/4.2.7.Final/netty-codec-smtp-4.2.7.Final.jar && \
+    curl -L -o DynamoDBLocal_lib/netty-codec-4.2.7.Final.jar \
+    https://repo1.maven.org/maven2/io/netty/netty-codec/4.2.7.Final/netty-codec-4.2.7.Final.jar && \
+    curl -L -o DynamoDBLocal_lib/netty-codec-http-4.2.7.Final.jar \
+    https://repo1.maven.org/maven2/io/netty/netty-codec-http/4.2.7.Final/netty-codec-http-4.2.7.Final.jar && \
+    curl -L -o DynamoDBLocal_lib/commons-lang3-3.17.0.jar \
+    https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.18.0/commons-lang3-3.18.0.jar
 USER dynamodblocal
 WORKDIR /home/dynamodblocal

@@ -42,7 +42,7 @@ export const AddedOutputsList: React.FC<AddedOutputsListProps> = ({
         
         const rulesText = dprRules.map((rule: [number, number, number]) => {
           const [minDpr, maxDpr, quality] = rule;
-          const qualityPercent = Math.round(quality * 100);
+          const qualityPercent = Math.round(quality);
           if (maxDpr === 999) {
             return `${minDpr}+: ${qualityPercent}%`;
           } else if (minDpr === maxDpr) {

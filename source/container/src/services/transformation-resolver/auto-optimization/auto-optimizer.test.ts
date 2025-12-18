@@ -33,31 +33,45 @@ describe('applyAutoOptimizations', () => {
   describe('format optimizations', () => {
     it('should optimize format when policy output format is auto', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
-      mockRequest.headers = { 'dit-accept': 'text/html,image/webp,*/*' };
+      mockRequest.headers = { 'dit-accept': 'text/html,image/jpg,*/*' };
       
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
       
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
         type: 'format',
-        value: 'webp',
+        value: 'jpeg',
         source: 'auto'
       });
     });
 
     it('should prioritize formats by priority order (webp, avif, jpeg, png)', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
-      mockRequest.headers = { 'dit-accept': 'image/jpeg,image/webp,image/avif,*/*' };
+      mockRequest.headers = { 'dit-accept': 'image/jpeg,image/avif,image/avif,*/*' };
       
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
       
       expect(result).toHaveLength(1);
-      expect(result[0].value).toBe('webp');
+      expect(result[0].value).toBe('avif');
     });
 
-    it('should not optimize format when policy format is not auto', () => {
+    it('should apply static format when policy format is not auto', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'jpeg' }];
       mockRequest.headers = { 'dit-accept': 'image/webp,*/*' };
+      
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
+      
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        type: 'format',
+        value: 'jpeg',
+        source: 'auto'
+      });
+    });
+
+    it('should ignore wildcards and return no format optimization', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/*,*/*' };
       
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
       
@@ -85,7 +99,7 @@ describe('applyAutoOptimizations', () => {
       });
     });
 
-    it('should not optimize quality when policy quality type is not auto', () => {
+    it('should apply static quality when policy has single quality value', () => {
       mockPolicy.outputs = [{
         type: 'quality',
         value: [80]
@@ -94,7 +108,12 @@ describe('applyAutoOptimizations', () => {
       
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
       
-      expect(result).toHaveLength(0);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        type: 'quality',
+        value: 80,
+        source: 'auto'
+      });
     });
 
     it('should not optimize quality when quality output is missing', () => {
@@ -103,8 +122,7 @@ describe('applyAutoOptimizations', () => {
       
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
       
-      expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('format');
+      expect(result).toHaveLength(0);
     });
 
 
@@ -159,8 +177,7 @@ describe('applyAutoOptimizations', () => {
       
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
       
-      expect(result).toHaveLength(1);
-      expect(result[0].type).toBe('format');
+      expect(result).toHaveLength(0);
     });
 
 

@@ -479,17 +479,6 @@ describe("Transformation Query Parameters", () => {
       expect(result.data).toEqual(["https://example.com/logo.png", [10, 10, 0.8, 0.3, 0.3]]);
     });
 
-    it("should parse and validate multiple watermarks from URL", () => {
-      const parsed = qs.parse(TEST_URLS.watermarkMultiple.split("?")[1], { allowDots: true });
-      const typed = queryTypes.parseObject(parsed);
-
-      const result = transformationSchemas.watermark.safeParse(typed.watermark);
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual([
-        ["https://example.com/logo1.png", [10, 10, 0.8, 0.3, 0.3]],
-        ["https://example.com/logo2.png", [100, 100, 0.5, 0.2, 0.2]],
-      ]);
-    });
   });
 
   describe("Validation failures", () => {
@@ -534,7 +523,7 @@ describe("Transformation Query Parameters", () => {
     });
 
     it("should fail validation for watermark without width or height ratio", () => {
-      const watermarkData = ["https://example.com/logo.png", [10, 10]];
+      const watermarkData = ["https://example.com/logo.png", [10, 10, null, null, null]];
       
       const result = transformationSchemas.watermark.safeParse(watermarkData);
       expect(result.success).toBe(false);

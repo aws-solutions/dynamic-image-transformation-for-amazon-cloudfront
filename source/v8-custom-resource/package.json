@@ -1,6 +1,5 @@
 {
   "name": "v8-custom-resource",
-  "version": "8.0.0",
   "private": true,
   "description": "DIT metrics custom resource for ECS architecture",
   "license": "Apache-2.0",

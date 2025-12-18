@@ -10,7 +10,7 @@ RUN dnf update -y && \
     rm -rf /var/cache/dnf
 
 # Copy workspace configuration
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 COPY container/package.json ./container/
 COPY data-models/package.json ./data-models/
 
@@ -39,7 +39,7 @@ RUN dnf update -y && \
     rm -rf /var/cache/dnf
 
 # Install production dependencies with workspace structure
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 COPY container/package.json ./container/
 COPY data-models/ ./data-models/
 RUN npm ci --workspaces --omit=dev --no-audit --no-fund && \

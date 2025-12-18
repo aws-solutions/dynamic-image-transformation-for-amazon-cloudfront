@@ -7,12 +7,11 @@ import { Construct } from "constructs";
 import { Schedule } from "aws-cdk-lib/aws-events";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { EventbridgeToLambda } from "@aws-solutions-constructs/aws-eventbridge-lambda";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
 import { LambdaToSqsToLambda } from "@aws-solutions-constructs/aws-lambda-sqs-lambda";
 import { MetricDataQuery } from "@aws-sdk/client-cloudwatch";
-import { ILogGroup, QueryDefinition, QueryDefinitionProps, QueryString, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { ILogGroup, QueryDefinition, QueryDefinitionProps, QueryString } from "aws-cdk-lib/aws-logs";
 import { ExecutionDay, MetricDataProps, SolutionsMetricProps } from "../lambda/helpers/types";
 import {
   addLambdaBilledDurationMemorySize,
@@ -27,6 +26,7 @@ import {
   addECSTransformationUsageMetrics,
   addTransformationSourceMetrics,
 } from "./query-builders";
+import { DITNodejsFunction } from "../../constructs/lib/v8/constructs/common"
 
 export class SolutionsMetrics extends Construct {
   private metricDataQueries: MetricDataQuery[];
@@ -38,13 +38,11 @@ export class SolutionsMetrics extends Construct {
   constructor(scope: Construct, id: string, props: SolutionsMetricProps) {
     super(scope, id);
     const { VERSION } = process.env;
-    this.metricsLambdaFunction = new NodejsFunction(this, "MetricsLambda", {
+    this.metricsLambdaFunction = new DITNodejsFunction(this, "MetricsLambda", {
       description: "Metrics util",
       entry: path.join(__dirname, "../lambda/index.ts"),
-      runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(60),
       memorySize: 128,
-      logRetention: RetentionDays.ONE_WEEK,
       environment: {
         QUERY_PREFIX: `${Aws.STACK_NAME}-`,
         SOLUTION_ID: scope.node.tryGetContext("solutionId"),

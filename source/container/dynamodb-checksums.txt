@@ -1,0 +1,6 @@
+1125086301253b89539fa3bdbf1ded0656c596a2d34e0ca3c10af83373e7fd88 *dynamodb_local_3.0.0.tar.gz
+5ab6c54ff5609e10850e52baa1b504fea719ed486e58e8cecaa09fda18c9695a  netty-codec-smtp-4.2.7.Final.jar
+c98254983dffa9c62bccb0e39638e1138feb4dd7b46e7a663e790f6a070a9306  netty-codec-http2-4.2.7.Final.jar
+5f369658381789998c042a98f02da71d9c39884bbb4f7fd58282f765e09ca031  netty-codec-4.2.7.Final.jar
+2984dd38420a61c4dd68fcacc51ffc528eb46f73f7795cdafdb3a4d6fcb76862  netty-codec-http-4.2.7.Final.jar
+4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720  commons-lang3-3.18.0.jar

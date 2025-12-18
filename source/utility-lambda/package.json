@@ -1,6 +1,5 @@
 {
   "name": "utility-lambda",
-  "version": "8.0.0",
   "scripts": {
     "test": "jest --coverage",
     "build": "tsc"

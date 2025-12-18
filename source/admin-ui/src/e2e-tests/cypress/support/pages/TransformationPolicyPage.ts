@@ -49,6 +49,9 @@ export class TransformationPolicyPage {
         // Wait for configuration modal
         cy.contains('Add Transformation - Step 2 of 2').should('be.visible');
         
+        // Wait for modal content to fully load
+        cy.wait(1000);
+        
         // Fill configuration if provided
         if (transformation.config) {
           this.fillTransformationConfig(transformation.type, transformation.config);
@@ -132,7 +135,8 @@ export class TransformationPolicyPage {
       'flatten': 'Flatten',
       'stripExif': 'Strip EXIF',
       'stripIcc': 'Strip ICC',
-      'animated': 'Animated'
+      'animated': 'Animated',
+      'watermark': 'Watermark'
     };
     return titles[type as keyof typeof titles] || type;
   }
@@ -187,6 +191,29 @@ export class TransformationPolicyPage {
         if (config.top) cy.get('input[type="number"]').eq(1).type(config.top.toString(), { force: true });
         if (config.width) cy.get('input[type="number"]').eq(2).type(config.width.toString(), { force: true });
         if (config.height) cy.get('input[type="number"]').eq(3).type(config.height.toString(), { force: true });
+        break;
+      case 'watermark':
+        // Wait for watermark form label to be visible
+        cy.contains('Watermark Source URL', { timeout: 10000 }).should('be.visible');
+        
+        if (config.sourceUrl) {
+          cy.get('[data-testid="watermark-url-input"] input').should('be.visible').clear({ force: true }).type(config.sourceUrl, { force: true });
+        }
+        if (config.positionX !== undefined) {
+          cy.get('[data-testid="watermark-x-offset-input"] input').should('be.visible').clear({ force: true }).type(config.positionX.toString(), { force: true });
+        }
+        if (config.positionY !== undefined) {
+          cy.get('[data-testid="watermark-y-offset-input"] input').should('be.visible').clear({ force: true }).type(config.positionY.toString(), { force: true });
+        }
+        if (config.widthRatio !== undefined) {
+          cy.get('[data-testid="watermark-width-ratio-input"] input').should('be.visible').clear({ force: true }).type(config.widthRatio.toString(), { force: true });
+        }
+        if (config.heightRatio !== undefined) {
+          cy.get('[data-testid="watermark-height-ratio-input"] input').should('be.visible').clear({ force: true }).type(config.heightRatio.toString(), { force: true });
+        }
+        if (config.opacity !== undefined) {
+          cy.get('[data-testid="watermark-opacity-input"] input').should('be.visible').clear({ force: true }).type(config.opacity.toString(), { force: true });
+        }
         break;
       case 'convolve':
         // No configuration needed for Edge Detection

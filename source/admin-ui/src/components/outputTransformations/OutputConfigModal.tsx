@@ -50,7 +50,7 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
                            `${minDpr}-${maxDpr}`;
             return {
               dprRange,
-              quality: Math.round(qualityRatio * 100)
+              quality: qualityRatio
             };
           });
           setConfig({ defaultQuality, dprRules });
@@ -88,7 +88,7 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
           config.dprRules.forEach((rule: any) => {
             const [minDpr, maxDpr] = parseDprRange(rule.dprRange);
             const qualityValue = parseInt(rule.quality) || 80;
-            qualityConfig.push([minDpr, maxDpr, qualityValue / 100]); // Convert to 0-1 ratio
+            qualityConfig.push([minDpr, maxDpr, qualityValue]);
           });
         }
         return qualityConfig;
@@ -147,14 +147,14 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
         const qualityValue = parseInt(rule.quality);
         if (!isNaN(qualityValue)) {
           try {
-            z.number().min(0).max(1).parse(qualityValue / 100);
+            z.number().min(1).max(100).parse(qualityValue);
           } catch (err) {
             if (err instanceof z.ZodError) {
-              qualityErrors[index] = 'Quality must be between 0 and 100';
+              qualityErrors[index] = 'Quality must be between 1 and 100';
             }
           }
         } else {
-          qualityErrors[index] = 'Quality must be a number between 0 and 100';
+          qualityErrors[index] = 'Quality must be a number between 1 and 100';
         }
       }
     });

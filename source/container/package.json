@@ -1,6 +1,5 @@
 {
   "name": "dit-container",
-  "version": "8.0.0",
   "description": "Dynamic Image Transformation ECS Container",
   "main": "dist/server.js",
   "scripts": {

@@ -53,19 +53,21 @@ function parseOutputs(policy?: TransformationPolicy) {
 }
 
 function getFormatOptimizations(req: Request, formatConfig: any, imageRequest?: ImageProcessingRequest): Transformation[] {
-  if (formatConfig !== 'auto') {
+  if (!formatConfig) {
     return [];
+  }
+  
+  if (formatConfig !== 'auto') {
+    return [createOptimizationTransformation('format', formatConfig)];
   }
   
   const accept = req.header('dit-accept') || '';
   console.log('Accept header found as: ', req.header('dit-accept'))
-  const acceptsGeneric = accept.includes('image/*') || accept.includes('*/*') || accept === 'image' || !accept.trim();
   const compatibleFormats = Object.keys(FORMAT_MAPPING)
     .filter(mimeType => accept.includes(mimeType))
     .map(mimeType => FORMAT_MAPPING[mimeType]);
   
-  const availableFormats = acceptsGeneric ? FORMAT_PRIORITY : compatibleFormats;
-  const selectedFormat = FORMAT_PRIORITY.find(format => availableFormats.includes(format));
+  const selectedFormat = FORMAT_PRIORITY.find(format => compatibleFormats.includes(format));
   
   if (!selectedFormat) {
     return [];
@@ -84,13 +86,18 @@ function getFormatOptimizations(req: Request, formatConfig: any, imageRequest?: 
 
 function getQualityOptimizations(req: Request, qualityConfig: any): Transformation[] {
   console.log('getQuality: ', qualityConfig)
-  if (!qualityConfig || !Array.isArray(qualityConfig) || qualityConfig.length <= 2) {
+  if (!qualityConfig || !Array.isArray(qualityConfig) || qualityConfig.length === 0) {
     return [];
   }
   
-  const dpr = req.header('dit-dpr');
   const defaultQuality = qualityConfig[0];
   
+  // Static quality only (no DPR ranges)
+  if (qualityConfig.length === 1) {
+    return [createOptimizationTransformation('quality', defaultQuality)];
+  }
+  
+  const dpr = req.header('dit-dpr');
   if (!dpr) {
     return [createOptimizationTransformation('quality', defaultQuality)];
   }

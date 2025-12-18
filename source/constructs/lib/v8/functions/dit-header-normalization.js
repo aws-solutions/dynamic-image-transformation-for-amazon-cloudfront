@@ -1,6 +1,44 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+const FORMAT_PRIORITY = ['webp', 'avif', 'jpeg', 'png', 'heif', 'tiff', 'raw', 'gif'];
+
+const FORMAT_MAPPING = {
+  'image/webp': 'webp',
+  'image/avif': 'avif',
+  'image/jpeg': 'jpeg',
+  'image/jpg': 'jpeg',
+  'image/png': 'png',
+  'image/heif': 'heif',
+  'image/heic': 'heif',
+  'image/tiff': 'tiff',
+  'image/raw': 'raw',
+  'image/gif': 'gif'
+};
+
+function normalizeAcceptHeader(acceptHeader) {
+  if (!acceptHeader) return null;
+
+  const mimeTypes = acceptHeader
+    .split(',')
+    .map(part => part.split(';')[0].trim().toLowerCase());
+
+  var supportedFormats = [];
+  for (var i = 0; i < mimeTypes.length; i++) {
+    if (FORMAT_MAPPING[mimeTypes[i]]) {
+      supportedFormats.push(FORMAT_MAPPING[mimeTypes[i]]);
+    }
+  }
+
+  for (var j = 0; j < FORMAT_PRIORITY.length; j++) {
+    if (supportedFormats.indexOf(FORMAT_PRIORITY[j]) !== -1) {
+      return 'image/' + FORMAT_PRIORITY[j];
+    }
+  }
+
+  return null;
+}
+
 async function handler(event) {
   var request = event.request;
   var headers = request.headers;
@@ -48,8 +86,12 @@ async function handler(event) {
       request.headers[ditHostHeader] = { value: headers["host"]["value"] };
     }
 
-    if (headers["accept"] && ditAcceptHeader) {
-      request.headers[ditAcceptHeader] = { value: headers["accept"]["value"] };
+    // Only set dit-accept if format parameter is not present in query string
+    if (headers["accept"] && ditAcceptHeader && !(request.querystring && request.querystring.format)) {
+      const normalizedFormat = normalizeAcceptHeader(headers["accept"]["value"]);
+      if (normalizedFormat) {
+        request.headers[ditAcceptHeader] = { value: normalizedFormat };
+      }
     }
 
     // Normalize DPR values to nearest tenth and cap at 5.0

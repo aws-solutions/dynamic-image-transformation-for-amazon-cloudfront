@@ -5,7 +5,7 @@ import { Duration, aws_logs as logs } from "aws-cdk-lib";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 
 // Lambda constants
-export const DIT_LAMBDA_RUNTIME = Runtime.NODEJS_20_X;
+export const DIT_LAMBDA_RUNTIME = Runtime.NODEJS_22_X;
 export const DIT_LAMBDA_DEFAULT_MEMORY_SIZE = 512;
 export const DIT_LAMBDA_DEFAULT_TIMEOUT = Duration.seconds(30);
 export const DIT_CONFIG_TABLE_NAME = "DIT-Config-Table";

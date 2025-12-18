@@ -42,7 +42,7 @@ describe("DIT CloudFront Function", () => {
     const result = await handler(event);
 
     expect(result.headers["dit-host"]?.value).toEqual(event.request.headers["host"].value);
-    expect(result.headers["dit-accept"]?.value).toEqual(event.request.headers["accept"].value);
+    expect(result.headers["dit-accept"]?.value).toEqual("image/webp");
     expect(result.headers["dit-viewport-width"]?.value).toBe("1440");
     expect(result.headers["dit-dpr"]?.value).toEqual(event.request.headers["sec-ch-dpr"].value);
   });
@@ -76,7 +76,7 @@ describe("DIT CloudFront Function", () => {
     const result = await handler(event);
 
     expect(result.headers["dit-host"]?.value).toEqual(event.request.headers["host"].value);
-    expect(result.headers["dit-accept"]?.value).toEqual(event.request.headers["accept"].value);
+    expect(result.headers["dit-accept"]).toBeUndefined(); // Wildcards are ignored
     expect(result.headers["dit-viewport-width"]).toBeUndefined();
   });
 
@@ -108,7 +108,7 @@ describe("DIT CloudFront Function", () => {
 
     // DIT headers should be added
     expect(result.headers["dit-host"]?.value).toEqual(event.request.headers["host"].value);
-    expect(result.headers["dit-accept"]?.value).toEqual(event.request.headers["accept"].value);
+    expect(result.headers["dit-accept"]?.value).toEqual("image/webp");
     expect(result.headers["dit-viewport-width"]?.value).toBe("1440");
     expect(result.headers["dit-dpr"]?.value).toEqual(event.request.headers["sec-ch-dpr"].value);
   });
@@ -159,5 +159,97 @@ describe("DIT CloudFront Function", () => {
       const result = await handler(event);
       expect(result.headers["dit-dpr"]?.value).toBe(testCase.expected);
     }
+  });
+
+  describe("Accept header normalization", () => {
+    test("should select highest priority format from Accept header", async () => {
+      const testCases = [
+        { input: "image/avif,image/webp,image/png", expected: "image/webp" },
+        { input: "image/png,image/jpeg", expected: "image/jpeg" },
+        { input: "image/avif,image/heif", expected: "image/avif" },
+        { input: "image/gif", expected: "image/gif" },
+      ];
+
+      for (const testCase of testCases) {
+        const event: CloudFrontEvent = {
+          request: {
+            headers: {
+              host: { value: "test.com" },
+              accept: { value: testCase.input },
+            },
+          },
+        };
+
+        const result = await handler(event);
+        expect(result.headers["dit-accept"]?.value).toBe(testCase.expected);
+      }
+    });
+
+    test("should ignore wildcards in Accept header", async () => {
+      const testCases = ["*/*", "image/*", "image/*,*/*;q=0.8"];
+
+      for (const input of testCases) {
+        const event: CloudFrontEvent = {
+          request: {
+            headers: {
+              host: { value: "test.com" },
+              accept: { value: input },
+            },
+          },
+        };
+
+        const result = await handler(event);
+        expect(result.headers["dit-accept"]).toBeUndefined();
+      }
+    });
+
+    test("should strip quality values from Accept header", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/webp;q=0.9,image/png;q=0.8" },
+          },
+        },
+      };
+
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp");
+    });
+
+    test("should ignore quality values when selecting format", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/png;q=1.0,image/webp;q=0.1" },
+          },
+        },
+      };
+
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp");
+    });
+
+    test("should handle MIME type aliases", async () => {
+      const testCases = [
+        { input: "image/jpg", expected: "image/jpeg" },
+        { input: "image/heic", expected: "image/heif" },
+      ];
+
+      for (const testCase of testCases) {
+        const event: CloudFrontEvent = {
+          request: {
+            headers: {
+              host: { value: "test.com" },
+              accept: { value: testCase.input },
+            },
+          },
+        };
+
+        const result = await handler(event);
+        expect(result.headers["dit-accept"]?.value).toBe(testCase.expected);
+      }
+    });
   });
 });

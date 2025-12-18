@@ -31,7 +31,9 @@ const colorSchema = z.union([
 // Accepts integers or percentage strings (e.g., "50p", "-25p") with 1-4 digits followed by 'p'
 const positionSchema = z.union([
   z.int(),
-  z.string().regex(/^-?\d{1,4}p$/).max(5)
+  z.string()
+    .max(5, "Percentage too long (max 4 digits + p)")
+    .regex(/^-?\d{1,4}p$/, "Enter a percentage like 50 or -25p")
 ]);
 
 // Allows either URLs or domain styled watermark sources
@@ -49,11 +51,15 @@ const watermarkTuple = z.tuple([
     .tuple([
       positionSchema, // xOffset
       positionSchema, // yOffset
-      z.number().min(0).max(1).optional(), // alpha (0-1 ratio)
-      z.number().min(0).max(1).optional(), // widthRatio (0-1 ratio)
-      z.number().min(0).max(1).optional(), // heightRatio (0-1 ratio)
+      z.nullable(z.number().min(0).max(1)).default(null), // alpha (0-1 ratio),
+      z.nullable(z.number().min(0).max(1)).default(null), // widthRatio (0-1 ratio),
+      z.nullable(z.number().min(0).max(1)).default(null), // heightRatio (0-1 ratio),
     ])
-    .refine((data) => data[2] !== undefined || data[3] !== undefined, {
+    .refine((data) => {
+      const widthRatio = data[3];
+      const heightRatio = data[4];
+      return (widthRatio !== null) || (heightRatio !== null);
+    }, {
       message: "At least widthRatio or heightRatio must be provided",
     }),
 ]);
@@ -114,10 +120,7 @@ export const transformationSchemas = {
   ]),
   stripExif: z.boolean(),
   stripIcc: z.boolean(),
-  watermark: z.union([
-    watermarkTuple, // single watermark
-    z.array(watermarkTuple).min(1, "At least one watermark required"), // multiple watermarks
-  ]),
+  watermark: watermarkTuple, // single watermark only
 };
 
 const outputSchemas = {
@@ -129,7 +132,7 @@ const outputSchemas = {
       z.tuple([
         z.number().min(0), // min dpr
         z.number().min(0), // max dpr
-        z.number().min(0).max(1), // quality
+        z.int().min(1).max(100), // quality
       ])
     )
     .refine((arr) => arr.length >= 1, "Must have default quality"),

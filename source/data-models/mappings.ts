@@ -17,14 +17,14 @@ const hostHeaderPatternSchema = z
   .min(1)
   .max(253)
   .regex(
-    /^(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/,
+    /^(?:\*\.)?[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/,
     "Invalid host pattern - use format: example.com or *.example.com"
   );
 const pathPatternSchema = z
   .string()
   .min(1)
   .max(1023)
-  .regex(/^\/([a-zA-Z0-9._-]+\/?)*(\*)?$/, "Invalid path pattern - use format: /path or /path/* for wildcards");
+  .regex(/^\/(?:[a-zA-Z0-9._-]+\/?)*(?:\*)?$/, "Invalid path pattern - use format: /path or /path/* for wildcards");
 const originIdSchema = z.uuid({ version: "v4" });
 const policyIdSchema = z.uuid({ version: "v4" });
 

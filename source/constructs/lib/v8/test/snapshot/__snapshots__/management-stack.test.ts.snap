@@ -581,7 +581,7 @@ Temporary Password: <strong>{####}</strong>
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Timeout": 30,
       },
       "Type": "AWS::Lambda::Function",
@@ -675,6 +675,14 @@ Temporary Password: <strong>{####}</strong>
         "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRoleDefaultPolicy0AFAE5F5",
         "CSPUpdaterCSPUpdaterProviderframeworkonEventServiceRole9DF2EE66",
       ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
       "Properties": {
         "Code": {
           "S3Bucket": "Omitted to remove snapshot dependency on bucket",
@@ -695,6 +703,9 @@ Temporary Password: <strong>{####}</strong>
         "LoggingConfig": {
           "ApplicationLogLevel": "FATAL",
           "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "CSPUpdaterCSPUpdaterFunctionLogGroup3255BE06",
+          },
         },
         "Role": {
           "Fn::GetAtt": [
@@ -888,6 +899,14 @@ Temporary Password: <strong>{####}</strong>
         "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",
         "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
       ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
       "Properties": {
         "Code": {
           "S3Bucket": "Omitted to remove snapshot dependency on bucket",
@@ -914,6 +933,29 @@ Temporary Password: <strong>{####}</strong>
         "Timeout": 900,
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CLogRetention1948627D": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 3653,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
     },
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265": {
       "Properties": {
@@ -1080,7 +1122,7 @@ Temporary Password: <strong>{####}</strong>
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Timeout": 30,
       },
       "Type": "AWS::Lambda::Function",
@@ -1866,6 +1908,14 @@ Temporary Password: <strong>{####}</strong>
         "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
         "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
       ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
       "Properties": {
         "Code": {
           "S3Bucket": "Omitted to remove snapshot dependency on bucket",
@@ -1970,6 +2020,14 @@ Temporary Password: <strong>{####}</strong>
       "DependsOn": [
         "MetricsCustomResourceLambdaServiceRole493FC361",
       ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
       "Properties": {
         "Code": {
           "S3Bucket": "Omitted to remove snapshot dependency on bucket",
@@ -1982,39 +2040,37 @@ Temporary Password: <strong>{####}</strong>
           },
         },
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "MetricsCustomResourceLambdaLogGroup041E9E89",
+          },
+        },
+        "MemorySize": 512,
         "Role": {
           "Fn::GetAtt": [
             "MetricsCustomResourceLambdaServiceRole493FC361",
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Timeout": 30,
       },
       "Type": "AWS::Lambda::Function",
     },
-    "MetricsCustomResourceLambdaLogRetention200C8177": {
-      "Properties": {
-        "LogGroupName": {
-          "Fn::Join": [
-            "",
-            [
-              "/aws/lambda/",
-              {
-                "Ref": "MetricsCustomResourceLambda8AAD16EB",
-              },
-            ],
-          ],
-        },
-        "RetentionInDays": 7,
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
-            "Arn",
+    "MetricsCustomResourceLambdaLogGroup041E9E89": {
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
           ],
         },
       },
-      "Type": "Custom::LogRetention",
+      "Properties": {
+        "RetentionInDays": 3653,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "MetricsCustomResourceLambdaServiceRole493FC361": {
       "Properties": {
