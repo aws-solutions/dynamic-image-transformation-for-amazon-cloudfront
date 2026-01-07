@@ -1235,7 +1235,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Tags": [
           {
             "Key": "SolutionId",
@@ -1475,7 +1475,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "Arn",
           ],
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs22.x",
         "Tags": [
           {
             "Key": "SolutionId",

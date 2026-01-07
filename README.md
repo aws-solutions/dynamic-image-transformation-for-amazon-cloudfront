@@ -73,10 +73,10 @@ NOTES:
 
 ```bash
 cd $MAIN_DIRECTORY
-# 1. Build assets:
-chmod +x bw_build.sh && ./bw_build.sh --stack_name BW-Serverless-Image-Handler--staging --profile bw
+# 1. Build assets (SIH stands for Serverless-Image-Handler):
+./bw_build.sh --stack_name LEVEL-staging-SIH--01-2026 --profile bw
 # 2. Deploy/update stack:
-chmod +x bw_deploy.sh && ./bw_deploy.sh --stack_name BW-Serverless-Image-Handler--staging --source_buckets bwpaperclip-bwlevelstaging,bwpaperclip-bwstaging --profile bw
+./bw_deploy.sh --stack_name LEVEL-staging-SIH--01-2026 --source_buckets bwpaperclip-bwlevelstaging --profile bw
 ```
 
 # Collection of operational metrics

@@ -3,7 +3,7 @@
 
 import * as path from "path";
 import { Effect, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Function as LambdaFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Bucket, IBucket } from "aws-cdk-lib/aws-s3";
 import { BucketDeployment, Source as S3Source } from "aws-cdk-lib/aws-s3-deployment";
@@ -123,7 +123,7 @@ export class CustomResourcesConstruct extends Construct {
 
     this.customResourceLambda = new NodejsFunction(this, "CustomResourceFunction", {
       description: `${props.solutionName} (${props.solutionVersion}): Custom resource`,
-      runtime: Runtime.NODEJS_20_X,
+      runtime: new Runtime("nodejs22.x", RuntimeFamily.NODEJS, { supportsInlineCode: true }),
       timeout: Duration.minutes(1),
       memorySize: 128,
       role: this.customResourceRole,
