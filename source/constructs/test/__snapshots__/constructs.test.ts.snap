@@ -400,7 +400,6 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "HeaderBehavior": "whitelist",
               "Headers": [
                 "origin",
-                "accept",
               ],
             },
             "QueryStringsConfig": {
@@ -1177,6 +1176,9 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         },
       },
       "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
         "Code": {
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
@@ -1228,7 +1230,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           },
         },
         "Handler": "index.handler",
-        "MemorySize": 3008,
+        "MemorySize": 2048,
         "Role": {
           "Fn::GetAtt": [
             "BackEndImageHandlerFunctionRoleABF81E5C",

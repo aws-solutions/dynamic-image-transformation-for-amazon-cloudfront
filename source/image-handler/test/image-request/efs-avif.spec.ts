@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: Apache-2.0
-
 import S3 from "aws-sdk/clients/s3";
 import SecretsManager from "aws-sdk/clients/secretsmanager";
 
@@ -59,9 +56,9 @@ describe("EFS with AVIF edits", () => {
     // Mock EFS read with a valid JPEG buffer (JPEG signature: FF D8 FF E0)
     const jpegSignature = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
     const sampleContent = Buffer.from("SampleJPEGImageContent");
-    const jpegBuffer = Buffer.concat([jpegSignature, sampleContent]);
-
-    (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(jpegBuffer);
+    const mockReadFile = fsPromises.readFile as unknown as jest.Mock<Promise<Uint8Array>>;
+    const jpegBuffer = Buffer.concat([jpegSignature, sampleContent] as Uint8Array[]);
+    mockReadFile.mockResolvedValueOnce(jpegBuffer as Uint8Array);
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);
@@ -96,9 +93,9 @@ describe("EFS with AVIF edits", () => {
     // Mock EFS read with a valid JPEG buffer
     const jpegSignature = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
     const sampleContent = Buffer.from("SampleJPEGImageContent");
-    const jpegBuffer = Buffer.concat([jpegSignature, sampleContent]);
-
-    (fsPromises.readFile as jest.Mock).mockResolvedValueOnce(jpegBuffer);
+    const mockReadFile = fsPromises.readFile as unknown as jest.Mock<Promise<Uint8Array>>;
+    const jpegBuffer = Buffer.concat([jpegSignature, sampleContent] as Uint8Array[]);
+    mockReadFile.mockResolvedValueOnce(jpegBuffer as Uint8Array);
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);

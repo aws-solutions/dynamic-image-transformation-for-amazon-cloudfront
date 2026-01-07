@@ -108,8 +108,7 @@ export class BackEnd extends Construct {
 
     const imageHandlerLambdaFunction = new NodejsFunction(this, "ImageHandlerLambdaFunction", {
       description: `${props.solutionName} (${props.solutionVersion}): Performs image edits and manipulations`,
-      // 2048MB for faster AVIF encoding (reduces warming timeouts)
-      // Note: 1769MB = 1 vCPU, but 2048MB provides better encoding performance
+      // 2048MB for faster AVIF encoding & avoid timeouts for large images
       memorySize: 2048,
       architecture: Architecture.ARM_64,
       runtime: new Runtime("nodejs22.x", RuntimeFamily.NODEJS, { supportsInlineCode: true }),

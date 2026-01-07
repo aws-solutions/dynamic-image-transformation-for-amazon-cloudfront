@@ -161,7 +161,7 @@ async function proxyThroughLocalCDN(
         });
 
         res.on("end", () => {
-          const body = Buffer.concat(chunks);
+          const body = Buffer.concat(chunks as Uint8Array[]);
           const contentType = res.headers?.["content-type"] || "image/avif";
           const xCache = res.headers?.["x-cache"] || "N/A";
 
