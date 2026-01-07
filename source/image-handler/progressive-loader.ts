@@ -151,7 +151,7 @@ async function proxyThroughLocalCDN(
         path: parsedUrl.pathname + parsedUrl.search,
         method: "GET",
         headers,
-        timeout: 25000,
+        timeout: 30000,
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -344,7 +344,7 @@ async function makeWarmingHttpRequest(
         path: parsedUrl.pathname + parsedUrl.search,
         method: "GET",
         headers,
-        timeout: 25000, // 25 second timeout (Lambda has 29s)
+        timeout: 30000, // 30 second timeout
       },
       (res) => {
         // Log key response headers for debugging cache behavior

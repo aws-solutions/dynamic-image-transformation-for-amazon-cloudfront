@@ -19,7 +19,7 @@ import {
 } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { IBucket } from "aws-cdk-lib/aws-s3";
@@ -108,7 +108,10 @@ export class BackEnd extends Construct {
 
     const imageHandlerLambdaFunction = new NodejsFunction(this, "ImageHandlerLambdaFunction", {
       description: `${props.solutionName} (${props.solutionVersion}): Performs image edits and manipulations`,
-      memorySize: 3008,
+      // 2048MB for faster AVIF encoding (reduces warming timeouts)
+      // Note: 1769MB = 1 vCPU, but 2048MB provides better encoding performance
+      memorySize: 2048,
+      architecture: Architecture.ARM_64,
       runtime: Runtime.NODEJS_20_X,
       timeout: Duration.seconds(29),
       role: imageHandlerLambdaFunctionRole,
@@ -140,8 +143,8 @@ export class BackEnd extends Construct {
             return [
               // Install sharp with all its dependencies (--force for cross-platform)
               `npm install --force --prefix ${outputDir} sharp`,
-              // Override with Linux x64 binaries for Lambda
-              `npm install --force --prefix ${outputDir} @img/sharp-linux-x64 @img/sharp-libvips-linux-x64`,
+              // Override with Linux ARM64 binaries for Lambda Graviton
+              `npm install --force --prefix ${outputDir} @img/sharp-linux-arm64 @img/sharp-libvips-linux-arm64`,
             ];
           },
         },
