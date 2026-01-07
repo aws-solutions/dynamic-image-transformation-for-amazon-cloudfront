@@ -262,13 +262,16 @@ export class ImageRequest {
 
   /**
    * Parses if we should use EFS storage or S3 storage
+   * Supports both old format (use_efs) and new format (efs)
    * @param event Lambda request body.
    * @param requestType Image handler request type.
    * @returns boolean.
    */
   public parseImageUseEfs(event: ImageHandlerEvent, requestType: RequestTypes): boolean {
     if (requestType === RequestTypes.DEFAULT) {
-      return this.decodeRequest(event).use_efs;
+      const decoded = this.decodeRequest(event);
+      // Support both old (use_efs) and new (efs) format
+      return decoded.efs ?? decoded.use_efs ?? false;
     } else if (requestType === RequestTypes.THUMBOR || requestType === RequestTypes.CUSTOM) {
       return false
     } else {

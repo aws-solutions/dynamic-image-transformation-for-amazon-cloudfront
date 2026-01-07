@@ -29,7 +29,7 @@ describe("resize", () => {
     const resultBuffer = await result.toBuffer();
     const convertedImage = await sharp(originalImage, { failOnError: false })
       .withMetadata()
-      .resize({ width: 99, height: 100 })
+      .resize({ width: 99, height: 100, fit: "inside" })
       .toBuffer();
     expect(resultBuffer).toEqual(convertedImage);
   });

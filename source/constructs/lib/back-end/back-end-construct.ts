@@ -10,7 +10,9 @@ import {
   CacheQueryStringBehavior,
   DistributionProps,
   IOrigin,
+  OriginRequestHeaderBehavior,
   OriginRequestPolicy,
+  OriginRequestQueryStringBehavior,
   OriginSslPolicy,
   PriceClass,
   ViewerProtocolPolicy,
@@ -83,17 +85,30 @@ export class BackEnd extends Construct {
           actions: ["rekognition:DetectFaces", "rekognition:DetectModerationLabels"],
           resources: ["*"],
         }),
+        // Permission for Lambda to invoke itself asynchronously (cache warming for progressive AVIF loading)
+        // Uses pattern to avoid circular dependency (Lambda depends on its role policy)
+        new PolicyStatement({
+          actions: ["lambda:InvokeFunction"],
+          resources: [
+            Stack.of(this).formatArn({
+              service: "lambda",
+              resource: "function",
+              resourceName: "*ImageHandler*",
+              arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+            }),
+          ],
+        }),
       ],
     });
 
     addCfnSuppressRules(imageHandlerLambdaFunctionRolePolicy, [
-      { id: "W12", reason: "rekognition:DetectFaces requires '*' resources." },
+      { id: "W12", reason: "rekognition:DetectFaces requires '*' resources. lambda:InvokeFunction uses pattern to avoid circular dependency." },
     ]);
     imageHandlerLambdaFunctionRole.attachInlinePolicy(imageHandlerLambdaFunctionRolePolicy);
 
     const imageHandlerLambdaFunction = new NodejsFunction(this, "ImageHandlerLambdaFunction", {
       description: `${props.solutionName} (${props.solutionVersion}): Performs image edits and manipulations`,
-      memorySize: 1024,
+      memorySize: 3008,
       runtime: Runtime.NODEJS_20_X,
       timeout: Duration.seconds(29),
       role: imageHandlerLambdaFunctionRole,
@@ -148,17 +163,23 @@ export class BackEnd extends Construct {
     const cachePolicy = new CachePolicy(this, "CachePolicy", {
       cachePolicyName: `ServerlessImageHandler-${props.uuid}`,
       defaultTtl: Duration.days(1),
-      minTtl: Duration.seconds(1),
+      // minTtl=0 allows honoring Cache-Control: no-store for redirect responses
+      minTtl: Duration.seconds(0),
       maxTtl: Duration.days(365),
       enableAcceptEncodingGzip: false,
-      headerBehavior: CacheHeaderBehavior.allowList("origin", "accept"),
+      // Note: x-bw-warm is NOT in cache key so warm requests target same cache entry as normal requests
+      // Accept header removed from cache key - payload already determines output format (avif/jpeg)
+      headerBehavior: CacheHeaderBehavior.allowList("origin"),
       queryStringBehavior: CacheQueryStringBehavior.allowList("signature"),
     });
 
     const originRequestPolicy = new OriginRequestPolicy(this, "OriginRequestPolicy", {
       originRequestPolicyName: `ServerlessImageHandler-${props.uuid}`,
-      headerBehavior: CacheHeaderBehavior.allowList("origin", "accept"),
-      queryStringBehavior: CacheQueryStringBehavior.allowList("signature"),
+      // Forward headers to origin for progressive AVIF loading:
+      // - x-bw-warm: triggers AVIF generation on warming requests (instead of 302 redirect)
+      // - x-bw-proxy: FLAG header for proxy-based cache warming (marks proxied requests)
+      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm", "x-bw-proxy"),
+      queryStringBehavior: OriginRequestQueryStringBehavior.allowList("signature"),
     });
 
     const apiGatewayRestApi = RestApi.fromRestApiId(
@@ -172,6 +193,10 @@ export class BackEnd extends Construct {
     const origin: IOrigin = new HttpOrigin(`${apiGatewayRestApi.restApiId}.execute-api.${Aws.REGION}.amazonaws.com`, {
       originPath: "/image",
       originSslProtocols: [OriginSslPolicy.TLS_V1_1, OriginSslPolicy.TLS_V1_2],
+      // Enable Origin Shield for global cache sharing
+      // All edge locations will check Origin Shield before going to origin,
+      // so cache warming from any location (including Lambda async warming) benefits all edges
+      originShieldRegion: Aws.REGION,
     });
 
     const cloudFrontDistributionProps: DistributionProps = {
@@ -188,11 +213,11 @@ export class BackEnd extends Construct {
       logBucket: props.logsBucket,
       logFilePrefix: "api-cloudfront/",
       errorResponses: [
-        { httpStatus: 500, ttl: Duration.minutes(10) },
-        { httpStatus: 501, ttl: Duration.minutes(10) },
-        { httpStatus: 502, ttl: Duration.minutes(10) },
-        { httpStatus: 503, ttl: Duration.minutes(10) },
-        { httpStatus: 504, ttl: Duration.minutes(10) },
+        { httpStatus: 500, ttl: Duration.seconds(30) },
+        { httpStatus: 501, ttl: Duration.seconds(30) },
+        { httpStatus: 502, ttl: Duration.seconds(30) },
+        { httpStatus: 503, ttl: Duration.seconds(30) },
+        { httpStatus: 504, ttl: Duration.seconds(30) },
       ],
     };
 
@@ -234,5 +259,11 @@ export class BackEnd extends Construct {
     imageHandlerCloudFrontApiGatewayLambda.apiGateway.node.tryRemoveChild("Endpoint"); // we don't need the RestApi endpoint in the outputs
 
     this.domainName = imageHandlerCloudFrontApiGatewayLambda.cloudFrontWebDistribution.distributionDomainName;
+
+    // Add CloudFront domain to Lambda environment for progressive AVIF loading warming requests
+    imageHandlerLambdaFunction.addEnvironment("CLOUDFRONT_DOMAIN", this.domainName);
+
+    // Note: Lambda function name for self-invoke is obtained from AWS_LAMBDA_FUNCTION_NAME
+    // which is automatically provided by the Lambda runtime
   }
 }

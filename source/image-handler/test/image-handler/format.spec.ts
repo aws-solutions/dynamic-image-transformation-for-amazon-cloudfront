@@ -98,14 +98,14 @@ describe("modifyImageOutput", () => {
     };
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     const sharpImage = sharp(request.originalImage, { failOnError: false }).withMetadata();
-    const toFormatSpy = jest.spyOn(sharp.prototype, "toFormat");
+    const jpegSpy = jest.spyOn(sharp.prototype, "jpeg");
     const result = await imageHandler["modifyImageOutput"](sharpImage, request).toBuffer();
 
     // Act
     const resultFormat = (await sharp(result).metadata()).format;
 
     // Assert
-    expect(toFormatSpy).toHaveBeenCalledWith("jpeg");
+    expect(jpegSpy).toHaveBeenCalledWith({ quality: 80 });
     expect(resultFormat).toEqual(ImageFormatTypes.JPEG);
   });
 
@@ -165,14 +165,14 @@ describe("modifyImageOutput", () => {
     };
     const sharpImage = sharp(request.originalImage, { failOnError: false }).withMetadata();
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
-    const toFormatSpy = jest.spyOn(sharp.prototype, "toFormat");
+    const avifSpy = jest.spyOn(sharp.prototype, "avif");
 
     // Act
     const result = await imageHandler["modifyImageOutput"](sharpImage, request).toBuffer();
     const resultFormat = (await sharp(result).metadata()).format;
 
     // Assert
-    expect(toFormatSpy).toHaveBeenCalledWith("avif");
+    expect(avifSpy).toHaveBeenCalledWith({ quality: 70 });
     expect(resultFormat).toEqual("heif");
   });
 });

@@ -11,8 +11,8 @@
   "scripts": {
     "lint": "npx eslint . --ext .ts",
     "prettier-format": "npx prettier --config .prettierrc.yml '**/*.ts' --write",
-    "install:custom-resource": "cd ./custom-resource && npm run clean && npm ci",
-    "install:image-handler": "cd ./image-handler && npm run clean && npm ci",
+    "install:custom-resource": "cd ./custom-resource && npm run clean && npm ci --force",
+    "install:image-handler": "cd ./image-handler && npm run clean && npm ci --force",
     "install:dependencies": "npm run install:custom-resource && npm run install:image-handler"
   },
   "devDependencies": {

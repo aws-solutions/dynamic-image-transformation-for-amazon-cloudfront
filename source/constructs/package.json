@@ -12,7 +12,7 @@
   },
   "scripts": {
     "cdk": "cdk",
-    "clean:install": "rm -rf node_modules/ cdk.out/ coverage/ && npm ci && cd ../ && npm run install:dependencies",
+    "clean:install": "rm -rf node_modules/ cdk.out/ coverage/ && npm ci --force && cd ../ && npm run install:dependencies",
     "cdk:synth": "npm run clean:install && overrideWarningsEnabled=false npx cdk synth --asset-metadata false --path-metadata false --json false",
     "pretest": "npm run clean:install",
     "build": "tsc",

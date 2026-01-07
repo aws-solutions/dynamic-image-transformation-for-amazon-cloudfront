@@ -47,21 +47,59 @@ export class ImageHandler {
   }
 
   /**
-   * Modify an image's output format if specified
+   * Modify an image's output format if specified.
+   * Applies format-specific quality settings from edits.
+   * Supports both old (quality) and new (q) format for quality values.
    * @param modifiedImage the image object.
    * @param imageRequestInfo the image request
    * @returns A Sharp image object
    */
   private modifyImageOutput(modifiedImage: sharp.Sharp, imageRequestInfo: ImageRequestInfo): sharp.Sharp {
     const modifiedOutputImage = modifiedImage;
+    const edits = imageRequestInfo.edits || {};
 
     // modify if specified
     if (imageRequestInfo.outputFormat !== undefined) {
-      // Include reduction effort for webp images if included
-      if (imageRequestInfo.outputFormat === ImageFormatTypes.WEBP && typeof imageRequestInfo.effort !== "undefined") {
-        modifiedOutputImage.webp({ effort: imageRequestInfo.effort });
-      } else {
-        modifiedOutputImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
+      switch (imageRequestInfo.outputFormat) {
+        case ImageFormatTypes.AVIF:
+          // Support both old (quality) and new (q) format
+          const avifQuality = edits.avif?.q ?? edits.avif?.quality ?? 70;
+          modifiedOutputImage.avif({ quality: avifQuality });
+          break;
+
+        case ImageFormatTypes.JPEG:
+        case ImageFormatTypes.JPG:
+          const jpegQuality = edits.jpeg?.q ?? edits.jpeg?.quality ?? 80;
+          modifiedOutputImage.jpeg({ quality: jpegQuality });
+          break;
+
+        case ImageFormatTypes.PNG:
+          const pngQuality = edits.png?.q ?? edits.png?.quality;
+          if (pngQuality !== undefined) {
+            modifiedOutputImage.png({ quality: pngQuality });
+          } else {
+            modifiedOutputImage.toFormat("png");
+          }
+          break;
+
+        case ImageFormatTypes.WEBP:
+          const webpOptions: any = {};
+          const webpQuality = edits.webp?.q ?? edits.webp?.quality;
+          if (webpQuality !== undefined) {
+            webpOptions.quality = webpQuality;
+          }
+          if (typeof imageRequestInfo.effort !== "undefined") {
+            webpOptions.effort = imageRequestInfo.effort;
+          }
+          if (Object.keys(webpOptions).length > 0) {
+            modifiedOutputImage.webp(webpOptions);
+          } else {
+            modifiedOutputImage.toFormat("webp");
+          }
+          break;
+
+        default:
+          modifiedOutputImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
       }
     }
 
@@ -173,6 +211,7 @@ export class ImageHandler {
 
   /**
    * Applies resize edit.
+   * Supports both old format (width, height) and new format (w, h).
    * @param originalImage The original sharp image.
    * @param edits The edits to be made to the original image.
    */
@@ -181,21 +220,26 @@ export class ImageHandler {
       edits.resize = {};
       edits.resize.fit = ImageFitTypes.INSIDE;
     } else {
-      if (edits.resize.width) edits.resize.width = Math.round(Number(edits.resize.width));
-      if (edits.resize.height) edits.resize.height = Math.round(Number(edits.resize.height));
+      // Support both old (width/height) and new (w/h) format
+      const width = edits.resize.width ?? edits.resize.w;
+      const height = edits.resize.height ?? edits.resize.h;
+
+      if (width) edits.resize.width = Math.round(Number(width));
+      if (height) edits.resize.height = Math.round(Number(height));
+
+      // Default fit to "inside" if not specified
+      if (!edits.resize.fit) edits.resize.fit = ImageFitTypes.INSIDE;
 
       if (edits.resize.ratio) {
         const ratio = edits.resize.ratio;
 
-        const { width, height } =
+        const { width: imgWidth, height: imgHeight } =
           edits.resize.width && edits.resize.height ? edits.resize : await originalImage.metadata();
 
-        edits.resize.width = Math.round(width * ratio);
-        edits.resize.height = Math.round(height * ratio);
+        edits.resize.width = Math.round(imgWidth * ratio);
+        edits.resize.height = Math.round(imgHeight * ratio);
         // Sharp doesn't have such parameter for resize(), we got it from Thumbor mapper.  We don't need to keep this field in the `resize` object
         delete edits.resize.ratio;
-
-        if (!edits.resize.fit) edits.resize.fit = ImageFitTypes.INSIDE;
       }
     }
   }

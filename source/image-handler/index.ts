@@ -10,6 +10,8 @@ import { isNullOrWhiteSpace } from "../solution-utils/helpers";
 import { ImageHandler } from "./image-handler";
 import { ImageRequest } from "./image-request";
 import { Headers, ImageHandlerEvent, ImageHandlerExecutionResult, StatusCodes } from "./lib";
+import { normalizePayload, hasProgressiveLoading } from "./payload-normalizer";
+import { handleProgressiveLoading, isWarmingRequest, executeWarmingRequest } from "./progressive-loader";
 import { SecretProvider } from "./secret-provider";
 
 const awsSdkOptions = getOptions();
@@ -26,9 +28,48 @@ const secretProvider = new SecretProvider(secretsManagerClient);
 export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExecutionResult> {
   console.info("Received event:", JSON.stringify(event, null, 2));
 
+  // Branch 1: Orchestrator mode - async invocation to make HTTP request to CloudFront and wait
+  // This ensures the warming request completes before Lambda terminates
+  if (event._warmOrchestrator) {
+    console.info("Orchestrator mode detected, executing warming request");
+    return await executeWarmingRequest(event._warmOrchestrator);
+  }
+
   const imageRequest = new ImageRequest(s3Client, secretProvider);
   const imageHandler = new ImageHandler(s3Client, rekognitionClient);
   const isAlb = event.requestContext && Object.prototype.hasOwnProperty.call(event.requestContext, "elb");
+
+  // Check for progressive loading (avif+jpeg) before full processing
+  // Progressive loading redirects to JPEG immediately and warms AVIF cache in background
+  const isWarmReq = isWarmingRequest(event);
+  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}`);
+
+  if (!isWarmReq) {
+    try {
+      const rawPayload = tryDecodePayload(event.path);
+      if (rawPayload) {
+        const payload = normalizePayload(rawPayload);
+        const hasAvif = !!payload.edits?.avif;
+        const hasJpeg = !!payload.edits?.jpeg;
+        const isProgressive = hasProgressiveLoading(payload);
+        console.info(
+          `Progressive loading check: hasAvif=${hasAvif}, hasJpeg=${hasJpeg}, isProgressive=${isProgressive}, ` +
+            `edits=${JSON.stringify(payload.edits)}`
+        );
+        if (isProgressive) {
+          console.info("Progressive loading detected, redirecting to JPEG and warming AVIF cache");
+          return await handleProgressiveLoading(event, payload, secretProvider);
+        }
+      } else {
+        console.info("Progressive loading check: could not decode payload (not base64 JSON)");
+      }
+    } catch (progressiveError) {
+      // If progressive loading check fails, continue with normal processing
+      console.info("Progressive loading check failed, continuing with normal processing:", progressiveError.message);
+    }
+  } else {
+    console.info("Warming request detected, skipping progressive loading redirect (will generate AVIF)");
+  }
 
   try {
     const imageRequestInfo = await imageRequest.setup(event);
@@ -165,4 +206,25 @@ export function getErrorResponse(error) {
       status: StatusCodes.INTERNAL_SERVER_ERROR,
     }),
   };
+}
+
+/**
+ * Attempts to decode a base64 payload from the request path.
+ * Returns null if decoding fails (e.g., not a base64 DEFAULT request type).
+ * @param path The request path
+ * @returns The decoded payload object or null
+ */
+function tryDecodePayload(path: string): any | null {
+  if (!path) {
+    return null;
+  }
+
+  try {
+    const encoded = path.startsWith("/") ? path.slice(1) : path;
+    const toBuffer = Buffer.from(encoded, "base64");
+    return JSON.parse(toBuffer.toString());
+  } catch {
+    // Not a valid base64 JSON payload (could be Thumbor or Custom request type)
+    return null;
+  }
 }

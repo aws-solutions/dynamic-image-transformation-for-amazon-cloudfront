@@ -15,12 +15,21 @@ export interface ImageHandlerEvent {
     elb?: unknown;
   };
   headers?: Headers;
+  _warmOrchestrator?: {
+    url: string;
+    acceptHeader?: string;
+  };
 }
 
 export interface DefaultImageRequest {
   bucket?: string;
   key: string;
-  use_efs: boolean;
+  // Support both old (use_efs) and new (efs) format
+  use_efs?: boolean;
+  efs?: boolean;
+  // Version field for cache invalidation (old: bw_original_version, new: v)
+  bw_original_version?: number;
+  v?: number;
   edits?: ImageEdits;
   outputFormat?: ImageFormatTypes;
   effort?: number;

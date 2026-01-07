@@ -53,6 +53,8 @@ describe("setup", () => {
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image/jpeg",
+      headers: undefined,
+      useEfs: false,
     };
 
     // Assert
@@ -124,6 +126,8 @@ describe("setup", () => {
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image/png",
+      headers: undefined,
+      useEfs: false,
     };
     // Assert
     expect(mockAwsS3.getObject).toHaveBeenCalledWith({
@@ -376,6 +380,8 @@ describe("setup", () => {
         originalImage: Buffer.from("SampleImageContent\n"),
         cacheControl: "max-age=31536000,public",
         contentType: "image/png",
+        headers: undefined,
+        useEfs: false,
       };
 
       // Assert
@@ -651,10 +657,12 @@ describe("setup", () => {
       bucket: "validBucket",
       key: "validKey",
       headers: { "Cache-Control": "max-age=31536000,public" },
+      edits: undefined,
       outputFormat: "jpeg",
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image/jpeg",
+      useEfs: false,
     };
 
     // Assert
@@ -691,6 +699,7 @@ describe("setup", () => {
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image/webp",
+      useEfs: false,
     };
 
     // Assert
@@ -727,6 +736,7 @@ describe("setup", () => {
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image/webp",
+      useEfs: false,
     };
 
     // Assert
@@ -763,6 +773,7 @@ describe("setup", () => {
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image/webp",
+      useEfs: false,
     };
 
     // Assert
@@ -799,6 +810,7 @@ describe("setup", () => {
       originalImage: Buffer.from("SampleImageContent\n"),
       cacheControl: "max-age=31536000,public",
       contentType: "image/webp",
+      useEfs: false,
     };
 
     // Assert

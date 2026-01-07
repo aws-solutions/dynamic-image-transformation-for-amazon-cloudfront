@@ -375,7 +375,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         "CachePolicyConfig": {
           "DefaultTTL": 86400,
           "MaxTTL": 31536000,
-          "MinTTL": 1,
+          "MinTTL": 0,
           "Name": {
             "Fn::Join": [
               "",
@@ -456,23 +456,23 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           "Comment": "Image Handler Distribution for Serverless Image Handler",
           "CustomErrorResponses": [
             {
-              "ErrorCachingMinTTL": 600,
+              "ErrorCachingMinTTL": 30,
               "ErrorCode": 500,
             },
             {
-              "ErrorCachingMinTTL": 600,
+              "ErrorCachingMinTTL": 30,
               "ErrorCode": 501,
             },
             {
-              "ErrorCachingMinTTL": 600,
+              "ErrorCachingMinTTL": 30,
               "ErrorCode": 502,
             },
             {
-              "ErrorCachingMinTTL": 600,
+              "ErrorCachingMinTTL": 30,
               "ErrorCode": 503,
             },
             {
-              "ErrorCachingMinTTL": 600,
+              "ErrorCachingMinTTL": 30,
               "ErrorCode": 504,
             },
           ],
@@ -547,6 +547,12 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               },
               "Id": "TestStackBackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistributionOrigin1A053AEB7",
               "OriginPath": "/image",
+              "OriginShield": {
+                "Enabled": true,
+                "OriginShieldRegion": {
+                  "Ref": "AWS::Region",
+                },
+              },
             },
           ],
           "PriceClass": {
@@ -1013,7 +1019,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           "rules_to_suppress": [
             {
               "id": "W12",
-              "reason": "rekognition:DetectFaces requires '*' resources.",
+              "reason": "rekognition:DetectFaces requires '*' resources. lambda:InvokeFunction uses pattern to avoid circular dependency.",
             },
           ],
         },
@@ -1088,6 +1094,30 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "Effect": "Allow",
               "Resource": "*",
             },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":lambda:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":function:*ImageHandler*",
+                  ],
+                ],
+              },
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -1160,6 +1190,12 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "Ref": "AutoWebPParameter",
             },
             "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
+            "CLOUDFRONT_DOMAIN": {
+              "Fn::GetAtt": [
+                "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
+                "DomainName",
+              ],
+            },
             "CORS_ENABLED": {
               "Ref": "CorsEnabledParameter",
             },
@@ -1192,7 +1228,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           },
         },
         "Handler": "index.handler",
-        "MemorySize": 1024,
+        "MemorySize": 3008,
         "Role": {
           "Fn::GetAtt": [
             "BackEndImageHandlerFunctionRoleABF81E5C",
@@ -1258,6 +1294,8 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "Headers": [
               "origin",
               "accept",
+              "x-bw-warm",
+              "x-bw-proxy",
             ],
           },
           "Name": {
