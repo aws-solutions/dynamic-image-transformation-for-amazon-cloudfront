@@ -100,14 +100,13 @@ describe("ProgressiveLoader", () => {
   });
 
   describe("handleProgressiveLoading", () => {
-    it("should return 302 redirect to JPEG URL for proxied requests (x-bw-proxy: 1)", async () => {
+    it("should return 302 redirect to JPEG URL with 5 second cache TTL", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
 
       const event = {
         path: "/originalBase64Payload",
         headers: {
           Host: "api-gateway.amazonaws.com",
-          "x-bw-proxy": "1", // Proxied request triggers 302 + async warming
         },
       };
 
@@ -128,180 +127,17 @@ describe("ProgressiveLoader", () => {
       expect(result.isBase64Encoded).toBe(false);
       // Should use CLOUDFRONT_DOMAIN, not the API Gateway host
       expect(result.headers?.Location).toContain("https://d1234.cloudfront.net/");
-      expect(result.headers?.["Cache-Control"]).toBe("private, max-age=1");
+      // private so CloudFront doesn't cache; browser caches 15s
+      expect(result.headers?.["Cache-Control"]).toBe("private, max-age=15");
     });
 
-    it("should proxy through local CDN for original requests (no x-bw-proxy header) and return image on cache hit", async () => {
-      process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      const https = require("https");
-
-      // Mock successful image response (cache hit at IAD)
-      const mockImageData = Buffer.from("fake-avif-image-data");
-      https.request.mockImplementation((options: any, callback: any) => {
-        setTimeout(() => {
-          const mockRes = {
-            statusCode: 200,
-            headers: { "content-type": "image/avif", "x-cache": "Hit from cloudfront" },
-            on: jest.fn((event, handler) => {
-              if (event === "data") handler(mockImageData);
-              if (event === "end") handler();
-            }),
-          };
-          callback(mockRes);
-        }, 0);
-        return mockRequest;
-      });
-
-      const event = {
-        path: "/originalBase64Payload",
-        headers: { Host: "api-gateway.amazonaws.com" }, // No x-bw-proxy = original request
-      };
-
-      const payload = {
-        bucket: "test-bucket",
-        efs: true,
-        key: "item_images/test.jpg",
-        edits: {
-          resize: { w: 750, h: 473, fit: "inside" },
-          avif: { q: 70 },
-          jpeg: { q: 85 },
-        },
-      };
-
-      const result = await handleProgressiveLoading(event, payload, secretProvider);
-
-      // Should return the AVIF from IAD cache
-      expect(result.statusCode).toBe(StatusCodes.OK);
-      expect(result.isBase64Encoded).toBe(true);
-      expect(result.headers?.["Content-Type"]).toBe("image/avif");
-      expect(result.body).toBe(mockImageData.toString("base64"));
-
-      // Verify proxy request was made with x-bw-proxy FLAG header
-      expect(https.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hostname: "d1234.cloudfront.net",
-          headers: expect.objectContaining({ "x-bw-proxy": "1" }),
-        }),
-        expect.any(Function)
-      );
-    });
-
-    it("should forward 302 redirect from proxy on cache miss (IAD cold)", async () => {
-      process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      const https = require("https");
-
-      // Mock 302 redirect response (cache miss at IAD)
-      https.request.mockImplementation((options: any, callback: any) => {
-        setTimeout(() => {
-          const mockRes = {
-            statusCode: 302,
-            headers: { location: "https://d1234.cloudfront.net/jpeg-fallback" },
-            on: jest.fn((event, handler) => {
-              if (event === "data") handler(Buffer.from(""));
-              if (event === "end") handler();
-            }),
-          };
-          callback(mockRes);
-        }, 0);
-        return mockRequest;
-      });
-
-      const event = {
-        path: "/originalBase64Payload",
-        headers: {
-          Host: "api-gateway.amazonaws.com",
-          Accept: "image/avif,image/webp,*/*",
-        },
-        queryStringParameters: { signature: "abc123" },
-      };
-
-      const payload = {
-        bucket: "test-bucket",
-        key: "item_images/test.jpg",
-        edits: {
-          avif: { q: 70 },
-          jpeg: { q: 85 },
-        },
-      };
-
-      const result = await handleProgressiveLoading(event, payload, secretProvider);
-
-      // Should forward the 302 redirect (IAD cache miss)
-      expect(result.statusCode).toBe(302);
-      expect(result.headers?.Location).toBe("https://d1234.cloudfront.net/jpeg-fallback");
-
-      // Verify proxy request was made with x-bw-proxy FLAG header and signature
-      expect(https.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hostname: "d1234.cloudfront.net",
-          path: "/originalBase64Payload?signature=abc123",
-          method: "GET",
-          headers: expect.objectContaining({ "x-bw-proxy": "1" }),
-        }),
-        expect.any(Function)
-      );
-    });
-
-    it("should include Accept header in proxy request when provided", async () => {
-      process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      const https = require("https");
-
-      // Mock successful response
-      const mockImageData = Buffer.from("fake-avif-image-data");
-      https.request.mockImplementation((options: any, callback: any) => {
-        setTimeout(() => {
-          const mockRes = {
-            statusCode: 200,
-            headers: { "content-type": "image/avif" },
-            on: jest.fn((event, handler) => {
-              if (event === "data") handler(mockImageData);
-              if (event === "end") handler();
-            }),
-          };
-          callback(mockRes);
-        }, 0);
-        return mockRequest;
-      });
-
-      const event = {
-        path: "/originalBase64Payload",
-        headers: {
-          Host: "api-gateway.amazonaws.com",
-          Accept: "image/avif,image/webp,*/*",
-        },
-      };
-
-      const payload = {
-        bucket: "test-bucket",
-        key: "item_images/test.jpg",
-        edits: {
-          avif: { q: 70 },
-          jpeg: { q: 85 },
-        },
-      };
-
-      await handleProgressiveLoading(event, payload, secretProvider);
-
-      // Verify Accept header is forwarded in proxy request
-      expect(https.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            "x-bw-proxy": "1",
-            accept: "image/avif,image/webp,*/*",
-          }),
-        }),
-        expect.any(Function)
-      );
-    });
-
-    it("should generate JPEG URL without avif in edits (for proxied requests)", async () => {
+    it("should generate JPEG URL without avif in edits", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
 
       const event = {
         path: "/originalBase64Payload",
         headers: {
           Host: "api-gateway.amazonaws.com",
-          "x-bw-proxy": "1", // Proxied request triggers 302 redirect
         },
       };
 
@@ -346,13 +182,12 @@ describe("ProgressiveLoader", () => {
       );
     });
 
-    it("should fallback to Host header if CLOUDFRONT_DOMAIN not set (for proxied requests)", async () => {
+    it("should fallback to Host header if CLOUDFRONT_DOMAIN not set", async () => {
       // No CLOUDFRONT_DOMAIN set
       const event = {
         path: "/originalBase64Payload",
         headers: {
           Host: "fallback-host.cloudfront.net",
-          "x-bw-proxy": "1", // Proxied request
         },
       };
 
@@ -370,7 +205,7 @@ describe("ProgressiveLoader", () => {
       expect(result.headers?.Location).toContain("https://fallback-host.cloudfront.net/");
     });
 
-    it("should trigger async warming orchestrator via Lambda invoke for proxied requests", async () => {
+    it("should trigger async warming orchestrator via Lambda invoke", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
 
@@ -378,7 +213,6 @@ describe("ProgressiveLoader", () => {
         path: "/originalBase64Payload",
         headers: {
           Host: "api-gateway.amazonaws.com",
-          "x-bw-proxy": "1", // Proxied request triggers async warming
         },
       };
 
@@ -404,7 +238,7 @@ describe("ProgressiveLoader", () => {
       });
     });
 
-    it("should include Accept header in warming orchestrator payload (for proxied requests)", async () => {
+    it("should include Accept header in warming orchestrator payload", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
 
@@ -412,7 +246,6 @@ describe("ProgressiveLoader", () => {
         path: "/originalBase64Payload",
         headers: {
           Host: "api-gateway.amazonaws.com",
-          "x-bw-proxy": "1",
           Accept: "image/avif,image/webp,image/*,*/*",
         },
       };
@@ -439,7 +272,7 @@ describe("ProgressiveLoader", () => {
       });
     });
 
-    it("should include signature in warming orchestrator payload when present (for proxied requests)", async () => {
+    it("should include signature in warming orchestrator payload when present", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
 
@@ -447,7 +280,6 @@ describe("ProgressiveLoader", () => {
         path: "/originalBase64Payload",
         headers: {
           Host: "api-gateway.amazonaws.com",
-          "x-bw-proxy": "1",
         },
         queryStringParameters: { signature: "abc123" },
       };
@@ -474,51 +306,7 @@ describe("ProgressiveLoader", () => {
       );
     });
 
-    it("should not invoke Lambda warming for original requests (they proxy first)", async () => {
-      process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
-      const https = require("https");
-
-      // Mock successful image response
-      const mockImageData = Buffer.from("fake-avif-image-data");
-      https.request.mockImplementation((options: any, callback: any) => {
-        setTimeout(() => {
-          const mockRes = {
-            statusCode: 200,
-            headers: { "content-type": "image/avif" },
-            on: jest.fn((event, handler) => {
-              if (event === "data") handler(mockImageData);
-              if (event === "end") handler();
-            }),
-          };
-          callback(mockRes);
-        }, 0);
-        return mockRequest;
-      });
-
-      const event = {
-        path: "/originalBase64Payload",
-        headers: {
-          Host: "api-gateway.amazonaws.com",
-          // No x-bw-proxy header = original request
-        },
-      };
-
-      const payload = {
-        key: "test.jpg",
-        edits: {
-          avif: { q: 70 },
-          jpeg: { q: 85 },
-        },
-      };
-
-      await handleProgressiveLoading(event, payload, secretProvider);
-
-      // Lambda warming orchestrator should NOT be invoked for original requests (they proxy first)
-      expect(mockLambdaInvoke).not.toHaveBeenCalled();
-    });
-
-    it("should not invoke Lambda when AWS_LAMBDA_FUNCTION_NAME is not set (for proxied requests)", async () => {
+    it("should not invoke Lambda when AWS_LAMBDA_FUNCTION_NAME is not set", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       // AWS_LAMBDA_FUNCTION_NAME is not set
 
@@ -526,7 +314,6 @@ describe("ProgressiveLoader", () => {
         path: "/originalBase64Payload",
         headers: {
           Host: "api-gateway.amazonaws.com",
-          "x-bw-proxy": "1",
         },
       };
 

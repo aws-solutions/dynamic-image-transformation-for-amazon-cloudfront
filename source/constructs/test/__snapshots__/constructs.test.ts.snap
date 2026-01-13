@@ -1297,7 +1297,6 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "origin",
               "accept",
               "x-bw-warm",
-              "x-bw-proxy",
             ],
           },
           "Name": {

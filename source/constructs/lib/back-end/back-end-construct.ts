@@ -171,7 +171,8 @@ export class BackEnd extends Construct {
       enableAcceptEncodingGzip: false,
       // Note: x-bw-warm is NOT in cache key so warm requests target same cache entry as normal requests
       // Accept header removed from cache key - payload already determines output format (avif/jpeg)
-      headerBehavior: CacheHeaderBehavior.allowList("origin"),
+      // Origin header removed from cache key so warming requests (no Origin) populate same cache entry as browser requests (with Origin)
+      headerBehavior: CacheHeaderBehavior.none(),
       queryStringBehavior: CacheQueryStringBehavior.allowList("signature"),
     });
 
@@ -179,8 +180,7 @@ export class BackEnd extends Construct {
       originRequestPolicyName: `ServerlessImageHandler-${props.uuid}`,
       // Forward headers to origin for progressive AVIF loading:
       // - x-bw-warm: triggers AVIF generation on warming requests (instead of 302 redirect)
-      // - x-bw-proxy: FLAG header for proxy-based cache warming (marks proxied requests)
-      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm", "x-bw-proxy"),
+      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm"),
       queryStringBehavior: OriginRequestQueryStringBehavior.allowList("signature"),
     });
 

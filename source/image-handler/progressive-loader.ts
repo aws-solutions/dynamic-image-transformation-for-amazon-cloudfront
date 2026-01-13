@@ -14,69 +14,35 @@ const awsSdkOptions = getOptions();
 const lambdaClient = new Lambda(awsSdkOptions);
 
 /**
- * Handles progressive loading for AVIF images using proxy-based cache warming.
+ * Handles progressive loading for AVIF images.
  *
- * The problem: Lambda warming populates IAD cache, but remote edges (CDG, LHR, etc.)
- * never see the warmed AVIF because they have separate caches.
+ * When a request for AVIF reaches Lambda (Origin Shield miss), we:
+ * 1. Return 302 redirect to JPEG for immediate response
+ * 2. Trigger async warming to generate and cache AVIF at Origin Shield
  *
- * Solution: Lambda proxies ALL cache-miss requests through its local CDN (IAD).
- * - If IAD has cached AVIF, proxy hits it and returns AVIF to original edge
- * - If IAD is cold, Lambda returns 302 + triggers async warming
- * - Either way, the original edge caches whatever Lambda returns
- *
- * Flow (using x-bw-proxy FLAG header):
- * 1. Original request (no FLAG) → Lambda proxies to CloudFront WITH FLAG
- * 2. Proxied request (has FLAG) → Lambda does progressive loading (302 + async warm)
- * 3. Subsequent requests → Cache hit at any edge (no Lambda)
+ * The 302 is cached for 5 seconds to reduce thundering herd during warming.
+ * After warming completes (~7-10s), subsequent requests get AVIF from Origin Shield.
  *
  * @param event The Lambda event
  * @param payload The normalized payload
  * @param secretProvider The secret provider for signature generation
- * @returns A 302 redirect (first hit) or the proxied AVIF response
+ * @returns A 302 redirect to JPEG URL
  */
 export async function handleProgressiveLoading(
   event: ImageHandlerEvent,
   payload: NormalizedPayload,
   secretProvider: SecretProvider
 ): Promise<ImageHandlerExecutionResult> {
-  // Get Accept header from original request - needed for cache key matching
   const acceptHeader = event.headers?.Accept || event.headers?.accept;
-  // Use CloudFront domain from environment variable for warming requests
-  // The Host header contains API Gateway domain, not CloudFront
   const cloudfrontDomain = process.env.CLOUDFRONT_DOMAIN;
   const hostHeader = event.headers?.Host || event.headers?.host;
-
-  if (!cloudfrontDomain) {
-    console.error(
-      `CLOUDFRONT_DOMAIN env var is NOT SET. Host header value: "${hostHeader}". ` +
-        "Warming requests will fail or go to wrong domain (API Gateway instead of CloudFront). " +
-        "Please set CLOUDFRONT_DOMAIN environment variable in your Lambda configuration."
-    );
-  }
-
   const host = cloudfrontDomain || hostHeader;
 
   if (!host) {
     throw new Error("CLOUDFRONT_DOMAIN environment variable is required for progressive loading");
   }
 
-  // Check for proxy FLAG header - indicates this is a proxied request from ourselves
-  const isProxiedRequest = event.headers?.["x-bw-proxy"] === "1" || event.headers?.["X-Bw-Proxy"] === "1";
-
-  console.info(
-    `Progressive loading: domain=${host} (from ${cloudfrontDomain ? "env" : "header"}), ` +
-      `isProxied=${isProxiedRequest}`
-  );
-
-  if (!isProxiedRequest) {
-    // Original request (no FLAG) - proxy it through our local CDN (IAD)
-    // This ensures we hit Origin Shield cache, which may have warmed AVIF
-    console.info("Original request detected, proxying through local CDN with FLAG header");
-    return await proxyThroughLocalCDN(host, event.path, event.queryStringParameters?.signature, acceptHeader);
-  }
-
-  // Proxied request (has FLAG) - do normal progressive loading: 302 + async warming
-  console.info("Proxied request detected, doing progressive loading (302 + async warm)");
+  console.info(`Progressive loading: domain=${host}, triggering 302 + async warming`);
 
   // 1. Build JPEG URL (same payload without avif key)
   const jpegPayload = createJpegOnlyPayload(payload);
@@ -90,149 +56,24 @@ export async function handleProgressiveLoading(
     jpegUrl += `?signature=${signature}`;
   }
 
-  // 3. Trigger async warming via Lambda self-invoke (ensures completion before termination)
+  // 3. Trigger async warming via Lambda self-invoke
   await triggerAsyncWarmingOrchestrator(host, event.path, event.queryStringParameters?.signature, acceptHeader);
 
   // 4. Return 302 redirect to JPEG
-  // Use very short max-age (1s) to minimize time users see redirect while allowing
-  // CloudFront to "reset" its cache behavior after the 302 expires.
-  // The async warming typically completes in 2-3s, so users requesting after that
-  // will get the cached AVIF.
+  // Use "private" so CloudFront doesn't cache 302 (allows warming request to reach Lambda).
+  // Browser caches for 15s to reduce repeated requests from same user during encoding.
   return {
     statusCode: StatusCodes.REDIRECT,
     isBase64Encoded: false,
     headers: {
       Location: jpegUrl,
-      "Cache-Control": "private, max-age=1",
+      "Cache-Control": "private, max-age=15",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
     body: "",
   };
-}
-
-/**
- * Proxies a request through the local CDN (Lambda's region, typically IAD).
- * This allows Lambda to check if Origin Shield has a cached AVIF.
- *
- * The FLAG header (x-bw-proxy: 1) tells the receiving Lambda that this is a
- * proxied request and should do progressive loading instead of proxying again.
- *
- * @param host The CloudFront hostname
- * @param path The request path
- * @param signature The request signature (if any)
- * @param acceptHeader The Accept header from the original request
- * @returns The proxied response (either AVIF from cache, or 302 redirect)
- */
-async function proxyThroughLocalCDN(
-  host: string,
-  path: string,
-  signature?: string,
-  acceptHeader?: string
-): Promise<ImageHandlerExecutionResult> {
-  const url = signature ? `https://${host}${path}?signature=${signature}` : `https://${host}${path}`;
-
-  console.info(`Proxying request through local CDN with FLAG: ${url}`);
-
-  return new Promise((resolve) => {
-    const parsedUrl = new URL(url);
-
-    const headers: Record<string, string> = {
-      "x-bw-proxy": "1", // FLAG: marks this as a proxied request
-    };
-    if (acceptHeader) {
-      headers["accept"] = acceptHeader;
-    }
-
-    const req = https.request(
-      {
-        hostname: parsedUrl.hostname,
-        path: parsedUrl.pathname + parsedUrl.search,
-        method: "GET",
-        headers,
-        timeout: 30000,
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-
-        res.on("data", (chunk) => {
-          chunks.push(chunk);
-        });
-
-        res.on("end", () => {
-          const body = Buffer.concat(chunks as Uint8Array[]);
-          const contentType = res.headers?.["content-type"] || "image/avif";
-          const xCache = res.headers?.["x-cache"] || "N/A";
-
-          console.info(
-            `Proxy request completed: status=${res.statusCode}, content-type=${contentType}, ` +
-              `x-cache=${xCache}, size=${body.length}`
-          );
-
-          // Handle redirect (302) - this means IAD cache was cold, pass redirect to client
-          if (res.statusCode === 302 || res.statusCode === 301) {
-            const location = res.headers?.["location"];
-            console.info(`IAD cache miss, returning redirect to client: ${location}`);
-            resolve({
-              statusCode: res.statusCode as StatusCodes,
-              isBase64Encoded: false,
-              headers: {
-                Location: location || "",
-                "Cache-Control": "private, max-age=1",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization",
-              },
-              body: "",
-            });
-            return;
-          }
-
-          // Return the image (AVIF from IAD cache hit)
-          // This will be cached by the original edge location
-          console.info("IAD cache hit, returning AVIF to be cached at original edge");
-          resolve({
-            statusCode: StatusCodes.OK,
-            isBase64Encoded: true,
-            headers: {
-              "Content-Type": contentType,
-              "Cache-Control": "public, max-age=31536000",
-              "Access-Control-Allow-Origin": "*",
-            },
-            body: body.toString("base64"),
-          });
-        });
-      }
-    );
-
-    req.on("error", (err) => {
-      console.error("Proxy request failed:", err.message);
-      resolve({
-        statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
-        isBase64Encoded: false,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        },
-        body: JSON.stringify({ error: err.message }),
-      });
-    });
-
-    req.on("timeout", () => {
-      console.error("Proxy request timed out");
-      req.destroy();
-      resolve({
-        statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
-        isBase64Encoded: false,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        },
-        body: JSON.stringify({ error: "timeout" }),
-      });
-    });
-
-    req.end();
-  });
 }
 
 /**
