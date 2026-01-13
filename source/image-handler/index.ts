@@ -11,7 +11,7 @@ import { ImageHandler } from "./image-handler";
 import { ImageRequest } from "./image-request";
 import { Headers, ImageHandlerEvent, ImageHandlerExecutionResult, StatusCodes } from "./lib";
 import { normalizePayload, hasProgressiveLoading } from "./payload-normalizer";
-import { handleProgressiveLoading, isWarmingRequest, executeWarmingRequest } from "./progressive-loader";
+import { handleProgressiveLoading, isWarmingRequest, isCacheCheckRequest, executeWarmingRequest } from "./progressive-loader";
 import { SecretProvider } from "./secret-provider";
 
 const awsSdkOptions = getOptions();
@@ -42,7 +42,24 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
   // Check for progressive loading (avif+jpeg) before full processing
   // Progressive loading redirects to JPEG immediately and warms AVIF cache in background
   const isWarmReq = isWarmingRequest(event);
-  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}`);
+  const isCacheCheck = isCacheCheckRequest(event);
+  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}, isCacheCheckRequest=${isCacheCheck}`);
+
+  // Cache-check requests return 204 immediately to signal cache miss
+  // This is used by handleProgressiveLoading to probe Origin Shield cache
+  if (isCacheCheck) {
+    console.info("Cache-check request detected, returning 204 (cache miss signal)");
+    return {
+      statusCode: StatusCodes.NO_CONTENT,
+      isBase64Encoded: false,
+      headers: {
+        "x-bw-cache-miss": "1",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: "",
+    };
+  }
 
   if (!isWarmReq) {
     try {

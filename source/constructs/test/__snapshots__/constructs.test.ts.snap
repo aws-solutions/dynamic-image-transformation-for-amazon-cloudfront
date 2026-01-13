@@ -397,10 +397,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "EnableAcceptEncodingBrotli": false,
             "EnableAcceptEncodingGzip": false,
             "HeadersConfig": {
-              "HeaderBehavior": "whitelist",
-              "Headers": [
-                "origin",
-              ],
+              "HeaderBehavior": "none",
             },
             "QueryStringsConfig": {
               "QueryStringBehavior": "whitelist",
@@ -1297,6 +1294,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "origin",
               "accept",
               "x-bw-warm",
+              "x-bw-cache-check",
             ],
           },
           "Name": {

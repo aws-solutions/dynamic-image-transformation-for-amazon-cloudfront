@@ -180,7 +180,8 @@ export class BackEnd extends Construct {
       originRequestPolicyName: `ServerlessImageHandler-${props.uuid}`,
       // Forward headers to origin for progressive AVIF loading:
       // - x-bw-warm: triggers AVIF generation on warming requests (instead of 302 redirect)
-      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm"),
+      // - x-bw-cache-check: probes Origin Shield cache, returns 204 on miss (used before returning 302)
+      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm", "x-bw-cache-check"),
       queryStringBehavior: OriginRequestQueryStringBehavior.allowList("signature"),
     });
 

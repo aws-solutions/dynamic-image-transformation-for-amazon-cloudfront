@@ -3,7 +3,7 @@
 
 import SecretsManager from "aws-sdk/clients/secretsmanager";
 
-import { handleProgressiveLoading, isWarmingRequest, executeWarmingRequest } from "../progressive-loader";
+import { handleProgressiveLoading, isWarmingRequest, isCacheCheckRequest, executeWarmingRequest } from "../progressive-loader";
 import { SecretProvider } from "../secret-provider";
 import { StatusCodes } from "../lib";
 
@@ -41,10 +41,18 @@ describe("ProgressiveLoader", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const https = require("https");
     // Reset mock implementations
     mockRequest.on.mockReturnThis();
     mockLambdaInvoke.mockReturnValue({
       promise: jest.fn().mockResolvedValue({}),
+    });
+    // Default: cache-check returns 204 (cache miss), so handleProgressiveLoading returns 302
+    https.request.mockImplementation((options: any, callback: any) => {
+      setTimeout(() => {
+        callback({ statusCode: 204, headers: {}, resume: jest.fn() });
+      }, 0);
+      return mockRequest;
     });
     delete process.env.ENABLE_SIGNATURE;
     delete process.env.SECRETS_MANAGER;
@@ -99,8 +107,54 @@ describe("ProgressiveLoader", () => {
     });
   });
 
+  describe("isCacheCheckRequest", () => {
+    it("should return true when x-bw-cache-check header is '1'", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { "x-bw-cache-check": "1" },
+      };
+
+      expect(isCacheCheckRequest(event)).toBe(true);
+    });
+
+    it("should return true when X-Bw-Cache-Check header is '1' (case variation)", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { "X-Bw-Cache-Check": "1" },
+      };
+
+      expect(isCacheCheckRequest(event)).toBe(true);
+    });
+
+    it("should return false when x-bw-cache-check header is not present", () => {
+      const event = {
+        path: "/base64payload",
+        headers: {},
+      };
+
+      expect(isCacheCheckRequest(event)).toBe(false);
+    });
+
+    it("should return false when x-bw-cache-check header is not '1'", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { "x-bw-cache-check": "0" },
+      };
+
+      expect(isCacheCheckRequest(event)).toBe(false);
+    });
+
+    it("should return false when headers is undefined", () => {
+      const event = {
+        path: "/base64payload",
+      };
+
+      expect(isCacheCheckRequest(event)).toBe(false);
+    });
+  });
+
   describe("handleProgressiveLoading", () => {
-    it("should return 302 redirect to JPEG URL with 5 second cache TTL", async () => {
+    it("should return 302 redirect to JPEG URL when cache-check misses", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
 
       const event = {
@@ -129,6 +183,63 @@ describe("ProgressiveLoader", () => {
       expect(result.headers?.Location).toContain("https://d1234.cloudfront.net/");
       // private so CloudFront doesn't cache; browser caches 15s
       expect(result.headers?.["Cache-Control"]).toBe("private, max-age=15");
+    });
+
+    it("should proxy AVIF directly when cache-check hits Origin Shield", async () => {
+      process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
+      const https = require("https");
+
+      // Mock a fake AVIF binary (just some bytes for testing)
+      const fakeAvifData = Buffer.from([0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66]);
+
+      // Simulate cache HIT: return 200 with AVIF content
+      https.request.mockImplementation((options: any, callback: any) => {
+        setTimeout(() => {
+          const mockRes = {
+            statusCode: 200,
+            headers: { "content-type": "image/avif", "x-cache": "Hit from cloudfront" },
+            on: jest.fn((event, handler) => {
+              if (event === "data") {
+                setTimeout(() => handler(fakeAvifData), 0);
+              } else if (event === "end") {
+                setTimeout(() => handler(), 10);
+              }
+              return mockRes;
+            }),
+            resume: jest.fn(),
+          };
+          callback(mockRes);
+        }, 0);
+        return mockRequest;
+      });
+
+      const event = {
+        path: "/originalBase64Payload",
+        headers: {
+          Host: "api-gateway.amazonaws.com",
+          Accept: "image/avif,image/webp,*/*",
+        },
+      };
+
+      const payload = {
+        bucket: "test-bucket",
+        key: "item_images/test.jpg",
+        edits: {
+          resize: { w: 750, h: 473, fit: "inside" },
+          avif: { q: 70 },
+          jpeg: { q: 85 },
+        },
+      };
+
+      const result = await handleProgressiveLoading(event, payload, secretProvider);
+
+      // Should return 200 with proxied AVIF
+      expect(result.statusCode).toBe(StatusCodes.OK);
+      expect(result.isBase64Encoded).toBe(true);
+      expect(result.headers?.["Content-Type"]).toBe("image/avif");
+      expect(result.headers?.["Cache-Control"]).toBe("max-age=31536000,public");
+      // Body should be base64 encoded AVIF
+      expect(result.body).toBe(fakeAvifData.toString("base64"));
     });
 
     it("should generate JPEG URL without avif in edits", async () => {

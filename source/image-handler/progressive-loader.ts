@@ -42,24 +42,52 @@ export async function handleProgressiveLoading(
     throw new Error("CLOUDFRONT_DOMAIN environment variable is required for progressive loading");
   }
 
-  console.info(`Progressive loading: domain=${host}, triggering 302 + async warming`);
+  console.info(`Progressive loading: domain=${host}, checking Origin Shield cache first`);
 
-  // 1. Build JPEG URL (same payload without avif key)
+  // 1. Check if Origin Shield already has the AVIF cached
+  // This works around CloudFront cache partitioning where browser requests don't hit
+  // cache populated by Lambda warming requests. Lambda→CloudFront requests DO hit the cache.
+  const cachedAvif = await checkOriginShieldCache(
+    host,
+    event.path,
+    event.queryStringParameters?.signature,
+    acceptHeader
+  );
+
+  if (cachedAvif) {
+    console.info(`Progressive loading: cache HIT, proxying ${cachedAvif.length} bytes AVIF to browser`);
+    return {
+      statusCode: StatusCodes.OK,
+      isBase64Encoded: true,
+      headers: {
+        "Content-Type": "image/avif",
+        "Cache-Control": "max-age=31536000,public",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+      body: cachedAvif.toString("base64"),
+    };
+  }
+
+  console.info("Progressive loading: cache MISS, returning 302 + triggering async warming");
+
+  // 2. Build JPEG URL (same payload without avif key)
   const jpegPayload = createJpegOnlyPayload(payload);
   const jpegPayloadDenormalized = denormalizePayload(jpegPayload);
   const jpegPath = "/" + Buffer.from(JSON.stringify(jpegPayloadDenormalized)).toString("base64");
 
-  // 2. Generate signature for JPEG URL (if signatures enabled)
+  // 3. Generate signature for JPEG URL (if signatures enabled)
   let jpegUrl = `https://${host}${jpegPath}`;
   if (process.env.ENABLE_SIGNATURE === "Yes") {
     const signature = await generateSignature(jpegPath, secretProvider);
     jpegUrl += `?signature=${signature}`;
   }
 
-  // 3. Trigger async warming via Lambda self-invoke
+  // 4. Trigger async warming via Lambda self-invoke
   await triggerAsyncWarmingOrchestrator(host, event.path, event.queryStringParameters?.signature, acceptHeader);
 
-  // 4. Return 302 redirect to JPEG
+  // 5. Return 302 redirect to JPEG
   // Use "private" so CloudFront doesn't cache 302 (allows warming request to reach Lambda).
   // Browser caches for 15s to reduce repeated requests from same user during encoding.
   return {
@@ -236,4 +264,87 @@ async function makeWarmingHttpRequest(
 export function isWarmingRequest(event: ImageHandlerEvent): boolean {
   const warmHeader = event.headers?.["x-bw-warm"] || event.headers?.["X-Bw-Warm"];
   return warmHeader === "1";
+}
+
+/**
+ * Checks if the current request is a cache-check request.
+ * Cache-check requests are used to probe Origin Shield cache before returning 302.
+ *
+ * @param event The Lambda event
+ * @returns True if the x-bw-cache-check header is set to "1"
+ */
+export function isCacheCheckRequest(event: ImageHandlerEvent): boolean {
+  const cacheCheckHeader = event.headers?.["x-bw-cache-check"] || event.headers?.["X-Bw-Cache-Check"];
+  return cacheCheckHeader === "1";
+}
+
+/**
+ * Checks Origin Shield cache for a cached AVIF response.
+ * Makes a synchronous request to CloudFront with x-bw-cache-check header.
+ * If Origin Shield has the AVIF cached, returns the binary data.
+ * If cache miss (Lambda returns 204), returns null.
+ *
+ * @param host The CloudFront hostname
+ * @param path The request path
+ * @param signature The request signature (if any)
+ * @param acceptHeader The Accept header to send
+ * @returns Buffer with AVIF data if cache hit, null if cache miss
+ */
+async function checkOriginShieldCache(
+  host: string,
+  path: string,
+  signature?: string,
+  acceptHeader?: string
+): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    const fullPath = signature ? `${path}?signature=${signature}` : path;
+
+    console.info(`Cache-check: probing Origin Shield for ${host}${fullPath}`);
+
+    const req = https.request(
+      {
+        hostname: host,
+        path: fullPath,
+        method: "GET",
+        headers: {
+          "x-bw-cache-check": "1",
+          accept: acceptHeader || "image/avif,image/webp,*/*",
+        },
+        timeout: 5000, // 5 second timeout - fail fast to 302
+      },
+      (res) => {
+        const xCache = res.headers?.["x-cache"] || "N/A";
+        const contentType = res.headers?.["content-type"] || "N/A";
+        console.info(`Cache-check response: status=${res.statusCode}, x-cache=${xCache}, content-type=${contentType}`);
+
+        // Only accept 200 with AVIF content-type as cache hit
+        if (res.statusCode === 200 && contentType.includes("image/avif")) {
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => {
+            console.info(`Cache-check HIT: received ${Buffer.concat(chunks).length} bytes`);
+            resolve(Buffer.concat(chunks));
+          });
+        } else {
+          // Cache miss (204) or unexpected response
+          res.resume();
+          console.info("Cache-check MISS: Origin Shield does not have cached AVIF");
+          resolve(null);
+        }
+      }
+    );
+
+    req.on("error", (err) => {
+      console.error("Cache-check request failed:", err.message);
+      resolve(null);
+    });
+
+    req.on("timeout", () => {
+      console.error("Cache-check request timed out");
+      req.destroy();
+      resolve(null);
+    });
+
+    req.end();
+  });
 }
