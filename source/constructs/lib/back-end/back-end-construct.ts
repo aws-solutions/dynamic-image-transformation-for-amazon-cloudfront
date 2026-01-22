@@ -180,8 +180,7 @@ export class BackEnd extends Construct {
       originRequestPolicyName: `ServerlessImageHandler-${props.uuid}`,
       // Forward headers to origin for progressive AVIF loading:
       // - x-bw-warm: triggers AVIF generation on warming requests (instead of 302 redirect)
-      // - x-bw-cache-check: probes Origin Shield cache, returns 204 on miss (used before returning 302)
-      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm", "x-bw-cache-check"),
+      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm"),
       queryStringBehavior: OriginRequestQueryStringBehavior.allowList("signature"),
     });
 
@@ -196,10 +195,6 @@ export class BackEnd extends Construct {
     const origin: IOrigin = new HttpOrigin(`${apiGatewayRestApi.restApiId}.execute-api.${Aws.REGION}.amazonaws.com`, {
       originPath: "/image",
       originSslProtocols: [OriginSslPolicy.TLS_V1_1, OriginSslPolicy.TLS_V1_2],
-      // Enable Origin Shield for global cache sharing
-      // All edge locations will check Origin Shield before going to origin,
-      // so cache warming from any location (including Lambda async warming) benefits all edges
-      originShieldRegion: Aws.REGION,
     });
 
     const cloudFrontDistributionProps: DistributionProps = {

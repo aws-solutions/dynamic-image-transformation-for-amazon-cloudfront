@@ -3,7 +3,14 @@
 
 import SecretsManager from "aws-sdk/clients/secretsmanager";
 
-import { handleProgressiveLoading, isWarmingRequest, isCacheCheckRequest, executeWarmingRequest } from "../progressive-loader";
+import {
+  handleProgressiveLoading,
+  isWarmingRequest,
+  executeWarmingRequest,
+  getAvifCacheKey,
+  getAvifFromS3Cache,
+  storeAvifToS3Cache,
+} from "../progressive-loader";
 import { SecretProvider } from "../secret-provider";
 import { StatusCodes } from "../lib";
 
@@ -32,6 +39,19 @@ jest.mock("aws-sdk/clients/lambda", () => {
   }));
 });
 
+// Mock S3 client
+const mockS3GetObjectPromise = jest.fn();
+const mockS3PutObjectPromise = jest.fn();
+const mockS3GetObject = jest.fn().mockReturnValue({ promise: mockS3GetObjectPromise });
+const mockS3PutObject = jest.fn().mockReturnValue({ promise: mockS3PutObjectPromise });
+
+jest.mock("aws-sdk/clients/s3", () => {
+  return jest.fn().mockImplementation(() => ({
+    getObject: (...args: any[]) => mockS3GetObject(...args),
+    putObject: (...args: any[]) => mockS3PutObject(...args),
+  }));
+});
+
 // Mock AWS SDK SecretsManager
 jest.mock("aws-sdk/clients/secretsmanager", () => jest.fn(() => ({})));
 
@@ -47,10 +67,13 @@ describe("ProgressiveLoader", () => {
     mockLambdaInvoke.mockReturnValue({
       promise: jest.fn().mockResolvedValue({}),
     });
-    // Default: cache-check returns 204 (cache miss), so handleProgressiveLoading returns 302
+    // Default: S3 cache miss
+    mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
+    mockS3PutObjectPromise.mockResolvedValue({});
+    // Default: warming request returns 200
     https.request.mockImplementation((options: any, callback: any) => {
       setTimeout(() => {
-        callback({ statusCode: 204, headers: {}, resume: jest.fn() });
+        callback({ statusCode: 200, headers: {}, resume: jest.fn() });
       }, 0);
       return mockRequest;
     });
@@ -59,6 +82,7 @@ describe("ProgressiveLoader", () => {
     delete process.env.SECRET_KEY;
     delete process.env.CLOUDFRONT_DOMAIN;
     delete process.env.AWS_LAMBDA_FUNCTION_NAME;
+    delete process.env.SOURCE_BUCKETS;
   });
 
   describe("isWarmingRequest", () => {
@@ -107,55 +131,146 @@ describe("ProgressiveLoader", () => {
     });
   });
 
-  describe("isCacheCheckRequest", () => {
-    it("should return true when x-bw-cache-check header is '1'", () => {
-      const event = {
-        path: "/base64payload",
-        headers: { "x-bw-cache-check": "1" },
+  describe("getAvifCacheKey", () => {
+    it("should generate Paperclip-style path using style from payload", () => {
+      const payload = {
+        key: "item_images/assets/2/000/076/056/original/3-1.jpg",
+        edits: {
+          resize: { w: 750, h: 473 },
+          avif: { q: 70, style: "sm" },
+        },
       };
 
-      expect(isCacheCheckRequest(event)).toBe(true);
+      const cacheKey = getAvifCacheKey(payload);
+
+      expect(cacheKey).toBe("item_images/assets/2/000/076/056/sm/3-1.avif");
     });
 
-    it("should return true when X-Bw-Cache-Check header is '1' (case variation)", () => {
-      const event = {
-        path: "/base64payload",
-        headers: { "X-Bw-Cache-Check": "1" },
+    it("should use xs style when provided", () => {
+      const payload = {
+        key: "item_images/assets/2/000/076/056/original/photo.png",
+        edits: {
+          resize: { w: 250, h: 157 },
+          avif: { q: 70, style: "xs" },
+        },
       };
 
-      expect(isCacheCheckRequest(event)).toBe(true);
+      const cacheKey = getAvifCacheKey(payload);
+
+      expect(cacheKey).toBe("item_images/assets/2/000/076/056/xs/photo.avif");
     });
 
-    it("should return false when x-bw-cache-check header is not present", () => {
-      const event = {
-        path: "/base64payload",
-        headers: {},
+    it("should use lg style when provided", () => {
+      const payload = {
+        key: "item_images/assets/2/000/076/056/original/image.jpg",
+        edits: {
+          resize: { w: 1200, h: 756 },
+          avif: { q: 70, style: "lg" },
+        },
       };
 
-      expect(isCacheCheckRequest(event)).toBe(false);
+      const cacheKey = getAvifCacheKey(payload);
+
+      expect(cacheKey).toBe("item_images/assets/2/000/076/056/lg/image.avif");
     });
 
-    it("should return false when x-bw-cache-check header is not '1'", () => {
-      const event = {
-        path: "/base64payload",
-        headers: { "x-bw-cache-check": "0" },
+    it("should use xl style when provided", () => {
+      const payload = {
+        key: "item_images/assets/5/000/123/456/original/large.jpeg",
+        edits: {
+          resize: { w: 2000, h: 1260 },
+          avif: { q: 70, style: "xl" },
+        },
       };
 
-      expect(isCacheCheckRequest(event)).toBe(false);
+      const cacheKey = getAvifCacheKey(payload);
+
+      expect(cacheKey).toBe("item_images/assets/5/000/123/456/xl/large.avif");
     });
 
-    it("should return false when headers is undefined", () => {
-      const event = {
-        path: "/base64payload",
+    it("should return null when style is not provided", () => {
+      const payload = {
+        key: "item_images/assets/2/000/076/056/original/custom.jpg",
+        edits: {
+          resize: { w: 750, h: 473 },
+          avif: { q: 70 },
+        },
       };
 
-      expect(isCacheCheckRequest(event)).toBe(false);
+      const cacheKey = getAvifCacheKey(payload);
+
+      expect(cacheKey).toBeNull();
+    });
+
+    it("should generate consistent keys for same payload", () => {
+      const payload = {
+        key: "item_images/assets/2/000/076/056/original/3-1.jpg",
+        edits: {
+          resize: { w: 750, h: 473 },
+          avif: { q: 70, style: "sm" },
+        },
+      };
+
+      const key1 = getAvifCacheKey(payload);
+      const key2 = getAvifCacheKey(payload);
+
+      expect(key1).toBe(key2);
+    });
+  });
+
+  describe("getAvifFromS3Cache", () => {
+    it("should return buffer on cache hit", async () => {
+      const fakeAvifData = Buffer.from([0x00, 0x00, 0x00, 0x1c]);
+      mockS3GetObjectPromise.mockResolvedValue({ Body: fakeAvifData });
+
+      const result = await getAvifFromS3Cache("test-bucket", "avif_cache/test.avif");
+
+      expect(result).toEqual(fakeAvifData);
+      expect(mockS3GetObject).toHaveBeenCalledWith({
+        Bucket: "test-bucket",
+        Key: "avif_cache/test.avif",
+      });
+    });
+
+    it("should return null on NoSuchKey error (cache miss)", async () => {
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
+
+      const result = await getAvifFromS3Cache("test-bucket", "avif_cache/test.avif");
+
+      expect(result).toBeNull();
+    });
+
+    it("should return null on other S3 errors (fail open)", async () => {
+      mockS3GetObjectPromise.mockRejectedValue(new Error("Network error"));
+
+      const result = await getAvifFromS3Cache("test-bucket", "avif_cache/test.avif");
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("storeAvifToS3Cache", () => {
+    it("should store AVIF to S3 with correct parameters", async () => {
+      const avifBuffer = Buffer.from([0x00, 0x00, 0x00, 0x1c]);
+      mockS3PutObjectPromise.mockResolvedValue({});
+
+      await storeAvifToS3Cache("test-bucket", "avif_cache/test.avif", avifBuffer);
+
+      expect(mockS3PutObject).toHaveBeenCalledWith({
+        Bucket: "test-bucket",
+        Key: "avif_cache/test.avif",
+        Body: avifBuffer,
+        ContentType: "image/avif",
+        CacheControl: "max-age=31536000,public",
+      });
     });
   });
 
   describe("handleProgressiveLoading", () => {
-    it("should return 302 redirect to JPEG URL when cache-check misses", async () => {
+    it("should return 302 redirect to JPEG URL when S3 cache misses", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
+      process.env.SOURCE_BUCKETS = "test-bucket";
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
         path: "/originalBase64Payload",
@@ -170,7 +285,7 @@ describe("ProgressiveLoader", () => {
         key: "item_images/test.jpg",
         edits: {
           resize: { w: 750, h: 473, fit: "inside" },
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -179,39 +294,17 @@ describe("ProgressiveLoader", () => {
 
       expect(result.statusCode).toBe(StatusCodes.REDIRECT);
       expect(result.isBase64Encoded).toBe(false);
-      // Should use CLOUDFRONT_DOMAIN, not the API Gateway host
       expect(result.headers?.Location).toContain("https://d1234.cloudfront.net/");
-      // private so CloudFront doesn't cache; browser caches 15s
       expect(result.headers?.["Cache-Control"]).toBe("private, max-age=15");
+      expect(mockS3GetObject).toHaveBeenCalled();
     });
 
-    it("should proxy AVIF directly when cache-check hits Origin Shield", async () => {
+    it("should return AVIF directly when S3 cache hits", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      const https = require("https");
+      process.env.SOURCE_BUCKETS = "test-bucket";
 
-      // Mock a fake AVIF binary (just some bytes for testing)
       const fakeAvifData = Buffer.from([0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66]);
-
-      // Simulate cache HIT: return 200 with AVIF content
-      https.request.mockImplementation((options: any, callback: any) => {
-        setTimeout(() => {
-          const mockRes = {
-            statusCode: 200,
-            headers: { "content-type": "image/avif", "x-cache": "Hit from cloudfront" },
-            on: jest.fn((event, handler) => {
-              if (event === "data") {
-                setTimeout(() => handler(fakeAvifData), 0);
-              } else if (event === "end") {
-                setTimeout(() => handler(), 10);
-              }
-              return mockRes;
-            }),
-            resume: jest.fn(),
-          };
-          callback(mockRes);
-        }, 0);
-        return mockRequest;
-      });
+      mockS3GetObjectPromise.mockResolvedValue({ Body: fakeAvifData });
 
       const event = {
         path: "/originalBase64Payload",
@@ -226,24 +319,24 @@ describe("ProgressiveLoader", () => {
         key: "item_images/test.jpg",
         edits: {
           resize: { w: 750, h: 473, fit: "inside" },
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
 
       const result = await handleProgressiveLoading(event, payload, secretProvider);
 
-      // Should return 200 with proxied AVIF
       expect(result.statusCode).toBe(StatusCodes.OK);
       expect(result.isBase64Encoded).toBe(true);
       expect(result.headers?.["Content-Type"]).toBe("image/avif");
       expect(result.headers?.["Cache-Control"]).toBe("max-age=31536000,public");
-      // Body should be base64 encoded AVIF
       expect(result.body).toBe(fakeAvifData.toString("base64"));
     });
 
     it("should generate JPEG URL without avif in edits", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
+      process.env.SOURCE_BUCKETS = "test-bucket";
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
         path: "/originalBase64Payload",
@@ -257,7 +350,7 @@ describe("ProgressiveLoader", () => {
         key: "item_images/test.jpg",
         edits: {
           resize: { w: 750, h: 473, fit: "inside" },
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -283,7 +376,7 @@ describe("ProgressiveLoader", () => {
       const payload = {
         key: "test.jpg",
         edits: {
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -294,7 +387,9 @@ describe("ProgressiveLoader", () => {
     });
 
     it("should fallback to Host header if CLOUDFRONT_DOMAIN not set", async () => {
-      // No CLOUDFRONT_DOMAIN set
+      process.env.SOURCE_BUCKETS = "test-bucket";
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
+
       const event = {
         path: "/originalBase64Payload",
         headers: {
@@ -306,7 +401,7 @@ describe("ProgressiveLoader", () => {
         bucket: "test-bucket",
         key: "item_images/test.jpg",
         edits: {
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -319,6 +414,8 @@ describe("ProgressiveLoader", () => {
     it("should trigger async warming orchestrator via Lambda invoke", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
+      process.env.SOURCE_BUCKETS = "test-bucket";
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
         path: "/originalBase64Payload",
@@ -330,7 +427,7 @@ describe("ProgressiveLoader", () => {
       const payload = {
         key: "test.jpg",
         edits: {
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -352,6 +449,8 @@ describe("ProgressiveLoader", () => {
     it("should include Accept header in warming orchestrator payload", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
+      process.env.SOURCE_BUCKETS = "test-bucket";
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
         path: "/originalBase64Payload",
@@ -364,7 +463,7 @@ describe("ProgressiveLoader", () => {
       const payload = {
         key: "test.jpg",
         edits: {
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -386,6 +485,8 @@ describe("ProgressiveLoader", () => {
     it("should include signature in warming orchestrator payload when present", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
+      process.env.SOURCE_BUCKETS = "test-bucket";
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
         path: "/originalBase64Payload",
@@ -398,7 +499,7 @@ describe("ProgressiveLoader", () => {
       const payload = {
         key: "test.jpg",
         edits: {
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -419,7 +520,8 @@ describe("ProgressiveLoader", () => {
 
     it("should not invoke Lambda when AWS_LAMBDA_FUNCTION_NAME is not set", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      // AWS_LAMBDA_FUNCTION_NAME is not set
+      process.env.SOURCE_BUCKETS = "test-bucket";
+      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
         path: "/originalBase64Payload",
@@ -431,7 +533,7 @@ describe("ProgressiveLoader", () => {
       const payload = {
         key: "test.jpg",
         edits: {
-          avif: { q: 70 },
+          avif: { q: 70, style: "sm" },
           jpeg: { q: 85 },
         },
       };
@@ -439,6 +541,31 @@ describe("ProgressiveLoader", () => {
       await handleProgressiveLoading(event, payload, secretProvider);
 
       expect(mockLambdaInvoke).not.toHaveBeenCalled();
+    });
+
+    it("should still return 302 when SOURCE_BUCKETS is not set (skip S3 cache check)", async () => {
+      process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
+      // SOURCE_BUCKETS not set
+
+      const event = {
+        path: "/originalBase64Payload",
+        headers: {
+          Host: "api-gateway.amazonaws.com",
+        },
+      };
+
+      const payload = {
+        key: "test.jpg",
+        edits: {
+          avif: { q: 70, style: "sm" },
+          jpeg: { q: 85 },
+        },
+      };
+
+      const result = await handleProgressiveLoading(event, payload, secretProvider);
+
+      expect(result.statusCode).toBe(StatusCodes.REDIRECT);
+      expect(mockS3GetObject).not.toHaveBeenCalled();
     });
   });
 
@@ -450,7 +577,11 @@ describe("ProgressiveLoader", () => {
       https.request.mockImplementation((options: any, callback: any) => {
         // Simulate successful response asynchronously
         setTimeout(() => {
-          callback({ statusCode: 200, headers: { "x-cache": "Miss from cloudfront", "content-type": "image/avif" }, resume: jest.fn() });
+          callback({
+            statusCode: 200,
+            headers: { "x-cache": "Miss from cloudfront", "content-type": "image/avif" },
+            resume: jest.fn(),
+          });
         }, 0);
         return mockRequest;
       });
@@ -480,7 +611,11 @@ describe("ProgressiveLoader", () => {
 
       https.request.mockImplementation((options: any, callback: any) => {
         setTimeout(() => {
-          callback({ statusCode: 200, headers: { "x-cache": "Miss from cloudfront", "content-type": "image/avif" }, resume: jest.fn() });
+          callback({
+            statusCode: 200,
+            headers: { "x-cache": "Miss from cloudfront", "content-type": "image/avif" },
+            resume: jest.fn(),
+          });
         }, 0);
         return mockRequest;
       });

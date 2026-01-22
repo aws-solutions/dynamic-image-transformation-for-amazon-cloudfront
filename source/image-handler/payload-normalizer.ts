@@ -9,7 +9,7 @@ export interface NormalizedResize {
 
 export interface NormalizedEdits {
   resize?: NormalizedResize;
-  avif?: { q?: number };
+  avif?: { q?: number; style?: string };
   jpeg?: { q?: number };
   png?: { q?: number };
   webp?: { q?: number };
@@ -57,7 +57,10 @@ export function normalizePayload(raw: any): NormalizedPayload {
 
   // Normalize format-specific quality settings
   if (edits.avif) {
-    normalizedEdits.avif = { q: edits.avif.q ?? edits.avif.quality };
+    normalizedEdits.avif = {
+      q: edits.avif.q ?? edits.avif.quality,
+      ...(edits.avif.style && { style: edits.avif.style }),
+    };
   }
   if (edits.jpeg) {
     normalizedEdits.jpeg = { q: edits.jpeg.q ?? edits.jpeg.quality };

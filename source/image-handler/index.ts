@@ -10,8 +10,8 @@ import { isNullOrWhiteSpace } from "../solution-utils/helpers";
 import { ImageHandler } from "./image-handler";
 import { ImageRequest } from "./image-request";
 import { Headers, ImageHandlerEvent, ImageHandlerExecutionResult, StatusCodes } from "./lib";
-import { normalizePayload, hasProgressiveLoading } from "./payload-normalizer";
-import { handleProgressiveLoading, isWarmingRequest, isCacheCheckRequest, executeWarmingRequest } from "./progressive-loader";
+import { normalizePayload, hasProgressiveLoading, NormalizedPayload } from "./payload-normalizer";
+import { handleProgressiveLoading, isWarmingRequest, executeWarmingRequest, getAvifCacheKey, storeAvifToS3Cache } from "./progressive-loader";
 import { SecretProvider } from "./secret-provider";
 
 const awsSdkOptions = getOptions();
@@ -42,47 +42,34 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
   // Check for progressive loading (avif+jpeg) before full processing
   // Progressive loading redirects to JPEG immediately and warms AVIF cache in background
   const isWarmReq = isWarmingRequest(event);
-  const isCacheCheck = isCacheCheckRequest(event);
-  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}, isCacheCheckRequest=${isCacheCheck}`);
+  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}`);
 
-  // Cache-check requests return 204 immediately to signal cache miss
-  // This is used by handleProgressiveLoading to probe Origin Shield cache
-  if (isCacheCheck) {
-    console.info("Cache-check request detected, returning 204 (cache miss signal)");
-    return {
-      statusCode: StatusCodes.NO_CONTENT,
-      isBase64Encoded: false,
-      headers: {
-        "x-bw-cache-miss": "1",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-      },
-      body: "",
-    };
+  // Decode payload once - used for both progressive loading check and S3 cache key
+  let normalizedPayload: NormalizedPayload | null = null;
+  try {
+    const rawPayload = tryDecodePayload(event.path);
+    if (rawPayload) {
+      normalizedPayload = normalizePayload(rawPayload);
+    }
+  } catch {
+    // Payload decode failed - will continue without it
   }
 
   if (!isWarmReq) {
-    try {
-      const rawPayload = tryDecodePayload(event.path);
-      if (rawPayload) {
-        const payload = normalizePayload(rawPayload);
-        const hasAvif = !!payload.edits?.avif;
-        const hasJpeg = !!payload.edits?.jpeg;
-        const isProgressive = hasProgressiveLoading(payload);
-        console.info(
-          `Progressive loading check: hasAvif=${hasAvif}, hasJpeg=${hasJpeg}, isProgressive=${isProgressive}, ` +
-            `edits=${JSON.stringify(payload.edits)}`
-        );
-        if (isProgressive) {
-          console.info("Progressive loading detected, redirecting to JPEG and warming AVIF cache");
-          return await handleProgressiveLoading(event, payload, secretProvider);
-        }
-      } else {
-        console.info("Progressive loading check: could not decode payload (not base64 JSON)");
+    if (normalizedPayload) {
+      const hasAvif = !!normalizedPayload.edits?.avif;
+      const hasJpeg = !!normalizedPayload.edits?.jpeg;
+      const isProgressive = hasProgressiveLoading(normalizedPayload);
+      console.info(
+        `Progressive loading check: hasAvif=${hasAvif}, hasJpeg=${hasJpeg}, isProgressive=${isProgressive}, ` +
+        `edits=${JSON.stringify(normalizedPayload.edits)}`
+      );
+      if (isProgressive) {
+        console.info("Progressive loading detected, redirecting to JPEG and warming AVIF cache");
+        return await handleProgressiveLoading(event, normalizedPayload, secretProvider);
       }
-    } catch (progressiveError) {
-      // If progressive loading check fails, continue with normal processing
-      console.info("Progressive loading check failed, continuing with normal processing:", progressiveError.message);
+    } else {
+      console.info("Progressive loading check: could not decode payload (not base64 JSON)");
     }
   } else {
     console.info("Warming request detected, skipping progressive loading redirect (will generate AVIF)");
@@ -93,6 +80,21 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
     console.info(imageRequestInfo);
 
     const processedRequest = await imageHandler.process(imageRequestInfo);
+
+    // Store AVIF to S3 cache if this is a warming request
+    if (isWarmReq && imageRequestInfo.contentType === "image/avif" && normalizedPayload) {
+      const bucket = process.env.SOURCE_BUCKETS?.split(",")[0];
+      const cacheKey = getAvifCacheKey(normalizedPayload);
+      if (bucket && cacheKey) {
+        console.info(`Warming request: storing AVIF to S3 cache bucket=${bucket} key=${cacheKey}`);
+        try {
+          await storeAvifToS3Cache(bucket, cacheKey, Buffer.from(processedRequest, "base64"));
+          console.info(`Successfully cached AVIF to S3: ${cacheKey}`);
+        } catch (err) {
+          console.error("Failed to cache AVIF to S3:", err);
+        }
+      }
+    }
 
     let headers = getResponseHeaders(false, isAlb);
     headers["Content-Type"] = imageRequestInfo.contentType;

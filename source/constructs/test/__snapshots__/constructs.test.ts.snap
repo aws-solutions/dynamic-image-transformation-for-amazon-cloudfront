@@ -543,12 +543,6 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               },
               "Id": "TestStackBackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistributionOrigin1A053AEB7",
               "OriginPath": "/image",
-              "OriginShield": {
-                "Enabled": true,
-                "OriginShieldRegion": {
-                  "Ref": "AWS::Region",
-                },
-              },
             },
           ],
           "PriceClass": {
@@ -1294,7 +1288,6 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "origin",
               "accept",
               "x-bw-warm",
-              "x-bw-cache-check",
             ],
           },
           "Name": {

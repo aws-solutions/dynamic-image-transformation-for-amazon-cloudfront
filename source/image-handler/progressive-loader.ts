@@ -4,6 +4,7 @@
 import { createHmac } from "crypto";
 import https from "https";
 import Lambda from "aws-sdk/clients/lambda";
+import S3 from "aws-sdk/clients/s3";
 
 import { getOptions } from "../solution-utils/get-options";
 import { ImageHandlerEvent, ImageHandlerExecutionResult, StatusCodes } from "./lib";
@@ -12,21 +13,103 @@ import { SecretProvider } from "./secret-provider";
 
 const awsSdkOptions = getOptions();
 const lambdaClient = new Lambda(awsSdkOptions);
+const s3Client = new S3(awsSdkOptions);
+
+/**
+ * Generates an S3 cache key for AVIF matching Rails Paperclip path structure.
+ * This produces the same path that Rails would use if "resize on the fly" is disabled.
+ *
+ * Example:
+ * - Input key: "item_images/assets/2/000/076/056/original/3-1.jpg"
+ * - Style: "sm" (passed in payload)
+ * - Output: "item_images/assets/2/000/076/056/sm/3-1.avif"
+ *
+ * The style name (xs, sm, lg, xl) must be provided in the payload by Rails.
+ *
+ * @param payload The normalized payload containing key and style
+ * @returns The S3 key for the cached AVIF, or null if style is missing
+ */
+export function getAvifCacheKey(payload: NormalizedPayload): string | null {
+  const key = payload.key;
+  const style = payload.edits?.avif?.style;
+
+  // Style is required for AVIF caching
+  if (!style) {
+    console.warn("AVIF style not provided in payload, skipping S3 cache");
+    return null;
+  }
+
+  // Parse original path: "base/path/style/filename.ext"
+  const lastSlashIndex = key.lastIndexOf("/");
+  const dirPath = key.substring(0, lastSlashIndex); // "item_images/assets/2/000/076/056/original"
+  const filename = key.substring(lastSlashIndex + 1); // "3-1.jpg"
+
+  // Remove the current style folder from dirPath (e.g., "original")
+  const secondLastSlashIndex = dirPath.lastIndexOf("/");
+  const basePath = dirPath.substring(0, secondLastSlashIndex); // "item_images/assets/2/000/076/056"
+
+  // Replace file extension with .avif (matching Rails style_path interpolation)
+  const dotIndex = filename.lastIndexOf(".");
+  const baseFilename = dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
+  const avifFilename = `${baseFilename}.avif`;
+
+  return `${basePath}/${style}/${avifFilename}`;
+}
+
+/**
+ * Checks if AVIF exists in S3 cache.
+ *
+ * @param bucket The S3 bucket
+ * @param cacheKey The S3 key for the cached AVIF
+ * @returns Buffer with AVIF data if found, null otherwise
+ */
+export async function getAvifFromS3Cache(bucket: string, cacheKey: string): Promise<Buffer | null> {
+  try {
+    const result = await s3Client
+      .getObject({
+        Bucket: bucket,
+        Key: cacheKey,
+      })
+      .promise();
+    return Buffer.from(result.Body as Uint8Array);
+  } catch (err: any) {
+    if (err.code === "NoSuchKey") return null;
+    console.error("S3 cache read error:", err);
+    return null; // Fail open - continue to generate
+  }
+}
+
+/**
+ * Stores AVIF to S3 cache.
+ *
+ * @param bucket The S3 bucket
+ * @param cacheKey The S3 key for the cached AVIF
+ * @param avifBuffer The AVIF data to store
+ */
+export async function storeAvifToS3Cache(bucket: string, cacheKey: string, avifBuffer: Buffer): Promise<void> {
+  await s3Client
+    .putObject({
+      Bucket: bucket,
+      Key: cacheKey,
+      Body: avifBuffer,
+      ContentType: "image/avif",
+      CacheControl: "max-age=31536000,public",
+    })
+    .promise();
+}
 
 /**
  * Handles progressive loading for AVIF images.
  *
- * When a request for AVIF reaches Lambda (Origin Shield miss), we:
- * 1. Return 302 redirect to JPEG for immediate response
- * 2. Trigger async warming to generate and cache AVIF at Origin Shield
- *
- * The 302 is cached for 5 seconds to reduce thundering herd during warming.
- * After warming completes (~7-10s), subsequent requests get AVIF from Origin Shield.
+ * When a request for AVIF reaches Lambda:
+ * 1. Check S3 for cached AVIF - if found, return it (200 OK)
+ * 2. If not found, return 302 redirect to JPEG and trigger async warming
+ * 3. Async warming generates AVIF and stores it to S3 for future requests
  *
  * @param event The Lambda event
  * @param payload The normalized payload
  * @param secretProvider The secret provider for signature generation
- * @returns A 302 redirect to JPEG URL
+ * @returns 200 with AVIF if cached, or 302 redirect to JPEG URL
  */
 export async function handleProgressiveLoading(
   event: ImageHandlerEvent,
@@ -42,52 +125,49 @@ export async function handleProgressiveLoading(
     throw new Error("CLOUDFRONT_DOMAIN environment variable is required for progressive loading");
   }
 
-  console.info(`Progressive loading: domain=${host}, checking Origin Shield cache first`);
+  const bucket = process.env.SOURCE_BUCKETS?.split(",")[0];
+  const cacheKey = getAvifCacheKey(payload);
 
-  // 1. Check if Origin Shield already has the AVIF cached
-  // This works around CloudFront cache partitioning where browser requests don't hit
-  // cache populated by Lambda warming requests. Lambda→CloudFront requests DO hit the cache.
-  const cachedAvif = await checkOriginShieldCache(
-    host,
-    event.path,
-    event.queryStringParameters?.signature,
-    acceptHeader
-  );
+  console.info(`Progressive loading: domain=${host}, checking S3 cache bucket=${bucket} key=${cacheKey}`);
 
-  if (cachedAvif) {
-    console.info(`Progressive loading: cache HIT, proxying ${cachedAvif.length} bytes AVIF to browser`);
-    return {
-      statusCode: StatusCodes.OK,
-      isBase64Encoded: true,
-      headers: {
-        "Content-Type": "image/avif",
-        "Cache-Control": "max-age=31536000,public",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-      body: cachedAvif.toString("base64"),
-    };
+  // Step 1: Check S3 cache first (only if we have a valid cache key)
+  if (bucket && cacheKey) {
+    const cachedAvif = await getAvifFromS3Cache(bucket, cacheKey);
+    if (cachedAvif) {
+      console.info(`S3 cache HIT, returning ${cachedAvif.length} bytes AVIF`);
+      return {
+        statusCode: StatusCodes.OK,
+        isBase64Encoded: true,
+        headers: {
+          "Content-Type": "image/avif",
+          "Cache-Control": "max-age=31536000,public",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+        body: cachedAvif.toString("base64"),
+      };
+    }
   }
 
-  console.info("Progressive loading: cache MISS, returning 302 + triggering async warming");
+  console.info("S3 cache MISS, returning 302 + triggering async warming");
 
-  // 2. Build JPEG URL (same payload without avif key)
+  // Step 2: Build JPEG URL (same payload without avif key)
   const jpegPayload = createJpegOnlyPayload(payload);
   const jpegPayloadDenormalized = denormalizePayload(jpegPayload);
   const jpegPath = "/" + Buffer.from(JSON.stringify(jpegPayloadDenormalized)).toString("base64");
 
-  // 3. Generate signature for JPEG URL (if signatures enabled)
+  // Step 3: Generate signature for JPEG URL (if signatures enabled)
   let jpegUrl = `https://${host}${jpegPath}`;
   if (process.env.ENABLE_SIGNATURE === "Yes") {
     const signature = await generateSignature(jpegPath, secretProvider);
     jpegUrl += `?signature=${signature}`;
   }
 
-  // 4. Trigger async warming via Lambda self-invoke
+  // Step 4: Trigger async warming via Lambda self-invoke
   await triggerAsyncWarmingOrchestrator(host, event.path, event.queryStringParameters?.signature, acceptHeader);
 
-  // 5. Return 302 redirect to JPEG
+  // Step 5: Return 302 redirect to JPEG
   // Use "private" so CloudFront doesn't cache 302 (allows warming request to reach Lambda).
   // Browser caches for 15s to reduce repeated requests from same user during encoding.
   return {
@@ -264,87 +344,4 @@ async function makeWarmingHttpRequest(
 export function isWarmingRequest(event: ImageHandlerEvent): boolean {
   const warmHeader = event.headers?.["x-bw-warm"] || event.headers?.["X-Bw-Warm"];
   return warmHeader === "1";
-}
-
-/**
- * Checks if the current request is a cache-check request.
- * Cache-check requests are used to probe Origin Shield cache before returning 302.
- *
- * @param event The Lambda event
- * @returns True if the x-bw-cache-check header is set to "1"
- */
-export function isCacheCheckRequest(event: ImageHandlerEvent): boolean {
-  const cacheCheckHeader = event.headers?.["x-bw-cache-check"] || event.headers?.["X-Bw-Cache-Check"];
-  return cacheCheckHeader === "1";
-}
-
-/**
- * Checks Origin Shield cache for a cached AVIF response.
- * Makes a synchronous request to CloudFront with x-bw-cache-check header.
- * If Origin Shield has the AVIF cached, returns the binary data.
- * If cache miss (Lambda returns 204), returns null.
- *
- * @param host The CloudFront hostname
- * @param path The request path
- * @param signature The request signature (if any)
- * @param acceptHeader The Accept header to send
- * @returns Buffer with AVIF data if cache hit, null if cache miss
- */
-async function checkOriginShieldCache(
-  host: string,
-  path: string,
-  signature?: string,
-  acceptHeader?: string
-): Promise<Buffer | null> {
-  return new Promise((resolve) => {
-    const chunks: Buffer[] = [];
-    const fullPath = signature ? `${path}?signature=${signature}` : path;
-
-    console.info(`Cache-check: probing Origin Shield for ${host}${fullPath}`);
-
-    const req = https.request(
-      {
-        hostname: host,
-        path: fullPath,
-        method: "GET",
-        headers: {
-          "x-bw-cache-check": "1",
-          accept: acceptHeader || "image/avif,image/webp,*/*",
-        },
-        timeout: 5000, // 5 second timeout - fail fast to 302
-      },
-      (res) => {
-        const xCache = res.headers?.["x-cache"] || "N/A";
-        const contentType = res.headers?.["content-type"] || "N/A";
-        console.info(`Cache-check response: status=${res.statusCode}, x-cache=${xCache}, content-type=${contentType}`);
-
-        // Only accept 200 with AVIF content-type as cache hit
-        if (res.statusCode === 200 && contentType.includes("image/avif")) {
-          res.on("data", (chunk: Buffer) => chunks.push(chunk));
-          res.on("end", () => {
-            console.info(`Cache-check HIT: received ${Buffer.concat(chunks).length} bytes`);
-            resolve(Buffer.concat(chunks));
-          });
-        } else {
-          // Cache miss (204) or unexpected response
-          res.resume();
-          console.info("Cache-check MISS: Origin Shield does not have cached AVIF");
-          resolve(null);
-        }
-      }
-    );
-
-    req.on("error", (err) => {
-      console.error("Cache-check request failed:", err.message);
-      resolve(null);
-    });
-
-    req.on("timeout", () => {
-      console.error("Cache-check request timed out");
-      req.destroy();
-      resolve(null);
-    });
-
-    req.end();
-  });
 }
