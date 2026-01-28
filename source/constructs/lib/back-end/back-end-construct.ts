@@ -9,6 +9,9 @@ import {
   CachePolicy,
   CacheQueryStringBehavior,
   DistributionProps,
+  Function as CloudFrontFunction,
+  FunctionCode,
+  FunctionEventType,
   IOrigin,
   OriginRequestHeaderBehavior,
   OriginRequestPolicy,
@@ -22,10 +25,12 @@ import { Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws
 import { Architecture, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { IBucket } from "aws-cdk-lib/aws-s3";
-import { ArnFormat, Aws, Duration, Lazy, Stack } from "aws-cdk-lib";
+import { Bucket, IBucket } from "aws-cdk-lib/aws-s3";
+import { ArnFormat, Aws, Duration, Lazy, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { CloudFrontToApiGatewayToLambda } from "@aws-solutions-constructs/aws-cloudfront-apigateway-lambda";
+
+import * as fs from "fs";
 
 import { addCfnSuppressRules } from "../../utils/utils";
 import { SolutionConstructProps } from "../types";
@@ -45,6 +50,20 @@ export class BackEnd extends Construct {
 
   constructor(scope: Construct, id: string, props: BackEndProps) {
     super(scope, id);
+
+    // AVIF cache bucket with 90-day expiration lifecycle rule
+    // Uses One Zone-IA storage class for cost savings (cache is regenerable)
+    const avifCacheBucket = new Bucket(this, "AvifCacheBucket", {
+      bucketName: `${Stack.of(this).stackName.toLowerCase()}-avif-cache`,
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      lifecycleRules: [
+        {
+          enabled: true,
+          expiration: Duration.days(90),
+        },
+      ],
+    });
 
     const imageHandlerLambdaFunctionRole = new Role(this, "ImageHandlerFunctionRole", {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
@@ -128,6 +147,7 @@ export class BackEnd extends Construct {
         ENABLE_DEFAULT_FALLBACK_IMAGE: props.enableDefaultFallbackImage,
         DEFAULT_FALLBACK_IMAGE_BUCKET: props.fallbackImageS3Bucket,
         DEFAULT_FALLBACK_IMAGE_KEY: props.fallbackImageS3KeyBucket,
+        AVIF_CACHE_BUCKET: avifCacheBucket.bucketName,
       },
       bundling: {
         externalModules: ["sharp"],
@@ -150,6 +170,9 @@ export class BackEnd extends Construct {
       },
     });
 
+    // Grant Lambda read/write access to the AVIF cache bucket
+    avifCacheBucket.grantReadWrite(imageHandlerLambdaFunction);
+
     const imageHandlerLogGroup = new LogGroup(this, "ImageHandlerLogGroup", {
       logGroupName: `/aws/lambda/${imageHandlerLambdaFunction.functionName}`,
       retention: props.logRetentionPeriod as RetentionDays,
@@ -162,6 +185,17 @@ export class BackEnd extends Construct {
       },
     ]);
 
+    // CloudFront Function to normalize Accept header into binary fmt query parameter
+    // This reduces cache fragmentation: instead of dozens of cache entries per Accept variation,
+    // we only have 2 entries per image (fmt=avif or fmt=jpeg)
+    const formatNormalizerFunction = new CloudFrontFunction(this, "FormatNormalizerFunction", {
+      functionName: `FormatNormalizer-${props.uuid}`,
+      code: FunctionCode.fromInline(
+        fs.readFileSync(path.join(__dirname, "../cloudfront-functions/format-normalizer.js"), "utf-8")
+      ),
+      comment: "Normalizes Accept header to fmt query param for AVIF content negotiation",
+    });
+
     const cachePolicy = new CachePolicy(this, "CachePolicy", {
       cachePolicyName: `ServerlessImageHandler-${props.uuid}`,
       defaultTtl: Duration.days(1),
@@ -170,10 +204,11 @@ export class BackEnd extends Construct {
       maxTtl: Duration.days(365),
       enableAcceptEncodingGzip: false,
       // Note: x-bw-warm is NOT in cache key so warm requests target same cache entry as normal requests
-      // Accept header removed from cache key - payload already determines output format (avif/jpeg)
+      // Accept header removed from cache key - CloudFront Function normalizes it to ?fmt= query param
       // Origin header removed from cache key so warming requests (no Origin) populate same cache entry as browser requests (with Origin)
       headerBehavior: CacheHeaderBehavior.none(),
-      queryStringBehavior: CacheQueryStringBehavior.allowList("signature"),
+      // fmt query param added by CloudFront Function for AVIF content negotiation (avif or jpeg)
+      queryStringBehavior: CacheQueryStringBehavior.allowList("signature", "fmt"),
     });
 
     const originRequestPolicy = new OriginRequestPolicy(this, "OriginRequestPolicy", {
@@ -181,7 +216,8 @@ export class BackEnd extends Construct {
       // Forward headers to origin for progressive AVIF loading:
       // - x-bw-warm: triggers AVIF generation on warming requests (instead of 302 redirect)
       headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm"),
-      queryStringBehavior: OriginRequestQueryStringBehavior.allowList("signature"),
+      // Forward fmt query param (added by CloudFront Function) to Lambda for AVIF detection
+      queryStringBehavior: OriginRequestQueryStringBehavior.allowList("signature", "fmt"),
     });
 
     const apiGatewayRestApi = RestApi.fromRestApiId(
@@ -205,6 +241,12 @@ export class BackEnd extends Construct {
         viewerProtocolPolicy: ViewerProtocolPolicy.HTTPS_ONLY,
         originRequestPolicy,
         cachePolicy,
+        functionAssociations: [
+          {
+            function: formatNormalizerFunction,
+            eventType: FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
       },
       priceClass: props.cloudFrontPriceClass as PriceClass,
       enableLogging: true,

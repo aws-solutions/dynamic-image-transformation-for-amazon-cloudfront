@@ -131,17 +131,6 @@ export function denormalizePayload(normalized: NormalizedPayload): any {
 }
 
 /**
- * Checks if the payload has progressive loading enabled.
- * Progressive loading is enabled when both avif and jpeg edits are present.
- *
- * @param payload The normalized payload
- * @returns True if progressive loading is enabled
- */
-export function hasProgressiveLoading(payload: NormalizedPayload): boolean {
-  return !!(payload.edits?.avif && payload.edits?.jpeg);
-}
-
-/**
  * Creates a JPEG-only payload by removing the avif key from edits.
  * Used for the redirect URL in progressive loading.
  *

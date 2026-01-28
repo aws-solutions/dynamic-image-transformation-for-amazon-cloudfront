@@ -370,6 +370,103 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::ServiceCatalogAppRegistry::ResourceAssociation",
     },
+    "BackEndAvifCacheBucketAutoDeleteObjectsCustomResourceABF97AE7": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "BackEndAvifCacheBucketPolicyA6C0F468",
+      ],
+      "Properties": {
+        "BucketName": {
+          "Ref": "BackEndAvifCacheBucketE07EF41A",
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::S3AutoDeleteObjects",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "BackEndAvifCacheBucketE07EF41A": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BucketName": "teststack-avif-cache",
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "ExpirationInDays": 90,
+              "Status": "Enabled",
+            },
+          ],
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true",
+          },
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "BackEndAvifCacheBucketPolicyA6C0F468": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "BackEndAvifCacheBucketE07EF41A",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "BackEndAvifCacheBucketE07EF41A",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "BackEndAvifCacheBucketE07EF41A",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
     "BackEndCachePolicy1DCE9B1B": {
       "Properties": {
         "CachePolicyConfig": {
@@ -403,12 +500,58 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "QueryStringBehavior": "whitelist",
               "QueryStrings": [
                 "signature",
+                "fmt",
               ],
             },
           },
         },
       },
       "Type": "AWS::CloudFront::CachePolicy",
+    },
+    "BackEndFormatNormalizerFunction6ED0BA43": {
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "// CloudFront Function: Normalize Accept header to binary fmt query parameter
+// This reduces cache fragmentation by normalizing varying Accept headers into two cache entries: avif or jpeg
+function handler(event) {
+  var request = event.request;
+  var headers = request.headers;
+
+  // Only add fmt if not already present
+  if (!request.querystring.fmt) {
+    // Determine format based on Accept header
+    var fmt = "jpeg"; // default
+    if (headers["accept"] && headers["accept"].value.includes("image/avif")) {
+      fmt = "avif";
+    }
+
+    // Add normalized format to query string (becomes part of cache key)
+    request.querystring.fmt = { value: fmt };
+  }
+
+  return request;
+}
+",
+        "FunctionConfig": {
+          "Comment": "Normalizes Accept header to fmt query param for AVIF content negotiation",
+          "Runtime": "cloudfront-js-1.0",
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "FormatNormalizer-",
+              {
+                "Fn::GetAtt": [
+                  "CommonResourcesCustomResourcesCustomResourceUuid64E7CCAD",
+                  "UUID",
+                ],
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Function",
     },
     "BackEndImageHandlerCloudFrontApiGatewayLambdaApiAccessLogGroup9B786692": {
       "DeletionPolicy": "Retain",
@@ -481,6 +624,17 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
               "Ref": "BackEndCachePolicy1DCE9B1B",
             },
             "Compress": true,
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "BackEndFormatNormalizerFunction6ED0BA43",
+                    "FunctionARN",
+                  ],
+                },
+              },
+            ],
             "OriginRequestPolicyId": {
               "Ref": "BackEndOriginRequestPolicy771345D7",
             },
@@ -1144,8 +1298,62 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::IAM::Role",
     },
+    "BackEndImageHandlerFunctionRoleDefaultPolicyC190C3BD": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "BackEndAvifCacheBucketE07EF41A",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "BackEndAvifCacheBucketE07EF41A",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "BackEndImageHandlerFunctionRoleDefaultPolicyC190C3BD",
+        "Roles": [
+          {
+            "Ref": "BackEndImageHandlerFunctionRoleABF81E5C",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "BackEndImageHandlerLambdaFunctionADEF7FF2": {
       "DependsOn": [
+        "BackEndImageHandlerFunctionRoleDefaultPolicyC190C3BD",
         "BackEndImageHandlerFunctionRoleABF81E5C",
       ],
       "Metadata": {
@@ -1181,6 +1389,9 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
           "Variables": {
             "AUTO_WEBP": {
               "Ref": "AutoWebPParameter",
+            },
+            "AVIF_CACHE_BUCKET": {
+              "Ref": "BackEndAvifCacheBucketE07EF41A",
             },
             "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
             "CLOUDFRONT_DOMAIN": {
@@ -1308,6 +1519,7 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
             "QueryStringBehavior": "whitelist",
             "QueryStrings": [
               "signature",
+              "fmt",
             ],
           },
         },
@@ -1956,6 +2168,64 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+      "DependsOn": [
+        "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "Omitted to remove snapshot dependency on hash",
+        },
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Lambda function for auto-deleting objects in ",
+              {
+                "Ref": "BackEndAvifCacheBucketE07EF41A",
+              },
+              " S3 bucket.",
+            ],
+          ],
+        },
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs18.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
     },
     "DefaultApplicationAttributeGroup41AD7209": {
       "Properties": {

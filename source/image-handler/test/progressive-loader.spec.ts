@@ -10,6 +10,7 @@ import {
   getAvifCacheKey,
   getAvifFromS3Cache,
   storeAvifToS3Cache,
+  clientSupportsAvif,
 } from "../progressive-loader";
 import { SecretProvider } from "../secret-provider";
 import { StatusCodes } from "../lib";
@@ -83,6 +84,7 @@ describe("ProgressiveLoader", () => {
     delete process.env.CLOUDFRONT_DOMAIN;
     delete process.env.AWS_LAMBDA_FUNCTION_NAME;
     delete process.env.SOURCE_BUCKETS;
+    delete process.env.AVIF_CACHE_BUCKET;
   });
 
   describe("isWarmingRequest", () => {
@@ -128,6 +130,89 @@ describe("ProgressiveLoader", () => {
       };
 
       expect(isWarmingRequest(event)).toBe(false);
+    });
+  });
+
+  describe("clientSupportsAvif", () => {
+    it("should return true when fmt query param is 'avif'", () => {
+      const event = {
+        path: "/base64payload",
+        queryStringParameters: { fmt: "avif" as const },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(true);
+    });
+
+    it("should return false when fmt query param is 'jpeg'", () => {
+      const event = {
+        path: "/base64payload",
+        queryStringParameters: { fmt: "jpeg" as const },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(false);
+    });
+
+    it("should prioritize fmt query param over Accept header", () => {
+      const event = {
+        path: "/base64payload",
+        queryStringParameters: { fmt: "jpeg" as const },
+        headers: { Accept: "image/avif,image/webp,*/*" },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(false);
+    });
+
+    it("should return true when Accept header includes image/avif (fallback)", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { Accept: "image/avif,image/webp,image/*,*/*" },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(true);
+    });
+
+    it("should return true when accept header (lowercase) includes image/avif", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { accept: "image/avif,image/webp,*/*" },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(true);
+    });
+
+    it("should return false when Accept header does not include image/avif", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { Accept: "image/webp,image/*,*/*" },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(false);
+    });
+
+    it("should return false when Accept header is empty", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { Accept: "" },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(false);
+    });
+
+    it("should return false when headers is undefined", () => {
+      const event = {
+        path: "/base64payload",
+      };
+
+      expect(clientSupportsAvif(event)).toBe(false);
+    });
+
+    it("should return false when Accept header is missing", () => {
+      const event = {
+        path: "/base64payload",
+        headers: { "Content-Type": "application/json" },
+      };
+
+      expect(clientSupportsAvif(event)).toBe(false);
     });
   });
 
@@ -220,56 +305,76 @@ describe("ProgressiveLoader", () => {
 
   describe("getAvifFromS3Cache", () => {
     it("should return buffer on cache hit", async () => {
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       const fakeAvifData = Buffer.from([0x00, 0x00, 0x00, 0x1c]);
       mockS3GetObjectPromise.mockResolvedValue({ Body: fakeAvifData });
 
-      const result = await getAvifFromS3Cache("test-bucket", "avif_cache/test.avif");
+      const result = await getAvifFromS3Cache("avif_cache/test.avif");
 
       expect(result).toEqual(fakeAvifData);
       expect(mockS3GetObject).toHaveBeenCalledWith({
-        Bucket: "test-bucket",
+        Bucket: "avif-cache-bucket",
         Key: "avif_cache/test.avif",
       });
     });
 
+    it("should return null when AVIF_CACHE_BUCKET is not set", async () => {
+      const result = await getAvifFromS3Cache("avif_cache/test.avif");
+
+      expect(result).toBeNull();
+      expect(mockS3GetObject).not.toHaveBeenCalled();
+    });
+
     it("should return null on NoSuchKey error (cache miss)", async () => {
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
-      const result = await getAvifFromS3Cache("test-bucket", "avif_cache/test.avif");
+      const result = await getAvifFromS3Cache("avif_cache/test.avif");
 
       expect(result).toBeNull();
     });
 
     it("should return null on other S3 errors (fail open)", async () => {
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue(new Error("Network error"));
 
-      const result = await getAvifFromS3Cache("test-bucket", "avif_cache/test.avif");
+      const result = await getAvifFromS3Cache("avif_cache/test.avif");
 
       expect(result).toBeNull();
     });
   });
 
   describe("storeAvifToS3Cache", () => {
-    it("should store AVIF to S3 with correct parameters", async () => {
+    it("should store AVIF to S3 with correct parameters including ONEZONE_IA storage class", async () => {
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       const avifBuffer = Buffer.from([0x00, 0x00, 0x00, 0x1c]);
       mockS3PutObjectPromise.mockResolvedValue({});
 
-      await storeAvifToS3Cache("test-bucket", "avif_cache/test.avif", avifBuffer);
+      await storeAvifToS3Cache("avif_cache/test.avif", avifBuffer);
 
       expect(mockS3PutObject).toHaveBeenCalledWith({
-        Bucket: "test-bucket",
+        Bucket: "avif-cache-bucket",
         Key: "avif_cache/test.avif",
         Body: avifBuffer,
         ContentType: "image/avif",
         CacheControl: "max-age=31536000,public",
+        StorageClass: "ONEZONE_IA",
       });
+    });
+
+    it("should skip storage when AVIF_CACHE_BUCKET is not set", async () => {
+      const avifBuffer = Buffer.from([0x00, 0x00, 0x00, 0x1c]);
+
+      await storeAvifToS3Cache("avif_cache/test.avif", avifBuffer);
+
+      expect(mockS3PutObject).not.toHaveBeenCalled();
     });
   });
 
   describe("handleProgressiveLoading", () => {
     it("should return 302 redirect to JPEG URL when S3 cache misses", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
@@ -301,7 +406,7 @@ describe("ProgressiveLoader", () => {
 
     it("should return AVIF directly when S3 cache hits", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
 
       const fakeAvifData = Buffer.from([0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66]);
       mockS3GetObjectPromise.mockResolvedValue({ Body: fakeAvifData });
@@ -335,7 +440,7 @@ describe("ProgressiveLoader", () => {
 
     it("should generate JPEG URL without avif in edits", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
@@ -387,7 +492,7 @@ describe("ProgressiveLoader", () => {
     });
 
     it("should fallback to Host header if CLOUDFRONT_DOMAIN not set", async () => {
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
@@ -414,7 +519,7 @@ describe("ProgressiveLoader", () => {
     it("should trigger async warming orchestrator via Lambda invoke", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
@@ -449,7 +554,7 @@ describe("ProgressiveLoader", () => {
     it("should include Accept header in warming orchestrator payload", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
@@ -485,7 +590,7 @@ describe("ProgressiveLoader", () => {
     it("should include signature in warming orchestrator payload when present", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
@@ -520,7 +625,7 @@ describe("ProgressiveLoader", () => {
 
     it("should not invoke Lambda when AWS_LAMBDA_FUNCTION_NAME is not set", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      process.env.SOURCE_BUCKETS = "test-bucket";
+      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
       mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
 
       const event = {
@@ -543,9 +648,9 @@ describe("ProgressiveLoader", () => {
       expect(mockLambdaInvoke).not.toHaveBeenCalled();
     });
 
-    it("should still return 302 when SOURCE_BUCKETS is not set (skip S3 cache check)", async () => {
+    it("should still return 302 when AVIF_CACHE_BUCKET is not set (skip S3 cache check)", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      // SOURCE_BUCKETS not set
+      // AVIF_CACHE_BUCKET not set
 
       const event = {
         path: "/originalBase64Payload",

@@ -57,13 +57,23 @@ export function getAvifCacheKey(payload: NormalizedPayload): string | null {
 }
 
 /**
+ * Gets the AVIF cache bucket from environment.
+ * @returns The bucket name or undefined if not configured
+ */
+function getAvifCacheBucket(): string | undefined {
+  return process.env.AVIF_CACHE_BUCKET;
+}
+
+/**
  * Checks if AVIF exists in S3 cache.
  *
- * @param bucket The S3 bucket
  * @param cacheKey The S3 key for the cached AVIF
  * @returns Buffer with AVIF data if found, null otherwise
  */
-export async function getAvifFromS3Cache(bucket: string, cacheKey: string): Promise<Buffer | null> {
+export async function getAvifFromS3Cache(cacheKey: string): Promise<Buffer | null> {
+  const bucket = getAvifCacheBucket();
+  if (!bucket) return null;
+
   try {
     const result = await s3Client
       .getObject({
@@ -82,11 +92,16 @@ export async function getAvifFromS3Cache(bucket: string, cacheKey: string): Prom
 /**
  * Stores AVIF to S3 cache.
  *
- * @param bucket The S3 bucket
  * @param cacheKey The S3 key for the cached AVIF
  * @param avifBuffer The AVIF data to store
  */
-export async function storeAvifToS3Cache(bucket: string, cacheKey: string, avifBuffer: Buffer): Promise<void> {
+export async function storeAvifToS3Cache(cacheKey: string, avifBuffer: Buffer): Promise<void> {
+  const bucket = getAvifCacheBucket();
+  if (!bucket) {
+    console.warn("AVIF_CACHE_BUCKET not set, skipping S3 cache storage");
+    return;
+  }
+
   await s3Client
     .putObject({
       Bucket: bucket,
@@ -94,6 +109,7 @@ export async function storeAvifToS3Cache(bucket: string, cacheKey: string, avifB
       Body: avifBuffer,
       ContentType: "image/avif",
       CacheControl: "max-age=31536000,public",
+      StorageClass: "ONEZONE_IA",
     })
     .promise();
 }
@@ -125,14 +141,14 @@ export async function handleProgressiveLoading(
     throw new Error("CLOUDFRONT_DOMAIN environment variable is required for progressive loading");
   }
 
-  const bucket = process.env.SOURCE_BUCKETS?.split(",")[0];
   const cacheKey = getAvifCacheKey(payload);
+  const avifCacheBucket = process.env.AVIF_CACHE_BUCKET;
 
-  console.info(`Progressive loading: domain=${host}, checking S3 cache bucket=${bucket} key=${cacheKey}`);
+  console.info(`Progressive loading: domain=${host}, checking S3 cache bucket=${avifCacheBucket} key=${cacheKey}`);
 
-  // Step 1: Check S3 cache first (only if we have a valid cache key)
-  if (bucket && cacheKey) {
-    const cachedAvif = await getAvifFromS3Cache(bucket, cacheKey);
+  // Step 1: Check S3 cache first (only if we have a valid cache key and bucket)
+  if (cacheKey) {
+    const cachedAvif = await getAvifFromS3Cache(cacheKey);
     if (cachedAvif) {
       console.info(`S3 cache HIT, returning ${cachedAvif.length} bytes AVIF`);
       return {
@@ -344,4 +360,22 @@ async function makeWarmingHttpRequest(
 export function isWarmingRequest(event: ImageHandlerEvent): boolean {
   const warmHeader = event.headers?.["x-bw-warm"] || event.headers?.["X-Bw-Warm"];
   return warmHeader === "1";
+}
+
+/**
+ * Checks if the client supports AVIF based on CloudFront Function's normalized fmt query param.
+ * Falls back to Accept header for direct Lambda invocation / warming requests.
+ *
+ * @param event The Lambda event
+ * @returns True if fmt=avif or Accept header includes image/avif
+ */
+export function clientSupportsAvif(event: ImageHandlerEvent): boolean {
+  // Check CloudFront Function's normalized format param first
+  const fmt = event.queryStringParameters?.fmt;
+  if (fmt) {
+    return fmt === "avif";
+  }
+  // Fallback to Accept header (for direct Lambda invocation / warming requests)
+  const acceptHeader = event.headers?.Accept || event.headers?.accept || "";
+  return acceptHeader.includes("image/avif");
 }

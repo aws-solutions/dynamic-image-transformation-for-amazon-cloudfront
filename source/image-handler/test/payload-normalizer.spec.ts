@@ -4,7 +4,6 @@
 import {
   normalizePayload,
   denormalizePayload,
-  hasProgressiveLoading,
   createJpegOnlyPayload,
 } from "../payload-normalizer";
 
@@ -156,61 +155,6 @@ describe("PayloadNormalizer", () => {
       expect(denormalized.edits?.resize?.height).toBe(473);
       expect(denormalized.edits?.resize?.fit).toBe("inside");
       expect(denormalized.edits?.avif?.quality).toBe(70);
-    });
-  });
-
-  describe("hasProgressiveLoading", () => {
-    it("should return true when both avif and jpeg are present", () => {
-      const payload = {
-        key: "test.jpg",
-        edits: {
-          avif: { q: 70 },
-          jpeg: { q: 85 },
-        },
-      };
-
-      expect(hasProgressiveLoading(payload)).toBe(true);
-    });
-
-    it("should return false when only avif is present", () => {
-      const payload = {
-        key: "test.jpg",
-        edits: {
-          avif: { q: 70 },
-        },
-      };
-
-      expect(hasProgressiveLoading(payload)).toBe(false);
-    });
-
-    it("should return false when only jpeg is present", () => {
-      const payload = {
-        key: "test.jpg",
-        edits: {
-          jpeg: { q: 85 },
-        },
-      };
-
-      expect(hasProgressiveLoading(payload)).toBe(false);
-    });
-
-    it("should return false when no format edits are present", () => {
-      const payload = {
-        key: "test.jpg",
-        edits: {
-          resize: { w: 100 },
-        },
-      };
-
-      expect(hasProgressiveLoading(payload)).toBe(false);
-    });
-
-    it("should return false when edits is undefined", () => {
-      const payload = {
-        key: "test.jpg",
-      };
-
-      expect(hasProgressiveLoading(payload)).toBe(false);
     });
   });
 

@@ -10,8 +10,8 @@ import { isNullOrWhiteSpace } from "../solution-utils/helpers";
 import { ImageHandler } from "./image-handler";
 import { ImageRequest } from "./image-request";
 import { Headers, ImageHandlerEvent, ImageHandlerExecutionResult, StatusCodes } from "./lib";
-import { normalizePayload, hasProgressiveLoading, NormalizedPayload } from "./payload-normalizer";
-import { handleProgressiveLoading, isWarmingRequest, executeWarmingRequest, getAvifCacheKey, storeAvifToS3Cache } from "./progressive-loader";
+import { normalizePayload, NormalizedPayload } from "./payload-normalizer";
+import { handleProgressiveLoading, isWarmingRequest, executeWarmingRequest, getAvifCacheKey, storeAvifToS3Cache, clientSupportsAvif } from "./progressive-loader";
 import { SecretProvider } from "./secret-provider";
 
 const awsSdkOptions = getOptions();
@@ -39,10 +39,11 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
   const imageHandler = new ImageHandler(s3Client, rekognitionClient);
   const isAlb = event.requestContext && Object.prototype.hasOwnProperty.call(event.requestContext, "elb");
 
-  // Check for progressive loading (avif+jpeg) before full processing
+  // Check for progressive loading based on Accept header (AVIF support)
   // Progressive loading redirects to JPEG immediately and warms AVIF cache in background
   const isWarmReq = isWarmingRequest(event);
-  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}`);
+  const supportsAvif = clientSupportsAvif(event);
+  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}, supportsAvif=${supportsAvif}`);
 
   // Decode payload once - used for both progressive loading check and S3 cache key
   let normalizedPayload: NormalizedPayload | null = null;
@@ -55,23 +56,20 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
     // Payload decode failed - will continue without it
   }
 
-  if (!isWarmReq) {
-    if (normalizedPayload) {
-      const hasAvif = !!normalizedPayload.edits?.avif;
-      const hasJpeg = !!normalizedPayload.edits?.jpeg;
-      const isProgressive = hasProgressiveLoading(normalizedPayload);
-      console.info(
-        `Progressive loading check: hasAvif=${hasAvif}, hasJpeg=${hasJpeg}, isProgressive=${isProgressive}, ` +
-        `edits=${JSON.stringify(normalizedPayload.edits)}`
-      );
-      if (isProgressive) {
-        console.info("Progressive loading detected, redirecting to JPEG and warming AVIF cache");
-        return await handleProgressiveLoading(event, normalizedPayload, secretProvider);
-      }
-    } else {
-      console.info("Progressive loading check: could not decode payload (not base64 JSON)");
+  // Progressive AVIF loading: browser supports AVIF, has style config, not a warming request
+  if (supportsAvif && !isWarmReq && normalizedPayload) {
+    const hasAvifConfig = !!normalizedPayload.edits?.avif?.style;
+    console.info(
+      `Progressive loading check: hasAvifConfig=${hasAvifConfig}, ` +
+      `edits=${JSON.stringify(normalizedPayload.edits)}`
+    );
+    if (hasAvifConfig) {
+      console.info("AVIF-capable browser detected with style config, checking S3 cache");
+      return await handleProgressiveLoading(event, normalizedPayload, secretProvider);
     }
-  } else {
+  } else if (!normalizedPayload) {
+    console.info("Progressive loading check: could not decode payload (not base64 JSON)");
+  } else if (isWarmReq) {
     console.info("Warming request detected, skipping progressive loading redirect (will generate AVIF)");
   }
 
@@ -83,12 +81,11 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
 
     // Store AVIF to S3 cache if this is a warming request
     if (isWarmReq && imageRequestInfo.contentType === "image/avif" && normalizedPayload) {
-      const bucket = process.env.SOURCE_BUCKETS?.split(",")[0];
       const cacheKey = getAvifCacheKey(normalizedPayload);
-      if (bucket && cacheKey) {
-        console.info(`Warming request: storing AVIF to S3 cache bucket=${bucket} key=${cacheKey}`);
+      if (cacheKey) {
+        console.info(`Warming request: storing AVIF to S3 cache key=${cacheKey}`);
         try {
-          await storeAvifToS3Cache(bucket, cacheKey, Buffer.from(processedRequest, "base64"));
+          await storeAvifToS3Cache(cacheKey, Buffer.from(processedRequest, "base64"));
           console.info(`Successfully cached AVIF to S3: ${cacheKey}`);
         } catch (err) {
           console.error("Failed to cache AVIF to S3:", err);
