@@ -10,8 +10,8 @@ import { isNullOrWhiteSpace } from "../solution-utils/helpers";
 import { ImageHandler } from "./image-handler";
 import { ImageRequest } from "./image-request";
 import { Headers, ImageHandlerEvent, ImageHandlerExecutionResult, StatusCodes } from "./lib";
-import { normalizePayload, NormalizedPayload } from "./payload-normalizer";
-import { handleProgressiveLoading, isWarmingRequest, executeWarmingRequest, getAvifCacheKey, storeAvifToS3Cache, clientSupportsAvif } from "./progressive-loader";
+import { normalizePayload, NormalizedPayload, createJpegOnlyPayload, denormalizePayload } from "./payload-normalizer";
+import { handleProgressiveLoading, getAvifCacheKey, storeAvifToS3Cache, clientSupportsAvif } from "./progressive-loader";
 import { SecretProvider } from "./secret-provider";
 
 const awsSdkOptions = getOptions();
@@ -28,22 +28,36 @@ const secretProvider = new SecretProvider(secretsManagerClient);
 export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExecutionResult> {
   console.info("Received event:", JSON.stringify(event, null, 2));
 
-  // Branch 1: Orchestrator mode - async invocation to make HTTP request to CloudFront and wait
-  // This ensures the warming request completes before Lambda terminates
-  if (event._warmOrchestrator) {
-    console.info("Orchestrator mode detected, executing warming request");
-    return await executeWarmingRequest(event._warmOrchestrator);
+  if (event._warmAvif) {
+    console.info("Async AVIF generation mode, processing directly");
+    const { path: warmPath, signature, normalizedPayload: warmPayload } = event._warmAvif;
+    try {
+      const warmImageRequest = new ImageRequest(s3Client, secretProvider);
+      const warmImageHandler = new ImageHandler(s3Client, rekognitionClient);
+      const warmEvent = {
+        path: warmPath,
+        queryStringParameters: signature ? { signature } : undefined,
+      } as ImageHandlerEvent;
+      const imageRequestInfo = await warmImageRequest.setup(warmEvent);
+      const processedRequest = await warmImageHandler.process(imageRequestInfo);
+      if (imageRequestInfo.contentType === "image/avif") {
+        const cacheKey = getAvifCacheKey(warmPayload);
+        if (cacheKey) {
+          await storeAvifToS3Cache(cacheKey, Buffer.from(processedRequest, "base64"));
+          console.info(`Cached AVIF to S3: ${cacheKey}`);
+        }
+      }
+    } catch (err) {
+      console.error("Async AVIF generation failed:", err);
+    }
+    return { statusCode: StatusCodes.OK, isBase64Encoded: false, headers: {}, body: JSON.stringify({ warmed: true }) };
   }
 
   const imageRequest = new ImageRequest(s3Client, secretProvider);
   const imageHandler = new ImageHandler(s3Client, rekognitionClient);
   const isAlb = event.requestContext && Object.prototype.hasOwnProperty.call(event.requestContext, "elb");
 
-  // Check for progressive loading based on Accept header (AVIF support)
-  // Progressive loading redirects to JPEG immediately and warms AVIF cache in background
-  const isWarmReq = isWarmingRequest(event);
   const supportsAvif = clientSupportsAvif(event);
-  console.info(`Progressive loading check: isWarmingRequest=${isWarmReq}, supportsAvif=${supportsAvif}`);
 
   // Decode payload once - used for both progressive loading check and S3 cache key
   let normalizedPayload: NormalizedPayload | null = null;
@@ -56,21 +70,23 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
     // Payload decode failed - will continue without it
   }
 
-  // Progressive AVIF loading: browser supports AVIF, has style config, not a warming request
-  if (supportsAvif && !isWarmReq && normalizedPayload) {
+  if (supportsAvif && normalizedPayload) {
     const hasAvifConfig = !!normalizedPayload.edits?.avif?.style;
-    console.info(
-      `Progressive loading check: hasAvifConfig=${hasAvifConfig}, ` +
-      `edits=${JSON.stringify(normalizedPayload.edits)}`
-    );
     if (hasAvifConfig) {
       console.info("AVIF-capable browser detected with style config, checking S3 cache");
       return await handleProgressiveLoading(event, normalizedPayload, secretProvider);
     }
-  } else if (!normalizedPayload) {
-    console.info("Progressive loading check: could not decode payload (not base64 JSON)");
-  } else if (isWarmReq) {
-    console.info("Warming request detected, skipping progressive loading redirect (will generate AVIF)");
+  }
+
+  // If client doesn't support AVIF, strip avif config from payload so setup() produces JPEG.
+  // Validate signature against the original path first (signature was computed on it),
+  // then rewrite path for image processing.
+  if (!supportsAvif && normalizedPayload?.edits?.avif) {
+    await imageRequest.validateRequestSignature(event);
+    event._signatureValidated = true;
+    const jpegPayload = createJpegOnlyPayload(normalizedPayload);
+    const denormalized = denormalizePayload(jpegPayload);
+    event.path = "/" + Buffer.from(JSON.stringify(denormalized)).toString("base64");
   }
 
   try {
@@ -78,20 +94,6 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
     console.info(imageRequestInfo);
 
     const processedRequest = await imageHandler.process(imageRequestInfo);
-
-    // Store AVIF to S3 cache if this is a warming request
-    if (isWarmReq && imageRequestInfo.contentType === "image/avif" && normalizedPayload) {
-      const cacheKey = getAvifCacheKey(normalizedPayload);
-      if (cacheKey) {
-        console.info(`Warming request: storing AVIF to S3 cache key=${cacheKey}`);
-        try {
-          await storeAvifToS3Cache(cacheKey, Buffer.from(processedRequest, "base64"));
-          console.info(`Successfully cached AVIF to S3: ${cacheKey}`);
-        } catch (err) {
-          console.error("Failed to cache AVIF to S3:", err);
-        }
-      }
-    }
 
     let headers = getResponseHeaders(false, isAlb);
     headers["Content-Type"] = imageRequestInfo.contentType;

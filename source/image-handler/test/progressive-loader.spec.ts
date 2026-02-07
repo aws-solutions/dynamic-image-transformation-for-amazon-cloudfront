@@ -5,8 +5,6 @@ import SecretsManager from "aws-sdk/clients/secretsmanager";
 
 import {
   handleProgressiveLoading,
-  isWarmingRequest,
-  executeWarmingRequest,
   getAvifCacheKey,
   getAvifFromS3Cache,
   storeAvifToS3Cache,
@@ -14,19 +12,6 @@ import {
 } from "../progressive-loader";
 import { SecretProvider } from "../secret-provider";
 import { StatusCodes } from "../lib";
-
-// Mock https module for executeWarmingRequest tests
-const mockRequest = {
-  on: jest.fn().mockReturnThis(),
-  end: jest.fn(),
-  destroy: jest.fn(),
-};
-
-jest.mock("https", () => ({
-  request: jest.fn((options, callback) => {
-    return mockRequest;
-  }),
-}));
 
 // Mock Lambda client - need to define inside mock to avoid hoisting issues
 const mockLambdaInvokePromise = jest.fn().mockResolvedValue({});
@@ -62,22 +47,12 @@ describe("ProgressiveLoader", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    const https = require("https");
-    // Reset mock implementations
-    mockRequest.on.mockReturnThis();
     mockLambdaInvoke.mockReturnValue({
       promise: jest.fn().mockResolvedValue({}),
     });
     // Default: S3 cache miss
     mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
     mockS3PutObjectPromise.mockResolvedValue({});
-    // Default: warming request returns 200
-    https.request.mockImplementation((options: any, callback: any) => {
-      setTimeout(() => {
-        callback({ statusCode: 200, headers: {}, resume: jest.fn() });
-      }, 0);
-      return mockRequest;
-    });
     delete process.env.ENABLE_SIGNATURE;
     delete process.env.SECRETS_MANAGER;
     delete process.env.SECRET_KEY;
@@ -85,52 +60,6 @@ describe("ProgressiveLoader", () => {
     delete process.env.AWS_LAMBDA_FUNCTION_NAME;
     delete process.env.SOURCE_BUCKETS;
     delete process.env.AVIF_CACHE_BUCKET;
-  });
-
-  describe("isWarmingRequest", () => {
-    it("should return true when x-bw-warm header is '1'", () => {
-      const event = {
-        path: "/base64payload",
-        headers: { "x-bw-warm": "1" },
-      };
-
-      expect(isWarmingRequest(event)).toBe(true);
-    });
-
-    it("should return true when X-Bw-Warm header is '1' (case variation)", () => {
-      const event = {
-        path: "/base64payload",
-        headers: { "X-Bw-Warm": "1" },
-      };
-
-      expect(isWarmingRequest(event)).toBe(true);
-    });
-
-    it("should return false when x-bw-warm header is not present", () => {
-      const event = {
-        path: "/base64payload",
-        headers: {},
-      };
-
-      expect(isWarmingRequest(event)).toBe(false);
-    });
-
-    it("should return false when x-bw-warm header is not '1'", () => {
-      const event = {
-        path: "/base64payload",
-        headers: { "x-bw-warm": "0" },
-      };
-
-      expect(isWarmingRequest(event)).toBe(false);
-    });
-
-    it("should return false when headers is undefined", () => {
-      const event = {
-        path: "/base64payload",
-      };
-
-      expect(isWarmingRequest(event)).toBe(false);
-    });
   });
 
   describe("clientSupportsAvif", () => {
@@ -400,7 +329,7 @@ describe("ProgressiveLoader", () => {
       expect(result.statusCode).toBe(StatusCodes.REDIRECT);
       expect(result.isBase64Encoded).toBe(false);
       expect(result.headers?.Location).toContain("https://d1234.cloudfront.net/");
-      expect(result.headers?.["Cache-Control"]).toBe("private, max-age=15");
+      expect(result.headers?.["Cache-Control"]).toBe("private, max-age=60");
       expect(mockS3GetObject).toHaveBeenCalled();
     });
 
@@ -516,7 +445,7 @@ describe("ProgressiveLoader", () => {
       expect(result.headers?.Location).toContain("https://fallback-host.cloudfront.net/");
     });
 
-    it("should trigger async warming orchestrator via Lambda invoke", async () => {
+    it("should trigger async AVIF generation via Lambda invoke", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
       process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
@@ -543,51 +472,16 @@ describe("ProgressiveLoader", () => {
         FunctionName: "ImageHandler",
         InvocationType: "Event",
         Payload: JSON.stringify({
-          _warmOrchestrator: {
-            url: "https://d1234.cloudfront.net/originalBase64Payload",
-            acceptHeader: undefined,
+          _warmAvif: {
+            path: "/originalBase64Payload",
+            signature: undefined,
+            normalizedPayload: payload,
           },
         }),
       });
     });
 
-    it("should include Accept header in warming orchestrator payload", async () => {
-      process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
-      process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
-      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
-      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
-
-      const event = {
-        path: "/originalBase64Payload",
-        headers: {
-          Host: "api-gateway.amazonaws.com",
-          Accept: "image/avif,image/webp,image/*,*/*",
-        },
-      };
-
-      const payload = {
-        key: "test.jpg",
-        edits: {
-          avif: { q: 70, style: "sm" },
-          jpeg: { q: 85 },
-        },
-      };
-
-      await handleProgressiveLoading(event, payload, secretProvider);
-
-      expect(mockLambdaInvoke).toHaveBeenCalledWith({
-        FunctionName: "ImageHandler",
-        InvocationType: "Event",
-        Payload: JSON.stringify({
-          _warmOrchestrator: {
-            url: "https://d1234.cloudfront.net/originalBase64Payload",
-            acceptHeader: "image/avif,image/webp,image/*,*/*",
-          },
-        }),
-      });
-    });
-
-    it("should include signature in warming orchestrator payload when present", async () => {
+    it("should include signature in async AVIF generation payload when present", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
       process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
@@ -614,9 +508,10 @@ describe("ProgressiveLoader", () => {
       expect(mockLambdaInvoke).toHaveBeenCalledWith(
         expect.objectContaining({
           Payload: JSON.stringify({
-            _warmOrchestrator: {
-              url: "https://d1234.cloudfront.net/originalBase64Payload?signature=abc123",
-              acceptHeader: undefined,
+            _warmAvif: {
+              path: "/originalBase64Payload",
+              signature: "abc123",
+              normalizedPayload: payload,
             },
           }),
         })
@@ -674,76 +569,4 @@ describe("ProgressiveLoader", () => {
     });
   });
 
-  describe("executeWarmingRequest", () => {
-    it("should make one HTTP request with x-bw-warm header", async () => {
-      const https = require("https");
-
-      // Mock the response callback
-      https.request.mockImplementation((options: any, callback: any) => {
-        // Simulate successful response asynchronously
-        setTimeout(() => {
-          callback({
-            statusCode: 200,
-            headers: { "x-cache": "Miss from cloudfront", "content-type": "image/avif" },
-            resume: jest.fn(),
-          });
-        }, 0);
-        return mockRequest;
-      });
-
-      const result = await executeWarmingRequest({
-        url: "https://d1234.cloudfront.net/some/path?signature=abc",
-      });
-
-      // Only one request is made (with x-bw-warm) to avoid cascading timeouts
-      expect(https.request).toHaveBeenCalledTimes(1);
-
-      expect(https.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hostname: "d1234.cloudfront.net",
-          path: "/some/path?signature=abc",
-          method: "GET",
-          headers: expect.objectContaining({ "x-bw-warm": "1" }),
-        }),
-        expect.any(Function)
-      );
-
-      expect(result.statusCode).toBe(StatusCodes.OK);
-    });
-
-    it("should include Accept header in HTTP request when provided", async () => {
-      const https = require("https");
-
-      https.request.mockImplementation((options: any, callback: any) => {
-        setTimeout(() => {
-          callback({
-            statusCode: 200,
-            headers: { "x-cache": "Miss from cloudfront", "content-type": "image/avif" },
-            resume: jest.fn(),
-          });
-        }, 0);
-        return mockRequest;
-      });
-
-      const result = await executeWarmingRequest({
-        url: "https://d1234.cloudfront.net/some/path",
-        acceptHeader: "image/avif,image/webp,image/*,*/*",
-      });
-
-      // Only one request is made now (with x-bw-warm) to avoid cascading timeouts
-      expect(https.request).toHaveBeenCalledTimes(1);
-
-      expect(https.request).toHaveBeenCalledWith(
-        expect.objectContaining({
-          hostname: "d1234.cloudfront.net",
-          path: "/some/path",
-          method: "GET",
-          headers: { "x-bw-warm": "1", accept: "image/avif,image/webp,image/*,*/*" },
-        }),
-        expect.any(Function)
-      );
-
-      expect(result.statusCode).toBe(StatusCodes.OK);
-    });
-  });
 });

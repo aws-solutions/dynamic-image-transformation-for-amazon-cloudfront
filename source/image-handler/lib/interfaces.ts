@@ -16,10 +16,12 @@ export interface ImageHandlerEvent {
     elb?: unknown;
   };
   headers?: Headers;
-  _warmOrchestrator?: {
-    url: string;
-    acceptHeader?: string;
+  _warmAvif?: {
+    path: string;
+    signature?: string;
+    normalizedPayload: any;
   };
+  _signatureValidated?: boolean;
 }
 
 export interface DefaultImageRequest {

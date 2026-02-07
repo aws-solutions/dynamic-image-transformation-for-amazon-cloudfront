@@ -1498,7 +1498,6 @@ function handler(event) {
             "Headers": [
               "origin",
               "accept",
-              "x-bw-warm",
             ],
           },
           "Name": {

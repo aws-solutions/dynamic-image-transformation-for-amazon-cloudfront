@@ -531,8 +531,10 @@ export class ImageRequest {
    * @returns A promise.
    * @throws Throws the error if validation is enabled and the provided signature is invalid.
    */
-  private async validateRequestSignature(event: ImageHandlerEvent): Promise<void> {
+  async validateRequestSignature(event: ImageHandlerEvent): Promise<void> {
     const { ENABLE_SIGNATURE, SECRETS_MANAGER, SECRET_KEY } = process.env;
+
+    if (event._signatureValidated) return;
 
     // Checks signature enabled
     if (ENABLE_SIGNATURE === "Yes") {

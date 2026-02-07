@@ -213,9 +213,7 @@ export class BackEnd extends Construct {
 
     const originRequestPolicy = new OriginRequestPolicy(this, "OriginRequestPolicy", {
       originRequestPolicyName: `ServerlessImageHandler-${props.uuid}`,
-      // Forward headers to origin for progressive AVIF loading:
-      // - x-bw-warm: triggers AVIF generation on warming requests (instead of 302 redirect)
-      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept", "x-bw-warm"),
+      headerBehavior: OriginRequestHeaderBehavior.allowList("origin", "accept"),
       // Forward fmt query param (added by CloudFront Function) to Lambda for AVIF detection
       queryStringBehavior: OriginRequestQueryStringBehavior.allowList("signature", "fmt"),
     });
