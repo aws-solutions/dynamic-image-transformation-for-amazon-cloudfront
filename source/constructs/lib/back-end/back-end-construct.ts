@@ -124,6 +124,8 @@ export class BackEnd extends Construct {
       timeout: Duration.seconds(29),
       role: imageHandlerLambdaFunctionRole,
       entry: path.join(__dirname, "../../../image-handler/index.ts"),
+      projectRoot: path.join(__dirname, "../../.."),
+      depsLockFilePath: path.join(__dirname, "../../../image-handler/package-lock.json"),
       environment: {
         AUTO_WEBP: props.autoWebP,
         CORS_ENABLED: props.corsEnabled,

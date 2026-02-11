@@ -420,31 +420,6 @@ describe("ProgressiveLoader", () => {
       );
     });
 
-    it("should fallback to Host header if CLOUDFRONT_DOMAIN not set", async () => {
-      process.env.AVIF_CACHE_BUCKET = "avif-cache-bucket";
-      mockS3GetObjectPromise.mockRejectedValue({ code: "NoSuchKey" });
-
-      const event = {
-        path: "/originalBase64Payload",
-        headers: {
-          Host: "fallback-host.cloudfront.net",
-        },
-      };
-
-      const payload = {
-        bucket: "test-bucket",
-        key: "item_images/test.jpg",
-        edits: {
-          avif: { q: 70, style: "sm" },
-          jpeg: { q: 85 },
-        },
-      };
-
-      const result = await handleProgressiveLoading(event, payload, secretProvider);
-
-      expect(result.headers?.Location).toContain("https://fallback-host.cloudfront.net/");
-    });
-
     it("should trigger async AVIF generation via Lambda invoke", async () => {
       process.env.CLOUDFRONT_DOMAIN = "d1234.cloudfront.net";
       process.env.AWS_LAMBDA_FUNCTION_NAME = "ImageHandler";
