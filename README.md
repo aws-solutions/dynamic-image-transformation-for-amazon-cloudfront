@@ -11,7 +11,8 @@
   - [Prerequisites for Customization](#prerequisites-for-customization)
     - [1. Clone the repository](#1-clone-the-repository)
     - [2. Unit Test](#2-unit-test)
-    - [3. Build and Deploy (updated by BW)](#3-build-and-deploy-updated-by-bw)
+    - [3. Build (updated by BW)](#3-build-updated-by-bw)
+    - [4. Deploy (updated by BW)](#4-deploy-updated-by-bw)
 - [Collection of operational metrics](#collection-of-operational-metrics)
 - [External Contributors](#external-contributors)
 - [License](#license)
@@ -64,20 +65,54 @@ cd $MAIN_DIRECTORY/deployment
 chmod +x run-unit-tests.sh && ./run-unit-tests.sh
 ```
 
-### 3. Build and Deploy (updated by BW)
+### 3. Build (updated by BW)
 
 NOTES:
-1. --stack_name is the name of the stack to be created or updated
-2. --source_buckets is S3 buckets that should be served by that image handler
-3. --profile param is optional, AWS credentials will be picked up from env vars if omitted
+- `--stack_name` is the name of the stack to be created or updated
+- `--profile param` is optional, AWS credentials will be picked up from env vars if omitted
 
 ```bash
 cd $MAIN_DIRECTORY
-# 1. Build assets (SIH stands for Serverless-Image-Handler):
-./bw_build.sh --stack_name LEVEL-staging-SIH--01-2026 --profile bw
-# 2. Deploy/update stack:
-./bw_deploy.sh --stack_name LEVEL-staging-SIH--01-2026 --source_buckets bwpaperclip-bwlevelstaging --profile bw
+# Build assets (SIH stands for Serverless-Image-Handler):
+$ ./bw_build.sh --stack_name ServerlessImageHandler-bw-staging --profile bw
 ```
+
+### 4. Deploy (updated by BW)
+
+The deploy command accepts the same options as the build command, plus all configuration to connect the lambda function to relevant infrastructure.
+
+You can discover the appropriate values used by an existing stack, by running the build command with the `--eb_stack` option. 
+
+Example:
+
+```bash
+$ ./bw_deploy.sh --eb_stack bwstaging-docker --stack_name ServerlessImageHandler-bw-staging
+=== Discovering configuration ===
+
+EB Environment: bwstaging-docker
+  Application: BidWrangler
+  EFS File System ID: fs-078529a0b611294ab
+  EFS Access Point ARN: arn:aws:elasticfilesystem:us-east-1:333288749561:access-point/fsap-08dbed6b59f7645c5
+
+Serverless Stack: ServerlessImageHandler-bw-staging
+  Source Buckets: bwpaperclip-bwstaging
+  AVIF Cache Bucket: serverlessimagehandler-bw-staging-avif-cache
+  Lambda: ServerlessImageHandler-bw-BackEndImageHandlerLambd-zBVWhYxEsYnT
+  VPC Subnet IDs: subnet-0685b26ed0d883bc1
+  Security Group IDs: sg-066116ed37a51f0ac
+
+=== Deploy Command ===
+
+./bw_deploy.sh \
+  --stack_name ServerlessImageHandler-bw-staging \
+  --source_buckets "bwpaperclip-bwstaging" \
+  --avif_cache_bucket serverlessimagehandler-bw-staging-avif-cache \
+  --vpc_subnet_ids "subnet-0685b26ed0d883bc1" \
+  --security_group_ids "sg-066116ed37a51f0ac" \
+  --efs_access_point_arn "arn:aws:elasticfilesystem:us-east-1:333288749561:access-point/fsap-08dbed6b59f7645c5"
+```
+
+The displayed build command might be missing some values if they could not be determined / if the function was never deployed. In that case please research and replace the placeholder values with the correct values.
 
 # Collection of operational metrics
 
