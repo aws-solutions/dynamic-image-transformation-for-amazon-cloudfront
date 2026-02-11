@@ -26,10 +26,7 @@ const secretProvider = new SecretProvider(secretsManagerClient);
  * @returns Processed request response.
  */
 export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExecutionResult> {
-  console.info("Received event:", JSON.stringify(event, null, 2));
-
   if (event._warmAvif) {
-    console.info("Async AVIF generation mode, processing directly");
     const { path: warmPath, signature, normalizedPayload: warmPayload } = event._warmAvif;
     try {
       const warmImageRequest = new ImageRequest(s3Client, secretProvider);
@@ -44,7 +41,6 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
         const cacheKey = getAvifCacheKey(warmPayload);
         if (cacheKey) {
           await storeAvifToS3Cache(cacheKey, Buffer.from(processedRequest, "base64"));
-          console.info(`Cached AVIF to S3: ${cacheKey}`);
         }
       }
     } catch (err) {
@@ -73,7 +69,6 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
   if (supportsAvif && normalizedPayload) {
     const hasAvifConfig = !!normalizedPayload.edits?.avif?.style;
     if (hasAvifConfig) {
-      console.info("AVIF-capable browser detected with style config, checking S3 cache");
       return await handleProgressiveLoading(event, normalizedPayload, secretProvider);
     }
   }
@@ -91,8 +86,6 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
 
   try {
     const imageRequestInfo = await imageRequest.setup(event);
-    console.info(imageRequestInfo);
-
     const processedRequest = await imageHandler.process(imageRequestInfo);
 
     let headers = getResponseHeaders(false, isAlb);

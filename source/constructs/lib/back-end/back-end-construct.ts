@@ -196,7 +196,6 @@ export class BackEnd extends Construct {
       minTtl: Duration.seconds(1),
       maxTtl: Duration.days(365),
       enableAcceptEncodingGzip: false,
-      // Note: x-bw-warm is NOT in cache key so warm requests target same cache entry as normal requests
       // Accept header removed from cache key - CloudFront Function normalizes it to ?fmt= query param
       // Origin header removed from cache key so warming requests (no Origin) populate same cache entry as browser requests (with Origin)
       headerBehavior: CacheHeaderBehavior.none(),
