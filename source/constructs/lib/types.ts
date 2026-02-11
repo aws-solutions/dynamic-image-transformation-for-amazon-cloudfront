@@ -16,4 +16,8 @@ export interface SolutionConstructProps {
   readonly enableDefaultFallbackImage: YesNo;
   readonly fallbackImageS3Bucket: string;
   readonly fallbackImageS3KeyBucket: string;
+  readonly avifCacheBucket: string;
+  readonly vpcSubnetIds: string;
+  readonly vpcSecurityGroupIds: string;
+  readonly efsAccessPointArn: string;
 }

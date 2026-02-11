@@ -42,7 +42,6 @@ cp "$staging_dist_dir"/*.template.json "$template_dist_dir"/"$SOLUTION_NAME".tem
 rm ./*.template.json
 
 headline "[Package] Generate public assets for lambda and ui"
-# --force: sharp includes linux-only optional deps that fail on macOS dev machines
-cd "$deployment_dir"/cdk-solution-helper/asset-packager && npm ci --force
+cd "$deployment_dir"/cdk-solution-helper/asset-packager && npm ci
 npx ts-node ./index "$staging_dist_dir" "$build_dist_dir"
 rm -rf $staging_dist_dir

@@ -3,6 +3,18 @@
 exports[`Serverless Image Handler Stack Snapshot 1`] = `
 {
   "Conditions": {
+    "BackEndHasEfsConditionD1F37BB7": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "EfsAccessPointArnParameter",
+            },
+            "",
+          ],
+        },
+      ],
+    },
     "CommonResourcesDeployDemoUICondition308D3B09": {
       "Fn::Equals": [
         {
@@ -217,6 +229,11 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Description": "Would you like to enable automatic WebP based on accept headers? Select 'Yes' if so.",
       "Type": "String",
     },
+    "AvifCacheBucketParameter": {
+      "Default": "",
+      "Description": "The name of the S3 bucket used to cache AVIF images. Create this bucket manually before deploying.",
+      "Type": "String",
+    },
     "BootstrapVersion": {
       "Default": "/cdk-bootstrap/hnb659fds/version",
       "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
@@ -253,6 +270,11 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       ],
       "Default": "Yes",
       "Description": "Would you like to deploy a demo UI to explore the features and capabilities of this solution? This will create an additional Amazon S3 bucket and Amazon CloudFront distribution in your account.",
+      "Type": "String",
+    },
+    "EfsAccessPointArnParameter": {
+      "Default": "",
+      "Description": "ARN of the EFS access point to mount at /mnt/bw_images. Leave empty to disable EFS.",
       "Type": "String",
     },
     "EnableDefaultFallbackImageParameter": {
@@ -323,6 +345,16 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       "Description": "(Required) List the buckets (comma-separated) within your account that contain original image files. If you plan to use Thumbor or Custom image requests with this solution, the source bucket for those requests will be the first bucket listed in this field.",
       "Type": "String",
     },
+    "VpcSecurityGroupIdsParameter": {
+      "Default": "",
+      "Description": "Comma-separated list of security group IDs for Lambda VPC config.",
+      "Type": "String",
+    },
+    "VpcSubnetIdsParameter": {
+      "Default": "",
+      "Description": "Comma-separated list of private subnet IDs for Lambda VPC config (required for EFS access).",
+      "Type": "String",
+    },
   },
   "Resources": {
     "AppRegistry968496A3": {
@@ -370,109 +402,12 @@ exports[`Serverless Image Handler Stack Snapshot 1`] = `
       },
       "Type": "AWS::ServiceCatalogAppRegistry::ResourceAssociation",
     },
-    "BackEndAvifCacheBucketAutoDeleteObjectsCustomResourceABF97AE7": {
-      "DeletionPolicy": "Delete",
-      "DependsOn": [
-        "BackEndAvifCacheBucketPolicyA6C0F468",
-      ],
-      "Properties": {
-        "BucketName": {
-          "Ref": "BackEndAvifCacheBucketE07EF41A",
-        },
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "Custom::S3AutoDeleteObjects",
-      "UpdateReplacePolicy": "Delete",
-    },
-    "BackEndAvifCacheBucketE07EF41A": {
-      "DeletionPolicy": "Delete",
-      "Properties": {
-        "BucketName": "teststack-avif-cache",
-        "LifecycleConfiguration": {
-          "Rules": [
-            {
-              "ExpirationInDays": 90,
-              "Status": "Enabled",
-            },
-          ],
-        },
-        "Tags": [
-          {
-            "Key": "aws-cdk:auto-delete-objects",
-            "Value": "true",
-          },
-          {
-            "Key": "SolutionId",
-            "Value": "S0ABC",
-          },
-        ],
-      },
-      "Type": "AWS::S3::Bucket",
-      "UpdateReplacePolicy": "Delete",
-    },
-    "BackEndAvifCacheBucketPolicyA6C0F468": {
-      "Properties": {
-        "Bucket": {
-          "Ref": "BackEndAvifCacheBucketE07EF41A",
-        },
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "s3:PutBucketPolicy",
-                "s3:GetBucket*",
-                "s3:List*",
-                "s3:DeleteObject*",
-              ],
-              "Effect": "Allow",
-              "Principal": {
-                "AWS": {
-                  "Fn::GetAtt": [
-                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
-                    "Arn",
-                  ],
-                },
-              },
-              "Resource": [
-                {
-                  "Fn::GetAtt": [
-                    "BackEndAvifCacheBucketE07EF41A",
-                    "Arn",
-                  ],
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      {
-                        "Fn::GetAtt": [
-                          "BackEndAvifCacheBucketE07EF41A",
-                          "Arn",
-                        ],
-                      },
-                      "/*",
-                    ],
-                  ],
-                },
-              ],
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-      },
-      "Type": "AWS::S3::BucketPolicy",
-    },
     "BackEndCachePolicy1DCE9B1B": {
       "Properties": {
         "CachePolicyConfig": {
           "DefaultTTL": 86400,
           "MaxTTL": 31536000,
-          "MinTTL": 0,
+          "MinTTL": 1,
           "Name": {
             "Fn::Join": [
               "",
@@ -1239,6 +1174,14 @@ function handler(event) {
               "Resource": "*",
             },
             {
+              "Action": [
+                "elasticfilesystem:ClientMount",
+                "elasticfilesystem:ClientRead",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
               "Action": "lambda:InvokeFunction",
               "Effect": "Allow",
               "Resource": {
@@ -1298,62 +1241,8 @@ function handler(event) {
       },
       "Type": "AWS::IAM::Role",
     },
-    "BackEndImageHandlerFunctionRoleDefaultPolicyC190C3BD": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "s3:GetObject*",
-                "s3:GetBucket*",
-                "s3:List*",
-                "s3:DeleteObject*",
-                "s3:PutObject",
-                "s3:PutObjectLegalHold",
-                "s3:PutObjectRetention",
-                "s3:PutObjectTagging",
-                "s3:PutObjectVersionTagging",
-                "s3:Abort*",
-              ],
-              "Effect": "Allow",
-              "Resource": [
-                {
-                  "Fn::GetAtt": [
-                    "BackEndAvifCacheBucketE07EF41A",
-                    "Arn",
-                  ],
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      {
-                        "Fn::GetAtt": [
-                          "BackEndAvifCacheBucketE07EF41A",
-                          "Arn",
-                        ],
-                      },
-                      "/*",
-                    ],
-                  ],
-                },
-              ],
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "BackEndImageHandlerFunctionRoleDefaultPolicyC190C3BD",
-        "Roles": [
-          {
-            "Ref": "BackEndImageHandlerFunctionRoleABF81E5C",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
     "BackEndImageHandlerLambdaFunctionADEF7FF2": {
       "DependsOn": [
-        "BackEndImageHandlerFunctionRoleDefaultPolicyC190C3BD",
         "BackEndImageHandlerFunctionRoleABF81E5C",
       ],
       "Metadata": {
@@ -1391,7 +1280,7 @@ function handler(event) {
               "Ref": "AutoWebPParameter",
             },
             "AVIF_CACHE_BUCKET": {
-              "Ref": "BackEndAvifCacheBucketE07EF41A",
+              "Ref": "AvifCacheBucketParameter",
             },
             "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
             "CLOUDFRONT_DOMAIN": {
@@ -1431,6 +1320,22 @@ function handler(event) {
             },
           },
         },
+        "FileSystemConfigs": {
+          "Fn::If": [
+            "BackEndHasEfsConditionD1F37BB7",
+            [
+              {
+                "Arn": {
+                  "Ref": "EfsAccessPointArnParameter",
+                },
+                "LocalMountPath": "/mnt/bw_images",
+              },
+            ],
+            {
+              "Ref": "AWS::NoValue",
+            },
+          ],
+        },
         "Handler": "index.handler",
         "MemorySize": 2048,
         "Role": {
@@ -1447,6 +1352,32 @@ function handler(event) {
           },
         ],
         "Timeout": 29,
+        "VpcConfig": {
+          "Fn::If": [
+            "BackEndHasEfsConditionD1F37BB7",
+            {
+              "SecurityGroupIds": {
+                "Fn::Split": [
+                  ",",
+                  {
+                    "Ref": "VpcSecurityGroupIdsParameter",
+                  },
+                ],
+              },
+              "SubnetIds": {
+                "Fn::Split": [
+                  ",",
+                  {
+                    "Ref": "VpcSubnetIdsParameter",
+                  },
+                ],
+              },
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
+          ],
+        },
       },
       "Type": "AWS::Lambda::Function",
     },
@@ -2167,64 +2098,6 @@ function handler(event) {
         ],
       },
       "Type": "AWS::IAM::Policy",
-    },
-    "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
-      "DependsOn": [
-        "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
-      ],
-      "Properties": {
-        "Code": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
-          },
-          "S3Key": "Omitted to remove snapshot dependency on hash",
-        },
-        "Description": {
-          "Fn::Join": [
-            "",
-            [
-              "Lambda function for auto-deleting objects in ",
-              {
-                "Ref": "BackEndAvifCacheBucketE07EF41A",
-              },
-              " S3 bucket.",
-            ],
-          ],
-        },
-        "Handler": "index.handler",
-        "MemorySize": 128,
-        "Role": {
-          "Fn::GetAtt": [
-            "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
-            "Arn",
-          ],
-        },
-        "Runtime": "nodejs18.x",
-        "Timeout": 900,
-      },
-      "Type": "AWS::Lambda::Function",
-    },
-    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "ManagedPolicyArns": [
-          {
-            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
     },
     "DefaultApplicationAttributeGroup41AD7209": {
       "Properties": {

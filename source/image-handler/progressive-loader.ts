@@ -131,24 +131,18 @@ export async function handleProgressiveLoading(
   payload: NormalizedPayload,
   secretProvider: SecretProvider
 ): Promise<ImageHandlerExecutionResult> {
-  const cloudfrontDomain = process.env.CLOUDFRONT_DOMAIN;
-  const hostHeader = event.headers?.Host || event.headers?.host;
-  const host = cloudfrontDomain || hostHeader;
+  const host = process.env.CLOUDFRONT_DOMAIN;
 
   if (!host) {
     throw new Error("CLOUDFRONT_DOMAIN environment variable is required for progressive loading");
   }
 
   const cacheKey = getAvifCacheKey(payload);
-  const avifCacheBucket = process.env.AVIF_CACHE_BUCKET;
-
-  console.info(`Progressive loading: domain=${host}, checking S3 cache bucket=${avifCacheBucket} key=${cacheKey}`);
 
   // Step 1: Check S3 cache first (only if we have a valid cache key and bucket)
   if (cacheKey) {
     const cachedAvif = await getAvifFromS3Cache(cacheKey);
     if (cachedAvif) {
-      console.info(`S3 cache HIT, returning ${cachedAvif.length} bytes AVIF`);
       return {
         statusCode: StatusCodes.OK,
         isBase64Encoded: true,
@@ -163,8 +157,6 @@ export async function handleProgressiveLoading(
       };
     }
   }
-
-  console.info("S3 cache MISS, returning 302 + triggering async warming");
 
   // Step 2: Build JPEG URL (same payload without avif key)
   const jpegPayload = createJpegOnlyPayload(payload);
@@ -238,8 +230,6 @@ async function triggerAsyncAvifGeneration(
         }),
       })
       .promise();
-
-    console.info("Async AVIF generation invoked successfully");
   } catch (err) {
     console.error("Failed to invoke async AVIF generation:", err.message);
   }

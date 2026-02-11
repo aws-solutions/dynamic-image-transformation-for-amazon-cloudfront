@@ -130,6 +130,30 @@ export class ServerlessImageHandlerStack extends Stack {
       default: PriceClass.PRICE_CLASS_ALL,
     });
 
+    const avifCacheBucketParameter = new CfnParameter(this, "AvifCacheBucketParameter", {
+      type: "String",
+      description: "The name of the S3 bucket used to cache AVIF images. Create this bucket manually before deploying.",
+      default: "",
+    });
+
+    const vpcSubnetIdsParameter = new CfnParameter(this, "VpcSubnetIdsParameter", {
+      type: "String",
+      description: "Comma-separated list of private subnet IDs for Lambda VPC config (required for EFS access).",
+      default: "",
+    });
+
+    const vpcSecurityGroupIdsParameter = new CfnParameter(this, "VpcSecurityGroupIdsParameter", {
+      type: "String",
+      description: "Comma-separated list of security group IDs for Lambda VPC config.",
+      default: "",
+    });
+
+    const efsAccessPointArnParameter = new CfnParameter(this, "EfsAccessPointArnParameter", {
+      type: "String",
+      description: "ARN of the EFS access point to mount at /mnt/bw_images. Leave empty to disable EFS.",
+      default: "",
+    });
+
     const solutionMapping = new CfnMapping(this, "Solution", {
       mapping: {
         Config: {
@@ -156,6 +180,10 @@ export class ServerlessImageHandlerStack extends Stack {
       enableDefaultFallbackImage: enableDefaultFallbackImageParameter.valueAsString as YesNo,
       fallbackImageS3Bucket: fallbackImageS3BucketParameter.valueAsString,
       fallbackImageS3KeyBucket: fallbackImageS3KeyParameter.valueAsString,
+      avifCacheBucket: avifCacheBucketParameter.valueAsString,
+      vpcSubnetIds: vpcSubnetIdsParameter.valueAsString,
+      vpcSecurityGroupIds: vpcSecurityGroupIdsParameter.valueAsString,
+      efsAccessPointArn: efsAccessPointArnParameter.valueAsString,
     };
 
     const commonResources = new CommonResources(this, "CommonResources", {

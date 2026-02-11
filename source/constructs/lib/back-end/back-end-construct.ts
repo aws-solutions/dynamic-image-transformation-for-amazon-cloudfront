@@ -22,11 +22,11 @@ import {
 } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { Architecture, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
+import { Architecture, CfnFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { Bucket, IBucket } from "aws-cdk-lib/aws-s3";
-import { ArnFormat, Aws, Duration, Lazy, RemovalPolicy, Stack } from "aws-cdk-lib";
+import { IBucket } from "aws-cdk-lib/aws-s3";
+import { ArnFormat, Aws, CfnCondition, Duration, Fn, Lazy, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { CloudFrontToApiGatewayToLambda } from "@aws-solutions-constructs/aws-cloudfront-apigateway-lambda";
 
@@ -50,20 +50,6 @@ export class BackEnd extends Construct {
 
   constructor(scope: Construct, id: string, props: BackEndProps) {
     super(scope, id);
-
-    // AVIF cache bucket with 90-day expiration lifecycle rule
-    // Uses One Zone-IA storage class for cost savings (cache is regenerable)
-    const avifCacheBucket = new Bucket(this, "AvifCacheBucket", {
-      bucketName: `${Stack.of(this).stackName.toLowerCase()}-avif-cache`,
-      removalPolicy: RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-      lifecycleRules: [
-        {
-          enabled: true,
-          expiration: Duration.days(90),
-        },
-      ],
-    });
 
     const imageHandlerLambdaFunctionRole = new Role(this, "ImageHandlerFunctionRole", {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
@@ -103,6 +89,10 @@ export class BackEnd extends Construct {
         new PolicyStatement({
           actions: ["rekognition:DetectFaces", "rekognition:DetectModerationLabels"],
           resources: ["*"],
+        }),
+        new PolicyStatement({
+          actions: ['elasticfilesystem:ClientMount', 'elasticfilesystem:ClientRead'],
+          resources: ['*'],
         }),
         // Permission for Lambda to invoke itself asynchronously (cache warming for progressive AVIF loading)
         // Uses pattern to avoid circular dependency (Lambda depends on its role policy)
@@ -147,31 +137,33 @@ export class BackEnd extends Construct {
         ENABLE_DEFAULT_FALLBACK_IMAGE: props.enableDefaultFallbackImage,
         DEFAULT_FALLBACK_IMAGE_BUCKET: props.fallbackImageS3Bucket,
         DEFAULT_FALLBACK_IMAGE_KEY: props.fallbackImageS3KeyBucket,
-        AVIF_CACHE_BUCKET: avifCacheBucket.bucketName,
+        AVIF_CACHE_BUCKET: props.avifCacheBucket,
       },
       bundling: {
         externalModules: ["sharp"],
-        commandHooks: {
-          beforeBundling(): string[] {
-            return [];
-          },
-          beforeInstall(): string[] {
-            return [];
-          },
-          afterBundling(_inputDir: string, outputDir: string): string[] {
-            return [
-              // Install sharp with all its dependencies (--force for cross-platform)
-              `npm install --force --prefix ${outputDir} sharp`,
-              // Override with Linux ARM64 binaries for Lambda Graviton
-              `npm install --force --prefix ${outputDir} @img/sharp-linux-arm64 @img/sharp-libvips-linux-arm64`,
-            ];
-          },
-        },
+        nodeModules: ["sharp"],
+        forceDockerBundling: true,
       },
     });
 
-    // Grant Lambda read/write access to the AVIF cache bucket
-    avifCacheBucket.grantReadWrite(imageHandlerLambdaFunction);
+    const hasEfsCondition = new CfnCondition(this, 'HasEfsCondition', {
+      expression: Fn.conditionNot(Fn.conditionEquals(props.efsAccessPointArn, '')),
+    });
+
+    const cfnFunction = imageHandlerLambdaFunction.node.defaultChild as CfnFunction;
+    cfnFunction.addPropertyOverride('VpcConfig', Fn.conditionIf(
+      hasEfsCondition.logicalId,
+      {
+        SubnetIds: Fn.split(',', props.vpcSubnetIds),
+        SecurityGroupIds: Fn.split(',', props.vpcSecurityGroupIds),
+      },
+      Aws.NO_VALUE,
+    ));
+    cfnFunction.addPropertyOverride('FileSystemConfigs', Fn.conditionIf(
+      hasEfsCondition.logicalId,
+      [{ Arn: props.efsAccessPointArn, LocalMountPath: '/mnt/bw_images' }],
+      Aws.NO_VALUE,
+    ));
 
     const imageHandlerLogGroup = new LogGroup(this, "ImageHandlerLogGroup", {
       logGroupName: `/aws/lambda/${imageHandlerLambdaFunction.functionName}`,
@@ -199,8 +191,7 @@ export class BackEnd extends Construct {
     const cachePolicy = new CachePolicy(this, "CachePolicy", {
       cachePolicyName: `ServerlessImageHandler-${props.uuid}`,
       defaultTtl: Duration.days(1),
-      // minTtl=0 allows honoring Cache-Control: no-store for redirect responses
-      minTtl: Duration.seconds(0),
+      minTtl: Duration.seconds(1),
       maxTtl: Duration.days(365),
       enableAcceptEncodingGzip: false,
       // Note: x-bw-warm is NOT in cache key so warm requests target same cache entry as normal requests
