@@ -41,5 +41,8 @@
   },
   "resolutions": {
     "semver": "7.5.4"
+  },
+  "dependencies": {
+    "sharp": "^0.32.6"
   }
 }
