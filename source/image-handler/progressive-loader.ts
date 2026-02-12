@@ -47,10 +47,11 @@ export function getAvifCacheKey(payload: NormalizedPayload): string | null {
   const secondLastSlashIndex = dirPath.lastIndexOf("/");
   const basePath = dirPath.substring(0, secondLastSlashIndex); // "item_images/assets/2/000/076/056"
 
-  // Replace file extension with .avif (matching Rails style_path interpolation)
+  // Replace file extension with .avif, including version to bust cache on image updates
   const dotIndex = filename.lastIndexOf(".");
   const baseFilename = dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
-  const avifFilename = `${baseFilename}.avif`;
+  const version = payload.v;
+  const avifFilename = version ? `${baseFilename}_v${version}.avif` : `${baseFilename}.avif`;
 
   return `${basePath}/${style}/${avifFilename}`;
 }

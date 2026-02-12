@@ -146,7 +146,22 @@ describe("ProgressiveLoader", () => {
   });
 
   describe("getAvifCacheKey", () => {
-    it("should generate Paperclip-style path using style from payload", () => {
+    it("should generate Paperclip-style path with version suffix", () => {
+      const payload = {
+        key: "item_images/assets/2/000/076/056/original/3-1.jpg",
+        v: 1764178950,
+        edits: {
+          resize: { w: 750, h: 473 },
+          avif: { q: 70, style: "sm" },
+        },
+      };
+
+      const cacheKey = getAvifCacheKey(payload);
+
+      expect(cacheKey).toBe("item_images/assets/2/000/076/056/sm/3-1_v1764178950.avif");
+    });
+
+    it("should omit version suffix when v is not provided", () => {
       const payload = {
         key: "item_images/assets/2/000/076/056/original/3-1.jpg",
         edits: {
