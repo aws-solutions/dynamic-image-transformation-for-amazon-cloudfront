@@ -43,10 +43,11 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
           await storeAvifToS3Cache(cacheKey, Buffer.from(processedRequest, "base64"));
         }
       }
+      return { statusCode: StatusCodes.OK, isBase64Encoded: false, headers: {}, body: JSON.stringify({ warmed: true }) };
     } catch (err) {
       console.error("Async AVIF generation failed:", err);
+      return { statusCode: StatusCodes.INTERNAL_SERVER_ERROR, isBase64Encoded: false, headers: {}, body: "" };
     }
-    return { statusCode: StatusCodes.OK, isBase64Encoded: false, headers: {}, body: JSON.stringify({ warmed: true }) };
   }
 
   const imageRequest = new ImageRequest(s3Client, secretProvider);
