@@ -79,40 +79,40 @@ $ ./bw_build.sh --stack_name ServerlessImageHandler-bw-staging --profile bw
 
 ### 4. Deploy (updated by BW)
 
-The deploy command accepts the same options as the build command, plus all configuration to connect the lambda function to relevant infrastructure.
-
-You can discover the appropriate values used by an existing stack, by running the build command with the `--eb_stack` option. 
-
-Example:
+The deploy command accepts the same options as the build command, plus all configuration to connect the Lambda function to relevant infrastructure.
 
 ```bash
-$ ./bw_deploy.sh --eb_stack bwstaging-docker --stack_name ServerlessImageHandler-bw-staging
-=== Discovering configuration ===
-
-EB Environment: bwstaging-docker
-  Application: BidWrangler
-  EFS File System ID: fs-078529a0b611294ab
-  EFS Access Point ARN: arn:aws:elasticfilesystem:us-east-1:333288749561:access-point/fsap-08dbed6b59f7645c5
-
-Serverless Stack: ServerlessImageHandler-bw-staging
-  Source Buckets: bwpaperclip-bwstaging
-  AVIF Cache Bucket: serverlessimagehandler-bw-staging-avif-cache
-  Lambda: ServerlessImageHandler-bw-BackEndImageHandlerLambd-zBVWhYxEsYnT
-  VPC Subnet IDs: subnet-0685b26ed0d883bc1
-  Security Group IDs: sg-066116ed37a51f0ac
-
-=== Deploy Command ===
-
 ./bw_deploy.sh \
   --stack_name ServerlessImageHandler-bw-staging \
   --source_buckets "bwpaperclip-bwstaging" \
   --avif_cache_bucket serverlessimagehandler-bw-staging-avif-cache \
-  --vpc_subnet_ids "subnet-0685b26ed0d883bc1" \
-  --security_group_ids "sg-066116ed37a51f0ac" \
-  --efs_access_point_arn "arn:aws:elasticfilesystem:us-east-1:333288749561:access-point/fsap-08dbed6b59f7645c5"
+  --vpc_subnet_ids "subnet-abc123" \
+  --security_group_ids "sg-abc123" \
+  --efs_access_point_arn "arn:aws:elasticfilesystem:us-east-1:123456789:access-point/fsap-abc123" \
+  --profile bw
 ```
 
-The displayed build command might be missing some values if they could not be determined / if the function was never deployed. In that case please research and replace the placeholder values with the correct values.
+#### Parameter reference
+
+| Parameter | Required | Description | Where to find the value |
+|---|---|---|---|
+| `--stack_name` | Yes | Name of the CloudFormation stack to create or update. | Choose a name, or reuse the existing one visible in the CloudFormation console. Convention: `ServerlessImageHandler-bw-<env>`. |
+| `--source_buckets` | Yes | Comma-separated list of S3 buckets containing original images the handler is allowed to read from. | The S3 bucket(s) used by the Rails app for image uploads (e.g. `bwpaperclip-bwstaging`). Check `S3_BUCKET` env var in the EB environment. |
+| `--avif_cache_bucket` | Yes | S3 bucket used to cache generated AVIF images. Must be created manually before deploying. | Create one or reuse the existing one. Convention: `serverlessimagehandler-bw-<env>-avif-cache`. Visible as `AvifCacheBucketParameter` in the CloudFormation stack parameters. |
+| `--vpc_subnet_ids` | No | Comma-separated list of **private** subnet IDs. Required when using EFS so the Lambda can reach the mount target. | Use the same private subnets as the EB environment. Find them in VPC console > Subnets, or from the EB environment's configuration. |
+| `--security_group_ids` | No | Comma-separated list of security group IDs for the Lambda. Must allow outbound traffic and NFS (port 2049) to the EFS mount targets. | Use the same SG as the EB environment, or create a dedicated one. Check inbound rules allow NFS from this SG on the EFS security group. |
+| `--efs_access_point_arn` | No | Full ARN of the EFS access point to mount at `/mnt/bw_images`. Leave empty to disable EFS. | EFS console > File systems > Access points. Also visible in the EB environment config under `EFS_FILE_SYSTEM_ID` (then look up its access point). |
+| `--profile` | No | AWS CLI named profile to use. If omitted, credentials are picked up from environment variables. | Your `~/.aws/credentials` profile name (e.g. `bw`). |
+
+#### Discovery helper
+
+You can auto-discover the values from an existing EB environment and CloudFormation stack:
+
+```bash
+$ ./bw_deploy.sh --eb_stack bwstaging-docker --stack_name ServerlessImageHandler-bw-staging
+```
+
+This prints the discovered configuration and a ready-to-run deploy command. If some values could not be determined (e.g. first deploy), replace the placeholder values using the reference above.
 
 # Collection of operational metrics
 
