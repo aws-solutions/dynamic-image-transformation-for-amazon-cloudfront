@@ -1,3 +1,39 @@
+usage() {
+  cat <<'EOF'
+Usage: ./bw_deploy.sh [OPTIONS]
+
+Deploy mode (runs CDK deploy):
+  ./bw_deploy.sh \
+    --stack_name ServerlessImageHandler-bw-staging \
+    --source_buckets "bwpaperclip-bwstaging" \
+    --avif_cache_bucket serverlessimagehandler-bw-staging-avif-cache \
+    --vpc_subnet_ids "subnet-abc123" \
+    --security_group_ids "sg-abc123" \
+    --efs_access_point_arn "arn:aws:elasticfilesystem:us-east-1:123456789:access-point/fsap-abc123" \
+    --profile bw
+
+Discovery mode (prints a ready-to-run deploy command from existing infra):
+  ./bw_deploy.sh --eb_stack bwstaging-docker --stack_name ServerlessImageHandler-bw-staging
+
+Required parameters:
+  --stack_name            CloudFormation stack name (e.g. ServerlessImageHandler-bw-staging)
+  --source_buckets        Comma-separated S3 buckets with original images
+  --avif_cache_bucket     S3 bucket for AVIF cache (must exist before deploy)
+
+Optional parameters:
+  --vpc_subnet_ids        Comma-separated private subnet IDs (required for EFS)
+  --security_group_ids    Comma-separated security group IDs (must allow NFS port 2049)
+  --efs_access_point_arn  EFS access point ARN to mount at /mnt/bw_images
+  --profile               AWS CLI named profile (defaults to env vars)
+  --eb_stack              EB environment name for discovery mode (requires --stack_name)
+EOF
+  exit 1
+}
+
+if [ $# -eq 0 ]; then
+  usage
+fi
+
 while [[ $# -gt 0 ]] ; do
     key="$1"
     case $key in
@@ -33,6 +69,14 @@ while [[ $# -gt 0 ]] ; do
             EB_STACK="$2"
             shift
             ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo ""
+            usage
+            ;;
     esac
     shift
 done
@@ -47,8 +91,9 @@ fi
 ##
 if [ -n "${EB_STACK+x}" ]; then
   if [ -z "${STACK_NAME+x}" ]; then
-    echo "--stack_name is required for discovery!"
-    exit 1
+    echo "Discovery mode requires --stack_name"
+    echo ""
+    usage
   fi
 
   echo "=== Discovering configuration ==="
@@ -184,17 +229,14 @@ fi
 ##
 ## Deploy mode
 ##
-if [ -z ${STACK_NAME+x} ]; then
-  echo "--stack_name parameter is required!"
-  exit 1
-fi
-if [ -z ${SOURCE_BUCKETS+x} ]; then
-  echo "--source_buckets parameter is required!"
-  exit 1
-fi
-if [ -z ${AVIF_CACHE_BUCKET+x} ]; then
-  echo "--avif_cache_bucket parameter is required!"
-  exit 1
+MISSING=()
+[ -z "${STACK_NAME+x}" ] && MISSING+=("--stack_name")
+[ -z "${SOURCE_BUCKETS+x}" ] && MISSING+=("--source_buckets")
+[ -z "${AVIF_CACHE_BUCKET+x}" ] && MISSING+=("--avif_cache_bucket")
+if [ ${#MISSING[@]} -gt 0 ]; then
+  echo "Missing required parameters: ${MISSING[*]}"
+  echo ""
+  usage
 fi
 
 # VPC/EFS params are optional — CDK condition handles empty values
