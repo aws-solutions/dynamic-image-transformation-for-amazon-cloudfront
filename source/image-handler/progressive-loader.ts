@@ -210,11 +210,7 @@ async function generateSignature(path: string, secretProvider: SecretProvider): 
   return createHmac("sha256", key).update(path).digest("hex");
 }
 
-async function triggerAsyncAvifGeneration(
-  path: string,
-  payload: NormalizedPayload,
-  signature?: string
-): Promise<void> {
+async function triggerAsyncAvifGeneration(path: string, payload: NormalizedPayload, signature?: string): Promise<void> {
   const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
   if (!functionName) {
     console.error("AWS_LAMBDA_FUNCTION_NAME not set, skipping async AVIF generation");

@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import fsPromises from 'fs/promises';
-import fs from 'fs';
+import fsPromises from "fs/promises";
+import fs from "fs";
 import S3 from "aws-sdk/clients/s3";
 import { createHmac } from "crypto";
 
@@ -32,7 +32,7 @@ type OriginalImageInfo = Partial<{
 export class ImageRequest {
   private static readonly DEFAULT_EFFORT = 4;
 
-  constructor(private readonly s3Client: S3, private readonly secretProvider: SecretProvider) { }
+  constructor(private readonly s3Client: S3, private readonly secretProvider: SecretProvider) {}
 
   /**
    * Determines the output format of an image
@@ -112,7 +112,11 @@ export class ImageRequest {
       imageRequestInfo.useEfs = this.parseImageUseEfs(event, imageRequestInfo.requestType);
       imageRequestInfo.edits = this.parseImageEdits(event, imageRequestInfo.requestType);
 
-      const originalImage = await this.getOriginalImage(imageRequestInfo.bucket, imageRequestInfo.key, imageRequestInfo.useEfs);
+      const originalImage = await this.getOriginalImage(
+        imageRequestInfo.bucket,
+        imageRequestInfo.key,
+        imageRequestInfo.useEfs
+      );
       imageRequestInfo = { ...imageRequestInfo, ...originalImage };
 
       imageRequestInfo.headers = this.parseImageHeaders(event, imageRequestInfo.requestType);
@@ -163,19 +167,19 @@ export class ImageRequest {
       const result: OriginalImageInfo = {};
 
       // BW_CHANGE: get image from EFS if requested so
-      let originalImage: any = {}
-      let imageBuffer
+      let originalImage: any = {};
+      let imageBuffer;
       if (useEfs) {
-        const filePath = `/mnt/bw_images/${key}`
+        const filePath = `/mnt/bw_images/${key}`;
         try {
-          imageBuffer = await fsPromises.readFile(filePath)
+          imageBuffer = await fsPromises.readFile(filePath);
         } catch (err) {
           if (!fs.existsSync(filePath)) {
-            const notFoundError: any = new Error('File not found')
-            notFoundError.code = 'NoSuchKey'
-            throw notFoundError
+            const notFoundError: any = new Error("File not found");
+            notFoundError.code = "NoSuchKey";
+            throw notFoundError;
           } else {
-            throw err
+            throw err;
           }
         }
       } else {
@@ -273,12 +277,12 @@ export class ImageRequest {
       // Support both old (use_efs) and new (efs) format
       return decoded.efs ?? decoded.use_efs ?? false;
     } else if (requestType === RequestTypes.THUMBOR || requestType === RequestTypes.CUSTOM) {
-      return false
+      return false;
     } else {
       throw new ImageHandlerError(
-          StatusCodes.NOT_FOUND,
-          'ImageBucket::CannotFindUseEfs',
-          'Request type not supported.'
+        StatusCodes.NOT_FOUND,
+        "ImageBucket::CannotFindUseEfs",
+        "Request type not supported."
       );
     }
   }

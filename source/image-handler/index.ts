@@ -11,7 +11,12 @@ import { ImageHandler } from "./image-handler";
 import { ImageRequest } from "./image-request";
 import { Headers, ImageHandlerEvent, ImageHandlerExecutionResult, StatusCodes } from "./lib";
 import { normalizePayload, NormalizedPayload, createJpegOnlyPayload, denormalizePayload } from "./payload-normalizer";
-import { handleProgressiveLoading, getAvifCacheKey, storeAvifToS3Cache, clientSupportsAvif } from "./progressive-loader";
+import {
+  handleProgressiveLoading,
+  getAvifCacheKey,
+  storeAvifToS3Cache,
+  clientSupportsAvif,
+} from "./progressive-loader";
 import { SecretProvider } from "./secret-provider";
 
 const awsSdkOptions = getOptions();
@@ -43,7 +48,12 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
           await storeAvifToS3Cache(cacheKey, Buffer.from(processedRequest, "base64"));
         }
       }
-      return { statusCode: StatusCodes.OK, isBase64Encoded: false, headers: {}, body: JSON.stringify({ warmed: true }) };
+      return {
+        statusCode: StatusCodes.OK,
+        isBase64Encoded: false,
+        headers: {},
+        body: JSON.stringify({ warmed: true }),
+      };
     } catch (err) {
       console.error("Async AVIF generation failed:", err);
       return { statusCode: StatusCodes.INTERNAL_SERVER_ERROR, isBase64Encoded: false, headers: {}, body: "" };
