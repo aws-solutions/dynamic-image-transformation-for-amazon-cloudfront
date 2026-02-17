@@ -1,6 +1,26 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import * as path from "path";
+
+// Mock NodejsFunction to avoid Docker bundling during tests
+jest.mock("aws-cdk-lib/aws-lambda-nodejs", () => {
+  const lambda = require("aws-cdk-lib/aws-lambda");
+
+  return {
+    NodejsFunction: class extends lambda.Function {
+      constructor(scope: any, id: string, props: any) {
+        const { entry, bundling, projectRoot, depsLockFilePath, ...rest } = props;
+        super(scope, id, {
+          ...rest,
+          code: lambda.Code.fromAsset(path.join(__dirname)),
+          handler: "index.handler",
+        });
+      }
+    },
+  };
+});
+
 import { Template } from "aws-cdk-lib/assertions";
 import { App } from "aws-cdk-lib";
 

@@ -1282,7 +1282,6 @@ function handler(event) {
             "AVIF_CACHE_BUCKET": {
               "Ref": "AvifCacheBucketParameter",
             },
-            "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
             "CLOUDFRONT_DOMAIN": {
               "Fn::GetAtt": [
                 "BackEndImageHandlerCloudFrontApiGatewayLambdaCloudFrontToApiGatewayCloudFrontDistribution03AA31B2",
@@ -1595,7 +1594,6 @@ function handler(event) {
         "Description": "sih (v6.2.5): Custom resource",
         "Environment": {
           "Variables": {
-            "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
             "RETRY_SECONDS": "5",
             "SOLUTION_ID": "S0ABC",
             "SOLUTION_VERSION": "v6.2.5",
