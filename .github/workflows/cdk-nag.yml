@@ -25,5 +25,6 @@ jobs:
         with:
           platforms: arm64
       - run: |
-          cd source/constructs && npm i --only=dev
+          cd source/custom-resource && npm ci
+          cd ../constructs && npm i --only=dev
           STACK_NAME=TestStack overrideWarningsEnabled=false npx cdk synth

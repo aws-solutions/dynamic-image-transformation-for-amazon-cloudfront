@@ -23,6 +23,7 @@ export type ResourcePropertyTypes =
   | CreateLoggingBucketRequestProperties;
 
 export class CustomResourceError extends Error {
+  // prettier-ignore
   constructor(public readonly code: string, public readonly message: string) {
     super();
   }

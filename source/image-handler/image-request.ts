@@ -32,6 +32,7 @@ type OriginalImageInfo = Partial<{
 export class ImageRequest {
   private static readonly DEFAULT_EFFORT = 4;
 
+  // prettier-ignore
   constructor(private readonly s3Client: S3, private readonly secretProvider: SecretProvider) {}
 
   /**

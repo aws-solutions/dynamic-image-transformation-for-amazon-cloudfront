@@ -21,6 +21,7 @@ import {
 export class ImageHandler {
   private readonly LAMBDA_PAYLOAD_LIMIT = 6 * 1024 * 1024;
 
+  // prettier-ignore
   constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
 
   /**
@@ -61,19 +62,20 @@ export class ImageHandler {
     // modify if specified
     if (imageRequestInfo.outputFormat !== undefined) {
       switch (imageRequestInfo.outputFormat) {
-        case ImageFormatTypes.AVIF:
-          // Support both old (quality) and new (q) format
+        case ImageFormatTypes.AVIF: {
           const avifQuality = edits.avif?.q ?? edits.avif?.quality ?? 70;
           modifiedOutputImage.avif({ quality: avifQuality });
           break;
+        }
 
         case ImageFormatTypes.JPEG:
-        case ImageFormatTypes.JPG:
+        case ImageFormatTypes.JPG: {
           const jpegQuality = edits.jpeg?.q ?? edits.jpeg?.quality ?? 80;
           modifiedOutputImage.jpeg({ quality: jpegQuality });
           break;
+        }
 
-        case ImageFormatTypes.PNG:
+        case ImageFormatTypes.PNG: {
           const pngQuality = edits.png?.q ?? edits.png?.quality;
           if (pngQuality !== undefined) {
             modifiedOutputImage.png({ quality: pngQuality });
@@ -81,8 +83,9 @@ export class ImageHandler {
             modifiedOutputImage.toFormat("png");
           }
           break;
+        }
 
-        case ImageFormatTypes.WEBP:
+        case ImageFormatTypes.WEBP: {
           const webpOptions: any = {};
           const webpQuality = edits.webp?.q ?? edits.webp?.quality;
           if (webpQuality !== undefined) {
@@ -97,6 +100,7 @@ export class ImageHandler {
             modifiedOutputImage.toFormat("webp");
           }
           break;
+        }
 
         default:
           modifiedOutputImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
@@ -714,8 +718,8 @@ export class ImageHandler {
    * @returns object containing image buffer data and original image format.
    */
   private async getRekognitionCompatibleImage(image: sharp.Sharp): Promise<RekognitionCompatibleImage> {
-    const sharp_image = sharp(await image.toBuffer()); // Reload sharp image to ensure current metadata
-    const metadata = await sharp_image.metadata();
+    const reloadedImage = sharp(await image.toBuffer());
+    const metadata = await reloadedImage.metadata();
     const format = metadata.format;
     let imageBuffer: { data: Buffer; info: sharp.OutputInfo };
 
