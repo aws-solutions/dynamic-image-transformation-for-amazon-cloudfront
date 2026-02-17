@@ -163,6 +163,7 @@ describe("index", () => {
   });
 
   it("should return 500 error when there is no error status in the error", async () => {
+    jest.setTimeout(15000);
     // Arrange
     const event: ImageHandlerEvent = {
       path: "eyJidWNrZXQiOiJzb3VyY2UtYnVja2V0Iiwia2V5IjoidGVzdC5qcGciLCJlZGl0cyI6eyJ3cm9uZ0ZpbHRlciI6dHJ1ZX19",

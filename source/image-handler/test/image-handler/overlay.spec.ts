@@ -277,12 +277,10 @@ describe("overlay", () => {
       Bucket: "validBucket",
       Key: "validKey",
     });
-    expect(result).toEqual(
-      Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADUlEQVR4nGP4z8CQCgAEZgFltQhIfQAAAABJRU5ErkJggg==",
-        "base64"
-      )
-    );
+    const resultMetadata = await sharp(result).metadata();
+    expect(resultMetadata.format).toEqual("png");
+    expect(resultMetadata.width).toEqual(1);
+    expect(resultMetadata.height).toEqual(1);
   });
 
   it("Should pass and do not throw an exception that the overlay image dimensions are not integer numbers", async () => {

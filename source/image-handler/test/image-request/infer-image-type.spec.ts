@@ -12,16 +12,16 @@ describe("inferImageType", () => {
   const secretsManager = new SecretsManager();
   const secretProvider = new SecretProvider(secretsManager);
 
-    test.each([
-      { value: "FFD8FFDB" },
-      { value: "FFD8FFE0" },
-      { value: "FFD8FFED" },
-      { value: "FFD8FFEE" },
-      { value: "FFD8FFE1" },
-      { value: "FFD8FFE2" },
-    ])('Should pass if it returns "image/jpeg" for a magic number of $value', ({ value }) => {
-      const byteValues = value.match(/.{1,2}/g).map((x) => parseInt(x, 16));
-      const imageBuffer = Buffer.from(byteValues.concat(new Array(8).fill(0x00)));
+  test.each([
+    { value: "FFD8FFDB" },
+    { value: "FFD8FFE0" },
+    { value: "FFD8FFED" },
+    { value: "FFD8FFEE" },
+    { value: "FFD8FFE1" },
+    { value: "FFD8FFE2" },
+  ])('Should pass if it returns "image/jpeg" for a magic number of $value', ({ value }) => {
+    const byteValues = value.match(/.{1,2}/g).map((x) => parseInt(x, 16));
+    const imageBuffer = Buffer.from(byteValues.concat(new Array(8).fill(0x00)));
 
     // Act
     const imageRequest = new ImageRequest(s3Client, secretProvider);

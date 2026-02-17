@@ -16,6 +16,7 @@ export interface NormalizedEdits {
   jpeg?: { q?: number };
   png?: { q?: number };
   webp?: { q?: number };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -27,6 +28,7 @@ export interface NormalizedPayload {
   edits?: NormalizedEdits;
   outputFormat?: ImageFormatTypes;
   effort?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   headers?: Record<string, any>;
 }
 
@@ -34,10 +36,10 @@ export interface NormalizedPayload {
  * Normalizes a payload from either old or new format to a consistent structure.
  * Supports both old keys (use_efs, bw_original_version, width, height, quality)
  * and new keys (efs, v, w, h, q).
- *
  * @param raw The raw decoded payload from the request
  * @returns Normalized payload with consistent key names
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizePayload(raw: any): NormalizedPayload {
   if (!raw) {
     return { key: "" };
@@ -90,35 +92,36 @@ export function normalizePayload(raw: any): NormalizedPayload {
 /**
  * Converts a normalized payload back to the format expected by existing code.
  * This allows gradual migration without breaking existing functionality.
- *
  * @param normalized The normalized payload
  * @returns Payload in the original format expected by ImageRequest
  */
-export function denormalizePayload(normalized: NormalizedPayload): any {
-  const edits: any = { ...normalized.edits };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function denormalizePayload(normalized: NormalizedPayload): Record<string, any> {
+  const srcEdits = normalized.edits;
+  const edits: Record<string, unknown> = { ...srcEdits };
 
   // Convert resize back to original format
-  if (edits.resize) {
+  if (srcEdits?.resize) {
     edits.resize = {
-      width: edits.resize.w,
-      height: edits.resize.h,
-      fit: edits.resize.fit,
-      ...(edits.resize.ratio !== undefined && { ratio: edits.resize.ratio }),
+      width: srcEdits.resize.w,
+      height: srcEdits.resize.h,
+      fit: srcEdits.resize.fit,
+      ...(srcEdits.resize.ratio !== undefined && { ratio: srcEdits.resize.ratio }),
     };
   }
 
   // Convert quality settings back
-  if (edits.avif) {
-    edits.avif = { quality: edits.avif.q };
+  if (srcEdits?.avif) {
+    edits.avif = { quality: srcEdits.avif.q };
   }
-  if (edits.jpeg) {
-    edits.jpeg = { quality: edits.jpeg.q };
+  if (srcEdits?.jpeg) {
+    edits.jpeg = { quality: srcEdits.jpeg.q };
   }
-  if (edits.png) {
-    edits.png = { quality: edits.png.q };
+  if (srcEdits?.png) {
+    edits.png = { quality: srcEdits.png.q };
   }
-  if (edits.webp) {
-    edits.webp = { quality: edits.webp.q };
+  if (srcEdits?.webp) {
+    edits.webp = { quality: srcEdits.webp.q };
   }
 
   return {
@@ -136,7 +139,6 @@ export function denormalizePayload(normalized: NormalizedPayload): any {
 /**
  * Creates a JPEG-only payload by removing the avif key from edits.
  * Used for the redirect URL in progressive loading.
- *
  * @param payload The normalized payload with both avif and jpeg
  * @returns New payload with only jpeg (no avif)
  */

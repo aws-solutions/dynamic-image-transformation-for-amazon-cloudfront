@@ -45,8 +45,8 @@ describe("EFS with AVIF edits", () => {
       bw_original_version: 1764178950,
       edits: {
         resize: { width: 750, height: 473, fit: "inside" },
-        avif: { quality: 70 }
-      }
+        avif: { quality: 70 },
+      },
     };
 
     const event = {
@@ -82,8 +82,8 @@ describe("EFS with AVIF edits", () => {
       use_efs: true,
       key: "item_images/assets/2/000/076/423/original/test.jpg",
       edits: {
-        resize: { width: 750, height: 473, fit: "inside" }
-      }
+        resize: { width: 750, height: 473, fit: "inside" },
+      },
     };
 
     const event = {

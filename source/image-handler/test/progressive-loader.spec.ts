@@ -558,5 +558,4 @@ describe("ProgressiveLoader", () => {
       expect(mockS3GetObject).not.toHaveBeenCalled();
     });
   });
-
 });

@@ -236,7 +236,7 @@ export function getErrorResponse(error) {
  * @param path The request path
  * @returns The decoded payload object or null
  */
-function tryDecodePayload(path: string): any | null {
+function tryDecodePayload(path: string): Record<string, unknown> | null {
   if (!path) {
     return null;
   }

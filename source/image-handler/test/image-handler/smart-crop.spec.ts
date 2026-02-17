@@ -57,7 +57,7 @@ describe("smartCrop", () => {
     const image = sharp(originalImage, { failOnError: false }).withMetadata();
     const edits: ImageEdits = {
       toFormat: "webp",
-      smartCrop: { padding: 60 }
+      smartCrop: { padding: 60 },
     };
 
     // Mock

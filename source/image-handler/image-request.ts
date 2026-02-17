@@ -167,7 +167,7 @@ export class ImageRequest {
       const result: OriginalImageInfo = {};
 
       // BW_CHANGE: get image from EFS if requested so
-      let originalImage: any = {};
+      let originalImage: S3.GetObjectOutput = {};
       let imageBuffer;
       if (useEfs) {
         const filePath = `/mnt/bw_images/${key}`;
@@ -175,7 +175,7 @@ export class ImageRequest {
           imageBuffer = await fsPromises.readFile(filePath);
         } catch (err) {
           if (!fs.existsSync(filePath)) {
-            const notFoundError: any = new Error("File not found");
+            const notFoundError = new Error("File not found") as Error & { code: string };
             notFoundError.code = "NoSuchKey";
             throw notFoundError;
           } else {

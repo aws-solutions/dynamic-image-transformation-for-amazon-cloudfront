@@ -24,7 +24,6 @@ const s3Client = new S3(awsSdkOptions);
  * - Output: "item_images/assets/2/000/076/056/sm/3-1.avif"
  *
  * The style name (xs, sm, lg, xl) must be provided in the payload by Rails.
- *
  * @param payload The normalized payload containing key and style
  * @returns The S3 key for the cached AVIF, or null if style is missing
  */
@@ -66,7 +65,6 @@ function getAvifCacheBucket(): string | undefined {
 
 /**
  * Checks if AVIF exists in S3 cache.
- *
  * @param cacheKey The S3 key for the cached AVIF
  * @returns Buffer with AVIF data if found, null otherwise
  */
@@ -82,8 +80,8 @@ export async function getAvifFromS3Cache(cacheKey: string): Promise<Buffer | nul
       })
       .promise();
     return Buffer.from(result.Body as Uint8Array);
-  } catch (err: any) {
-    if (err.code === "NoSuchKey") return null;
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "NoSuchKey") return null;
     console.error("S3 cache read error:", err);
     return null; // Fail open - continue to generate
   }
@@ -91,7 +89,6 @@ export async function getAvifFromS3Cache(cacheKey: string): Promise<Buffer | nul
 
 /**
  * Stores AVIF to S3 cache.
- *
  * @param cacheKey The S3 key for the cached AVIF
  * @param avifBuffer The AVIF data to store
  */
@@ -121,7 +118,6 @@ export async function storeAvifToS3Cache(cacheKey: string, avifBuffer: Buffer): 
  * 1. Check S3 for cached AVIF - if found, return it (200 OK)
  * 2. If not found, return 302 redirect to JPEG and trigger async warming
  * 3. Async warming generates AVIF and stores it to S3 for future requests
- *
  * @param event The Lambda event
  * @param payload The normalized payload
  * @param secretProvider The secret provider for signature generation
@@ -193,7 +189,6 @@ export async function handleProgressiveLoading(
 
 /**
  * Generates an HMAC-SHA256 signature for a path.
- *
  * @param path The URL path to sign
  * @param secretProvider The secret provider
  * @returns The hex-encoded signature
@@ -210,6 +205,12 @@ async function generateSignature(path: string, secretProvider: SecretProvider): 
   return createHmac("sha256", key).update(path).digest("hex");
 }
 
+/**
+ * Triggers async Lambda self-invoke to generate and cache AVIF.
+ * @param path The original request path
+ * @param payload The normalized payload
+ * @param signature Optional request signature
+ */
 async function triggerAsyncAvifGeneration(path: string, payload: NormalizedPayload, signature?: string): Promise<void> {
   const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
   if (!functionName) {
@@ -228,14 +229,13 @@ async function triggerAsyncAvifGeneration(path: string, payload: NormalizedPaylo
       })
       .promise();
   } catch (err) {
-    console.error("Failed to invoke async AVIF generation:", err.message);
+    console.error("Failed to invoke async AVIF generation:", (err as Error).message);
   }
 }
 
 /**
  * Checks if the client supports AVIF based on CloudFront Function's normalized fmt query param.
  * Falls back to Accept header for direct Lambda invocation.
- *
  * @param event The Lambda event
  * @returns True if fmt=avif or Accept header includes image/avif
  */

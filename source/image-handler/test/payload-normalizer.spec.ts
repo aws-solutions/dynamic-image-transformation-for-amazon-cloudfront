@@ -1,11 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  normalizePayload,
-  denormalizePayload,
-  createJpegOnlyPayload,
-} from "../payload-normalizer";
+import { normalizePayload, denormalizePayload, createJpegOnlyPayload } from "../payload-normalizer";
 
 describe("PayloadNormalizer", () => {
   describe("normalizePayload", () => {

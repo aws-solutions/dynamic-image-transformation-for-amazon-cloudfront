@@ -21,7 +21,7 @@ import {
 export class ImageHandler {
   private readonly LAMBDA_PAYLOAD_LIMIT = 6 * 1024 * 1024;
 
-  constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) { }
+  constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
 
   /**
    * Creates a Sharp object from Buffer
@@ -317,9 +317,9 @@ export class ImageHandler {
         typeof edits.smartCrop === "object"
           ? edits.smartCrop
           : {
-            faceIndex: undefined,
-            padding: undefined,
-          };
+              faceIndex: undefined,
+              padding: undefined,
+            };
       const { imageBuffer, format } = await this.getRekognitionCompatibleImage(originalImage);
       const boundingBox = await this.getBoundingBox(imageBuffer.data, faceIndex ?? 0);
       const cropArea = this.getCropArea(boundingBox, padding ?? 0, imageBuffer.info);
@@ -368,11 +368,11 @@ export class ImageHandler {
         typeof edits.roundCrop === "object"
           ? edits.roundCrop
           : {
-            top: undefined,
-            left: undefined,
-            rx: undefined,
-            ry: undefined,
-          };
+              top: undefined,
+              left: undefined,
+              rx: undefined,
+              ry: undefined,
+            };
       const imageBuffer = await originalImage.toBuffer({ resolveWithObject: true });
       const width = imageBuffer.info.width;
       const height = imageBuffer.info.height;
@@ -437,10 +437,10 @@ export class ImageHandler {
         typeof edits.contentModeration === "object"
           ? edits.contentModeration
           : {
-            minConfidence: undefined,
-            blur: undefined,
-            moderationLabels: undefined,
-          };
+              minConfidence: undefined,
+              blur: undefined,
+              moderationLabels: undefined,
+            };
       const { imageBuffer, format } = await this.getRekognitionCompatibleImage(originalImage);
       const inappropriateContent = await this.detectInappropriateContent(imageBuffer.data, minConfidence);
 

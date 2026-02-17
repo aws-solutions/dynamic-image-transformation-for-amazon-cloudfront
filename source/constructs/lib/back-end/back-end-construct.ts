@@ -61,8 +61,14 @@ export class BackEnd extends Construct {
       statements: [
         // BW_CHANGE: added ec2 permissions to be able to add VPC network to connect to EFS
         new PolicyStatement({
-          actions: ['ec2:DescribeNetworkInterfaces', 'ec2:CreateNetworkInterface', 'ec2:DeleteNetworkInterface', 'ec2:DescribeInstances', 'ec2:AttachNetworkInterface'],
-          resources: ['*']
+          actions: [
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:CreateNetworkInterface",
+            "ec2:DeleteNetworkInterface",
+            "ec2:DescribeInstances",
+            "ec2:AttachNetworkInterface",
+          ],
+          resources: ["*"],
         }),
         new PolicyStatement({
           actions: ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
@@ -91,8 +97,8 @@ export class BackEnd extends Construct {
           resources: ["*"],
         }),
         new PolicyStatement({
-          actions: ['elasticfilesystem:ClientMount', 'elasticfilesystem:ClientRead'],
-          resources: ['*'],
+          actions: ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientRead"],
+          resources: ["*"],
         }),
         // Permission for Lambda to invoke itself asynchronously (cache warming for progressive AVIF loading)
         // Uses pattern to avoid circular dependency (Lambda depends on its role policy)
@@ -111,7 +117,11 @@ export class BackEnd extends Construct {
     });
 
     addCfnSuppressRules(imageHandlerLambdaFunctionRolePolicy, [
-      { id: "W12", reason: "rekognition:DetectFaces requires '*' resources. lambda:InvokeFunction uses pattern to avoid circular dependency." },
+      {
+        id: "W12",
+        reason:
+          "rekognition:DetectFaces requires '*' resources. lambda:InvokeFunction uses pattern to avoid circular dependency.",
+      },
     ]);
     imageHandlerLambdaFunctionRole.attachInlinePolicy(imageHandlerLambdaFunctionRolePolicy);
 
@@ -148,24 +158,30 @@ export class BackEnd extends Construct {
       },
     });
 
-    const hasEfsCondition = new CfnCondition(this, 'HasEfsCondition', {
-      expression: Fn.conditionNot(Fn.conditionEquals(props.efsAccessPointArn, '')),
+    const hasEfsCondition = new CfnCondition(this, "HasEfsCondition", {
+      expression: Fn.conditionNot(Fn.conditionEquals(props.efsAccessPointArn, "")),
     });
 
     const cfnFunction = imageHandlerLambdaFunction.node.defaultChild as CfnFunction;
-    cfnFunction.addPropertyOverride('VpcConfig', Fn.conditionIf(
-      hasEfsCondition.logicalId,
-      {
-        SubnetIds: Fn.split(',', props.vpcSubnetIds),
-        SecurityGroupIds: Fn.split(',', props.vpcSecurityGroupIds),
-      },
-      Aws.NO_VALUE,
-    ));
-    cfnFunction.addPropertyOverride('FileSystemConfigs', Fn.conditionIf(
-      hasEfsCondition.logicalId,
-      [{ Arn: props.efsAccessPointArn, LocalMountPath: '/mnt/bw_images' }],
-      Aws.NO_VALUE,
-    ));
+    cfnFunction.addPropertyOverride(
+      "VpcConfig",
+      Fn.conditionIf(
+        hasEfsCondition.logicalId,
+        {
+          SubnetIds: Fn.split(",", props.vpcSubnetIds),
+          SecurityGroupIds: Fn.split(",", props.vpcSecurityGroupIds),
+        },
+        Aws.NO_VALUE
+      )
+    );
+    cfnFunction.addPropertyOverride(
+      "FileSystemConfigs",
+      Fn.conditionIf(
+        hasEfsCondition.logicalId,
+        [{ Arn: props.efsAccessPointArn, LocalMountPath: "/mnt/bw_images" }],
+        Aws.NO_VALUE
+      )
+    );
 
     const imageHandlerLogGroup = new LogGroup(this, "ImageHandlerLogGroup", {
       logGroupName: `/aws/lambda/${imageHandlerLambdaFunction.functionName}`,
