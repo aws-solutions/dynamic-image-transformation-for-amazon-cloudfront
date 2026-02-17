@@ -26,5 +26,6 @@ jobs:
           platforms: arm64
       - run: |
           cd source/custom-resource && npm ci
+          cd ../image-handler && npm ci
           cd ../constructs && npm i --only=dev
           STACK_NAME=TestStack overrideWarningsEnabled=false npx cdk synth

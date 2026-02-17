@@ -4,3 +4,7 @@ CODE_OF_CONDUCT.md:4
 coverage/*
 .zip
 Config
+package-lock.json
+source/image-handler/test/*
+source/demo-ui/index.html
+source/custom-resource/index.ts:525
