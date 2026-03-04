@@ -45,12 +45,8 @@ export class ImageHandler {
       let image = sharp(originalImage, options).keepIccProfile().keepMetadata();
 
       if (edits?.stripExif === true) {
-        // Removes all EXIF by inserting minimal EXIF tag. Leaves ICC untouched.
-        image.keepIccProfile().withExif({
-          IFD0: {
-            Software: 'Dynamic Image Transformation for Amazon CloudFront'
-          }
-        });
+        // Removes all EXIF by setting empty EXIF data. Leaves ICC untouched.
+        image.keepIccProfile().withExif({});
         delete edits.stripExif;
       }
 
