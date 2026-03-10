@@ -23,6 +23,9 @@
 **/.vscode/settings.json
 demo-ui-config.js
 
+# Elastic Beanstalk
+.elasticbeanstalk/
+
 # System Files
 **/.DS_Store
 **/.vscode

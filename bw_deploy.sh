@@ -128,8 +128,6 @@ if [ -n "${EB_STACK+x}" ]; then
 
     if [ -n "$DISC_EFS_ARN" ]; then
       echo "  EFS Access Point ARN: $DISC_EFS_ARN"
-    else
-      echo "  WARNING: No EFS access point found for $EFS_FS_ID"
     fi
   else
     echo "  EFS: not configured"
@@ -152,7 +150,27 @@ if [ -n "${EB_STACK+x}" ]; then
     --query "Stacks[0].Parameters[?ParameterKey=='AvifCacheBucketParameter'].ParameterValue | [0]" \
     --output text 2>/dev/null)
   [ "$DISC_AVIF" = "None" ] && DISC_AVIF=""
-  echo "  AVIF Cache Bucket: ${DISC_AVIF:-(not found)}"
+
+  # If not found in stack params, try the conventional bucket name
+  if [ -z "$DISC_AVIF" ]; then
+    CONV_BUCKET=$(echo "${STACK_NAME}-avif-cache" | tr '[:upper:]' '[:lower:]')
+    if aws s3api head-bucket --bucket "$CONV_BUCKET" $AWS_ARGS >/dev/null 2>&1; then
+      DISC_AVIF="$CONV_BUCKET"
+    fi
+  fi
+
+  AVIF_BUCKET_EXISTS=true
+  if [ -n "$DISC_AVIF" ]; then
+    if ! aws s3api head-bucket --bucket "$DISC_AVIF" $AWS_ARGS >/dev/null 2>&1; then
+      AVIF_BUCKET_EXISTS=false
+      echo "  AVIF Cache Bucket: $DISC_AVIF (NOT FOUND — bucket does not exist)"
+    else
+      echo "  AVIF Cache Bucket: $DISC_AVIF"
+    fi
+  else
+    AVIF_BUCKET_EXISTS=false
+    echo "  AVIF Cache Bucket: (not found)"
+  fi
 
   # Find the ImageHandler Lambda in the stack
   LAMBDA_FUNC=$(aws cloudformation describe-stack-resources \
@@ -199,6 +217,11 @@ if [ -n "${EB_STACK+x}" ]; then
     echo "  WARNING: Lambda function not found in stack"
   fi
 
+  if [ -n "$EFS_FS_ID" ] && [ -z "$DISC_EFS_ARN" ]; then
+    echo "  WARNING: EFS file system $EFS_FS_ID found but no access point discovered."
+    echo "           Create one for Lambda access (see README)."
+  fi
+
   echo ""
   echo "=== Deploy Command ==="
   echo ""
@@ -208,7 +231,8 @@ if [ -n "${EB_STACK+x}" ]; then
   PARTS+=("./bw_deploy.sh")
   PARTS+=("  --stack_name $STACK_NAME")
   PARTS+=("  --source_buckets \"${DISC_SOURCE:-[SOURCE_BUCKETS]}\"")
-  PARTS+=("  --avif_cache_bucket ${DISC_AVIF:-[AVIF_CACHE_BUCKET]}")
+  AVIF_BUCKET_DEFAULT=$(echo "${STACK_NAME}-avif-cache" | tr '[:upper:]' '[:lower:]')
+  PARTS+=("  --avif_cache_bucket ${DISC_AVIF:-$AVIF_BUCKET_DEFAULT}")
   PARTS+=("  --vpc_subnet_ids \"${DISC_SUBNETS:-[VPC_SUBNET_IDS]}\"")
   PARTS+=("  --security_group_ids \"${DISC_SGS:-[SECURITY_GROUP_IDS]}\"")
   PARTS+=("  --efs_access_point_arn \"${DISC_EFS_ARN:-[EFS_ACCESS_POINT_ARN]}\"")
@@ -222,6 +246,16 @@ if [ -n "${EB_STACK+x}" ]; then
       echo "${PARTS[$i]}"
     fi
   done
+
+  if [ "$AVIF_BUCKET_EXISTS" = false ]; then
+    echo ""
+    echo "=== AVIF Cache Bucket Missing ==="
+    echo ""
+    echo "Create it first with:"
+    INIT_CMD="./bw_init_avif_cache.sh --stack_name $STACK_NAME"
+    [ -n "${PROFILE+x}" ] && INIT_CMD="$INIT_CMD --profile $PROFILE"
+    echo "  $INIT_CMD"
+  fi
 
   exit 0
 fi
