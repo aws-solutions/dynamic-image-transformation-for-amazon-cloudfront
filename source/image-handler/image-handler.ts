@@ -25,7 +25,19 @@ export class ImageHandler {
   constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
 
   /**
-   * Creates a Sharp object from Buffer
+   * Creates a Sharp object from Buffer.
+   *
+   * Applies EXIF orientation to pixels (and strips the EXIF orientation tag) unless
+   * the caller opted out with `edits.rotate === null`. This is required for AVIF/WebP
+   * output: those decoders ignore embedded EXIF orientation per the HEIF spec and only
+   * honor container-level `irot`/`imir` boxes, so without baking the rotation into the
+   * pixels the image would render unrotated.
+   *
+   * When the caller also specifies an explicit `edits.rotate` angle on top of EXIF
+   * orientation, we cannot simply chain `.rotate().rotate(angle)` — sharp's rotate
+   * calls replace each other rather than stack. We materialize the EXIF-baked image
+   * to a raw pixel buffer, then apply the user's angle on a fresh pipeline.
+   *
    * @param originalImage An image buffer.
    * @param edits The edits to be applied to an image
    * @param options Additional sharp options to be applied
@@ -33,18 +45,23 @@ export class ImageHandler {
    */
   // eslint-disable-next-line @typescript-eslint/ban-types
   private async instantiateSharpImage(originalImage: Buffer, edits: ImageEdits, options: Object): Promise<sharp.Sharp> {
-    let image: sharp.Sharp = null;
-
-    if (edits.rotate !== undefined && edits.rotate === null) {
-      image = sharp(originalImage, options);
-    } else {
-      const metadata = await sharp(originalImage, options).metadata();
-      image = metadata.orientation
-        ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
-        : sharp(originalImage, options).withMetadata();
+    if (edits.rotate === null) {
+      return sharp(originalImage, options);
     }
 
-    return image;
+    if (edits.rotate === undefined) {
+      return sharp(originalImage, options).rotate();
+    }
+
+    const metadata = await sharp(originalImage, options).metadata();
+    const hasExifRotation = metadata.orientation && metadata.orientation > 1;
+
+    if (!hasExifRotation) {
+      return sharp(originalImage, options).rotate(edits.rotate);
+    }
+
+    const intermediateBuffer = await sharp(originalImage, options).rotate().toBuffer();
+    return sharp(intermediateBuffer, options).rotate(edits.rotate);
   }
 
   /**
@@ -143,9 +160,10 @@ export class ImageHandler {
       base64EncodedImage = imageBuffer.toString("base64");
     } else {
       if (imageRequestInfo.outputFormat !== undefined) {
-        // convert image to Sharp and change output format if specified
-        const modifiedImage = this.modifyImageOutput(sharp(originalImage, options), imageRequestInfo);
-        // convert to base64 encoded string
+        // Route through instantiateSharpImage so EXIF orientation is baked into pixels
+        // before transcoding. Critical for AVIF/WebP, whose decoders ignore EXIF orientation.
+        const sharpImage = await this.instantiateSharpImage(originalImage, edits || {}, options);
+        const modifiedImage = this.modifyImageOutput(sharpImage, imageRequestInfo);
         const imageBuffer = await modifiedImage.toBuffer();
         base64EncodedImage = imageBuffer.toString("base64");
       } else {
@@ -200,6 +218,11 @@ export class ImageHandler {
         }
         case "crop": {
           this.applyCrop(originalImage, edits);
+          break;
+        }
+        case "rotate": {
+          // Already applied in instantiateSharpImage (before resize) so the resize
+          // sees the rotated dimensions.
           break;
         }
         default: {

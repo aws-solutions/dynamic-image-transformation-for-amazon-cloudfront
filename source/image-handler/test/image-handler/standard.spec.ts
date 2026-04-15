@@ -12,7 +12,7 @@ import fs from "fs";
 const s3Client = new S3();
 const rekognitionClient = new Rekognition();
 const image = fs.readFileSync("./test/image/25x15.png");
-const withMetatdataSpy = jest.spyOn(sharp.prototype, "withMetadata");
+const rotateSpy = jest.spyOn(sharp.prototype, "rotate");
 
 describe("standard", () => {
   it("Should pass if a series of standard edits are provided to the function", async () => {
@@ -62,50 +62,33 @@ describe("instantiateSharpImage", () => {
     jest.clearAllMocks();
   });
 
-  it("Should not include metadata if the rotation is null", async () => {
-    // Arrange
-    const edits = {
-      rotate: null,
-    };
+  it("Should not rotate when edits.rotate is null", async () => {
+    const edits = { rotate: null };
     const options = { faiOnError: false };
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
 
-    // Act
     await imageHandler["instantiateSharpImage"](image, edits, options);
 
-    //Assert
-    expect(withMetatdataSpy).not.toHaveBeenCalled();
+    expect(rotateSpy).not.toHaveBeenCalled();
   });
 
-  it("Should include metadata and not define orientation if the rotation is not null and orientation is not defined", async () => {
-    // Arrange
-    const edits = {
-      rotate: undefined,
-    };
+  it("Should auto-rotate from EXIF when edits.rotate is undefined", async () => {
+    const edits = { rotate: undefined };
     const options = { faiOnError: false };
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
 
-    // Act
     await imageHandler["instantiateSharpImage"](image, edits, options);
 
-    //Assert
-    expect(withMetatdataSpy).toHaveBeenCalled();
-    expect(withMetatdataSpy).not.toHaveBeenCalledWith(expect.objectContaining({ orientation: expect.anything }));
+    expect(rotateSpy).toHaveBeenCalledWith();
   });
 
-  it("Should include orientation metadata if the rotation is defined in the metadata", async () => {
-    // Arrange
-    const edits = {
-      rotate: undefined,
-    };
+  it("Should rotate by the specified angle when edits.rotate is a number", async () => {
+    const edits = { rotate: 90 };
     const options = { faiOnError: false };
-    const modifiedImage = await sharp(image).withMetadata({ orientation: 1 }).toBuffer();
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
 
-    // Act
-    await imageHandler["instantiateSharpImage"](modifiedImage, edits, options);
+    await imageHandler["instantiateSharpImage"](image, edits, options);
 
-    //Assert
-    expect(withMetatdataSpy).toHaveBeenCalledWith({ orientation: 1 });
+    expect(rotateSpy).toHaveBeenCalledWith(90);
   });
 });
