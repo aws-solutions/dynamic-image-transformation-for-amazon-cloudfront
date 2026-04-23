@@ -200,11 +200,12 @@ export class ThumborMapper {
     const toSupportedImageFormatType = (format: ImageFormatTypes): ImageFormatTypes => {
       if ([ImageFormatTypes.JPG, ImageFormatTypes.JPEG].includes(format)) {
         return ImageFormatTypes.JPEG;
+      } else if ([ImageFormatTypes.TIF, ImageFormatTypes.TIFF].includes(format)) {
+        return ImageFormatTypes.TIFF;
       } else if (
         [
           ImageFormatTypes.PNG,
           ImageFormatTypes.WEBP,
-          ImageFormatTypes.TIFF,
           ImageFormatTypes.HEIF,
           ImageFormatTypes.GIF,
           ImageFormatTypes.AVIF,

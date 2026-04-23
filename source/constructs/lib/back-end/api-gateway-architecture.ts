@@ -135,6 +135,17 @@ export class ApiGatewayArchitecture {
         { Enabled: false },
       ],
     });
+
+    // Add trusted key groups for signed URLs if enabled
+    const keyGroupIds = props.trustedKeyGroupIds.split(",").map((id: string) => id.trim()).filter(Boolean);
+    cfnDistribution.addOverride(
+      "Properties.DistributionConfig.DefaultCacheBehavior.TrustedKeyGroups",
+      Fn.conditionIf(
+        props.conditions.enableSignedUrlsCondition.logicalId,
+        keyGroupIds,
+        Aws.NO_VALUE
+      )
+    );
     Aspects.of(cfnDistribution).add(
       new ConditionAspect(
         new CfnCondition(scope, "DeployAPIGDistribution", {

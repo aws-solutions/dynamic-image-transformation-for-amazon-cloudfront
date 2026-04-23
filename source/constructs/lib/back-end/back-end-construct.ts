@@ -225,16 +225,6 @@ export class BackEnd extends Construct {
       ).toString(),
     });
 
-    const conditionalCloudFrontDistributionId = Fn.conditionIf(
-      props.conditions.useExistingCloudFrontDistributionCondition.logicalId,
-      existingDistribution.distributionId,
-      Fn.conditionIf(
-        props.conditions.enableS3ObjectLambdaCondition.logicalId,
-        s3ObjectLambdaArchitecture.imageHandlerCloudFrontDistribution.distributionId,
-        apiGatewayArchitecture.imageHandlerCloudFrontDistribution.distributionId
-      ).toString()
-    ).toString();
-
     solutionsMetrics.addLambdaInvocationCount({ functionName: imageHandlerLambdaFunction.functionName });
     solutionsMetrics.addLambdaBilledDurationMemorySize({
       logGroups: [imageHandlerLogGroup],
@@ -256,29 +246,118 @@ export class BackEnd extends Construct {
       queryDefinitionName: "RequestInfoQuery",
     });
 
+    // Add CloudFront metrics for API Gateway architecture
     solutionsMetrics.addCloudFrontMetric({
-      distributionId: conditionalCloudFrontDistributionId,
+      distributionId: apiGatewayArchitecture.imageHandlerCloudFrontDistribution.distributionId,
       metricName: "Requests",
+      identifier: "apigateway",
     });
     solutionsMetrics.addCloudFrontMetric({
-      distributionId: conditionalCloudFrontDistributionId,
+      distributionId: apiGatewayArchitecture.imageHandlerCloudFrontDistribution.distributionId,
       metricName: "BytesDownloaded",
+      identifier: "apigateway",
     });
 
-    Aspects.of(solutionsMetrics).add(new ConditionAspect(props.sendAnonymousStatistics));
+    // Add CloudFront metrics for S3 Object Lambda architecture
+    solutionsMetrics.addCloudFrontMetric({
+      distributionId: s3ObjectLambdaArchitecture.imageHandlerCloudFrontDistribution.distributionId,
+      metricName: "Requests",
+      identifier: "s3objectlambda",
+    });
+    solutionsMetrics.addCloudFrontMetric({
+      distributionId: s3ObjectLambdaArchitecture.imageHandlerCloudFrontDistribution.distributionId,
+      metricName: "BytesDownloaded",
+      identifier: "s3objectlambda",
+    });
 
-    const operationalInsightsDashboard = new OperationalInsightsDashboard(
+    // Add CloudFront metrics for existing distribution
+    solutionsMetrics.addCloudFrontMetric({
+      distributionId: existingDistribution.distributionId,
+      metricName: "Requests",
+      identifier: "existing",
+    });
+    solutionsMetrics.addCloudFrontMetric({
+      distributionId: existingDistribution.distributionId,
+      metricName: "BytesDownloaded",
+      identifier: "existing",
+    });
+
+    Aspects.of(solutionsMetrics as unknown as Construct).add(new ConditionAspect(props.sendAnonymousStatistics));
+
+    // Create dashboards for each architecture - only the active one will be deployed based on conditions
+    // Combined condition for API Gateway: not using existing AND not using S3 Object Lambda
+    const deployApiGatewayDashboardCondition = new CfnCondition(this, "DeployApiGatewayDashboardCondition", {
+      expression: Fn.conditionAnd(
+        Fn.conditionNot(props.conditions.useExistingCloudFrontDistributionCondition),
+        Fn.conditionNot(props.conditions.enableS3ObjectLambdaCondition)
+      ),
+    });
+
+    const apiGatewayDashboard = new OperationalInsightsDashboard(
       Stack.of(this),
-      "OperationalInsightsDashboard",
+      "ApiGatewayOperationalInsightsDashboard",
       {
         enabled: props.conditions.deployUICondition,
         backendLambdaFunctionName: imageHandlerLambdaFunction.functionName,
-        cloudFrontDistributionId: conditionalCloudFrontDistributionId,
+        cloudFrontDistributionId: apiGatewayArchitecture.imageHandlerCloudFrontDistribution.distributionId,
         namespace: Aws.REGION,
       }
     );
-    this.operationalDashboard = operationalInsightsDashboard.dashboard;
+    Aspects.of(apiGatewayDashboard).add(
+      new ConditionAspect(
+        new CfnCondition(this, "DeployApiGatewayDashboardCombinedCondition", {
+          expression: Fn.conditionAnd(props.deployCloudWatchDashboard, deployApiGatewayDashboardCondition),
+        })
+      )
+    );
 
-    Aspects.of(operationalInsightsDashboard).add(new ConditionAspect(props.deployCloudWatchDashboard));
+    // S3 Object Lambda dashboard
+    const s3ObjectLambdaDashboard = new OperationalInsightsDashboard(
+      Stack.of(this),
+      "S3ObjectLambdaOperationalInsightsDashboard",
+      {
+        enabled: props.conditions.deployUICondition,
+        backendLambdaFunctionName: imageHandlerLambdaFunction.functionName,
+        cloudFrontDistributionId: s3ObjectLambdaArchitecture.imageHandlerCloudFrontDistribution.distributionId,
+        namespace: Aws.REGION,
+      }
+    );
+    Aspects.of(s3ObjectLambdaDashboard).add(
+      new ConditionAspect(
+        new CfnCondition(this, "DeployS3ObjectLambdaDashboardCondition", {
+          expression: Fn.conditionAnd(
+            props.deployCloudWatchDashboard,
+            props.conditions.enableS3ObjectLambdaCondition,
+            Fn.conditionNot(props.conditions.useExistingCloudFrontDistributionCondition)
+          ),
+        })
+      )
+    );
+
+    // Existing distribution dashboard
+    const existingDistributionDashboard = new OperationalInsightsDashboard(
+      Stack.of(this),
+      "ExistingDistributionOperationalInsightsDashboard",
+      {
+        enabled: props.conditions.deployUICondition,
+        backendLambdaFunctionName: imageHandlerLambdaFunction.functionName,
+        cloudFrontDistributionId: existingDistribution.distributionId,
+        namespace: Aws.REGION,
+      }
+    );
+    Aspects.of(existingDistributionDashboard).add(
+      new ConditionAspect(
+        new CfnCondition(this, "DeployExistingDistributionDashboardCondition", {
+          expression: Fn.conditionAnd(
+            props.deployCloudWatchDashboard,
+            props.conditions.useExistingCloudFrontDistributionCondition
+          ),
+        })
+      )
+    );
+
+    // Set the operational dashboard to the API Gateway one by default for backward compatibility
+    // The actual deployed dashboard will depend on the conditions
+    this.operationalDashboard = apiGatewayDashboard.dashboard;
   }
 }

@@ -175,7 +175,7 @@ exports[`ServerlessImageHandlerStack Dynamic Image Transformation for Amazon Clo
   "Mappings": {
     "Solution": {
       "Config": {
-        "AnonymousUsage": "Yes",
+        "AnonymousUsage": "No",
         "DeployCloudWatchDashboard": "Yes",
         "SharpSizeLimit": "",
         "SolutionId": "S0ABC",

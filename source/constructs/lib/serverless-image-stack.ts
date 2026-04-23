@@ -199,6 +199,20 @@ export class ServerlessImageHandlerStack extends Stack {
       allowedPattern: "^$|^E[A-Z0-9]{8,}$",
     });
 
+    const enableSignedUrlsParameter = new CfnParameter(this, "EnableSignedUrlsParameter", {
+      type: "String",
+      description: `Would you like to enable CloudFront signed URLs for private content access? Select 'Yes' to require signed URLs. This will restrict access to images to only requests with valid time-limited signed URLs. You must provide TrustedKeyGroupIds.`,
+      allowedValues: ["Yes", "No"],
+      default: "No",
+    });
+
+    const trustedKeyGroupIdsParameter = new CfnParameter(this, "TrustedKeyGroupIdsParameter", {
+      type: "String",
+      description:
+        "Comma-separated list of CloudFront key group IDs to trust for signed URLs (e.g., abcd1234-5678-90ab-cdef-1234567890ab). Required if 'Enable Signed URLs' is set to 'Yes'. You must create key groups in CloudFront and upload your public keys before deployment.",
+      default: "",
+    });
+
     /* eslint-disable no-new */
     new CfnRule(this, "ExistingDistributionIdRequiredRule", {
       ruleCondition: Fn.conditionEquals(useExistingCloudFrontDistribution.valueAsString, "Yes"),
@@ -211,10 +225,21 @@ export class ServerlessImageHandlerStack extends Stack {
       ],
     });
 
+    new CfnRule(this, "SignedUrlsKeyGroupRequiredRule", {
+      ruleCondition: Fn.conditionEquals(enableSignedUrlsParameter.valueAsString, "Yes"),
+      assertions: [
+        {
+          assert: Fn.conditionNot(Fn.conditionEquals(trustedKeyGroupIdsParameter.valueAsString, "")),
+          assertDescription:
+            "If 'EnableSignedUrls' is set to 'Yes', 'TrustedKeyGroupIds' must be provided.",
+        },
+      ],
+    });
+
     const solutionMapping = new CfnMapping(this, "Solution", {
       mapping: {
         Config: {
-          AnonymousUsage: "Yes",
+          AnonymousUsage: "No",
           DeployCloudWatchDashboard: "Yes",
           SolutionId: props.solutionId,
           Version: props.solutionVersion,
@@ -250,6 +275,8 @@ export class ServerlessImageHandlerStack extends Stack {
       enableS3ObjectLambda: enableS3ObjectLambdaParameter.valueAsString,
       useExistingCloudFrontDistribution: useExistingCloudFrontDistribution.valueAsString as YesNo,
       existingCloudFrontDistributionId: existingCloudFrontDistributionId.valueAsString,
+      enableSignedUrls: enableSignedUrlsParameter.valueAsString as YesNo,
+      trustedKeyGroupIds: trustedKeyGroupIdsParameter.valueAsString,
     };
 
     const commonResources = new CommonResources(this, "CommonResources", {
