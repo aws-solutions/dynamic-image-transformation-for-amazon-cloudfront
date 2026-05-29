@@ -133,9 +133,13 @@ export class BackEnd extends Construct {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
+            // Must be a single command: each array element runs in its own shell, so `cd`
+            // cannot be split from the install or it won't apply. Remove the host-platform
+            // sharp binaries and the lock file (the lock pins darwin deps and would override
+            // the --os/--cpu flags), then force-install the linux-x64 build. --include=optional
+            // is required so npm 11 actually pulls the platform-specific @img/* package.
             return [
-              `cd ${outputDir}`,
-              "rm -rf node_modules/sharp && npm install --cpu=x64 --os=linux --libc=glibc sharp", // npm 10.4.0+ --libc=glibc is needed for the platform-specific deps to be installed when cross-compiling sharp from mac to linux
+              `cd ${outputDir} && rm -rf node_modules/sharp node_modules/@img package-lock.json && npm install --include=optional --cpu=x64 --os=linux --libc=glibc sharp`,
             ];
           },
         },
