@@ -5,13 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.6] - 2026-08-06
+
+### Security
+
+- Bump `react-router` from 6.30.3 to 8.3.0 (replacing `react-router-dom`), which required upgrading `react`/`react-dom` from 18 to 19 (react-router v8 peer requirement), to mitigate [CVE-2026-40181](https://avd.aquasec.com/nvd/cve-2026-40181), [CVE-2026-53666](https://avd.aquasec.com/nvd/cve-2026-53666), [CVE-2026-53668](https://avd.aquasec.com/nvd/cve-2026-53668), [CVE-2026-53669](https://avd.aquasec.com/nvd/cve-2026-53669), and [GHSA-qwww-vcr4-c8h2](https://github.com/advisories/GHSA-qwww-vcr4-c8h2)
+- Bump `sharp` from 0.34.5 to 0.35.3 to mitigate [GHSA-f88m-g3jw-g9cj](https://github.com/advisories/GHSA-f88m-g3jw-g9cj)
+- Bump `aws-cdk-lib` from 2.248.0 to 2.263.0 to mitigate [CVE-2026-13760](https://avd.aquasec.com/nvd/cve-2026-13760) and [GHSA-464c-974j-9xm6](https://github.com/advisories/GHSA-464c-974j-9xm6)
+- Bump `postcss` from 8.5.10 to 8.5.23 to mitigate [CVE-2026-45623](https://avd.aquasec.com/nvd/cve-2026-45623), [CVE-2026-69153](https://avd.aquasec.com/nvd/cve-2026-69153), and [GHSA-r28c-9q8g-f849](https://github.com/advisories/GHSA-r28c-9q8g-f849)
+- Bump `brace-expansion` from 1.1.13 to 1.1.18 to mitigate [CVE-2026-13149](https://avd.aquasec.com/nvd/cve-2026-13149), [CVE-2026-14257](https://avd.aquasec.com/nvd/cve-2026-14257), and [CVE-2026-45149](https://avd.aquasec.com/nvd/cve-2026-45149)
+- Bump `systeminformation` from 5.31.5 to 5.33.1 to mitigate [CVE-2026-44724](https://avd.aquasec.com/nvd/cve-2026-44724) and [CVE-2026-50289](https://avd.aquasec.com/nvd/cve-2026-50289)
+- Bump `ws` from 8.20.0 to 8.21.0 to mitigate [CVE-2026-45736](https://avd.aquasec.com/nvd/cve-2026-45736) and [CVE-2026-48779](https://avd.aquasec.com/nvd/cve-2026-48779)
+- Bump `vite` from 6.4.2 to 6.4.3 to mitigate [CVE-2026-53571](https://avd.aquasec.com/nvd/cve-2026-53571) and [CVE-2026-53632](https://avd.aquasec.com/nvd/cve-2026-53632)
+- Bump `vitest` from 3.2.4 to 3.2.6 to mitigate [CVE-2026-47429](https://avd.aquasec.com/nvd/cve-2026-47429)
+- Bump `js-yaml` from 3.14.2 to 3.15.0 to mitigate [CVE-2026-53550](https://avd.aquasec.com/nvd/cve-2026-53550) and [CVE-2026-59869](https://avd.aquasec.com/nvd/cve-2026-59869)
+- Bump `form-data` from 4.0.5 to 4.0.6 to mitigate [CVE-2026-12143](https://avd.aquasec.com/nvd/cve-2026-12143)
+- Bump `js-cookie` from 3.0.5 to 3.0.7 to mitigate [CVE-2026-46625](https://avd.aquasec.com/nvd/cve-2026-46625)
+- Bump `morgan` from 1.10.1 to 1.11.0 to mitigate [CVE-2026-5078](https://avd.aquasec.com/nvd/cve-2026-5078)
+- Bump `adm-zip` from 0.5.16 to 0.6.0 to mitigate [CVE-2026-39244](https://avd.aquasec.com/nvd/cve-2026-39244)
+- Bump `tmp` from 0.2.5 to 0.2.6 to mitigate [CVE-2026-44705](https://avd.aquasec.com/nvd/cve-2026-44705)
+- Bump `body-parser` from 1.20.4 to 1.20.6 to mitigate [CVE-2026-12590](https://avd.aquasec.com/nvd/cve-2026-12590)
+- Bump `esbuild` from 0.27.7 to 0.28.1 to mitigate [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr)
+- Bump `qs` from 6.15.1 to 6.15.3 to mitigate [CVE-2026-8723](https://avd.aquasec.com/nvd/cve-2026-8723)
+- Bump `uuid` from 8.3.2 to 11.1.1 to mitigate [CVE-2026-41907](https://avd.aquasec.com/nvd/cve-2026-41907)
+
 ## [8.0.5] - 2026-05-11
 
 ### Fixed
+
 - Migration issue preventing users from upgrading past major version v8.0.0 [#644](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/issues/644)
 - Animated content in the .gif format had the abiltiy to be converted to non-animated image formats, breaking the animation and serving a still image
 
 ### Security
+
 - Bump `fast-xml-parser` to 5.7.0 to mitigate [CVE-2026-41650](https://github.com/advisories/GHSA-gh4j-gqv2-49f6)
 
 ## [8.0.4] - 2026-04-20

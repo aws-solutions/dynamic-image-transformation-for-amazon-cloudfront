@@ -12,6 +12,7 @@
   "devDependencies": {
     "@types/jest": "^29.0.0",
     "@types/node": "^18.0.0",
+    "esbuild": "^0.28.1",
     "jest": "^29.0.0",
     "ts-jest": "^29.0.0",
     "typescript": "^5.0.0"
@@ -37,7 +38,7 @@
   },
   "overrides": {
     "minimatch@3": "3.1.5",
-    "brace-expansion@1": "1.1.13",
+    "brace-expansion@1": "1.1.18",
     "handlebars": "4.7.9",
     "picomatch@2": "2.3.2",
     "picomatch@4": "4.0.4"

@@ -35,6 +35,8 @@ export class EventSourceMappingResolver extends Construct {
     const resolverFunction = new NodejsFunction(this, "Function", {
       description: "Resolves EventSourceMapping conflicts during stack upgrades",
       entry: path.join(__dirname, "../../../custom-resource/event-source-mapping-resolver/index.ts"),
+      projectRoot: path.join(__dirname, "../../../custom-resource"),
+      depsLockFilePath: path.join(__dirname, "../../../custom-resource/package-lock.json"),
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(30),
       memorySize: 128,

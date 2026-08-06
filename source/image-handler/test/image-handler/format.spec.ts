@@ -97,7 +97,7 @@ describe("modifyImageOutput", () => {
       originalImage: image,
     };
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
-    const sharpImage = sharp(request.originalImage, { failOnError: false }).withMetadata();
+    const sharpImage = sharp(request.originalImage, { failOn: "none" }).withMetadata();
     const toFormatSpy = jest.spyOn(sharp.prototype, "toFormat");
     const result = await imageHandler["modifyImageOutput"](sharpImage, request).toBuffer();
 
@@ -118,7 +118,7 @@ describe("modifyImageOutput", () => {
       edits: { grayscale: true, flip: true },
       originalImage: image,
     };
-    const sharpImage = sharp(request.originalImage, { failOnError: false }).withMetadata();
+    const sharpImage = sharp(request.originalImage, { failOn: "none" }).withMetadata();
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
 
     // Act
@@ -140,7 +140,7 @@ describe("modifyImageOutput", () => {
       effort: 3,
       originalImage: image,
     };
-    const sharpImage = sharp(request.originalImage, { failOnError: false }).withMetadata();
+    const sharpImage = sharp(request.originalImage, { failOn: "none" }).withMetadata();
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     const webpSpy = jest.spyOn(sharp.prototype, "webp");
 

@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
 import { Spinner } from "@cloudscape-design/components";

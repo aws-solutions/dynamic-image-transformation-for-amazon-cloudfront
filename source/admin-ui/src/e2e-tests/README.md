@@ -4,42 +4,19 @@ This directory contains end-to-end (E2E) tests for the Dynamic Image Transformat
 
 ## Prerequisites
 
-1. **Deploy the Stack**: The Dynamic Image Transformation stack must be deployed before running tests
-2. **Node.js**: Version 16 or higher
-3. **AWS Credentials**: Valid AWS credentials with access to the deployed resources
-
-## Environment Setup
+1. The Dynamic Image Transformation stack must be deployed before running tests
+2. Node.js Version 16 or higher
+3. Local AWS credentials with permissions for DynamoDB, Cognito, and CloudFormation
+4. Environment variables `CURRENT_STACK_REGION` and `CURRENT_STACK_NAME`
 
 ### Required Environment Variables
 
-Before running tests, export the following environment variables:
+All configuration (`appUrl`, `cognitoOrigin`, `COGNITO_USER_POOL_ID`) is inferred automatically from the CloudFormation stack outputs.
 
-```bash
-# Cognito Configuration
-export COGNITO_ACCOUNT="your-aws-account-id"
-export COGNITO_USER_POOL_ID="user-pool-id"
-export COGNITO_REGION="your-deployed-region"
+- **appUrl** — `WebPortalUrl` output
+- **COGNITO_USER_POOL_ID** — output key containing `UserPool`
+- **cognitoOrigin** — derived from output key containing `CognitoDomainPrefix`
 
-# Application URL
-export APP_URL="https://your-app-domain.com"
-
-# AWS Credentials (if not using default profile)
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export AWS_SESSION_TOKEN="your-session-token"  # If using temporary credentials
-
-# Password for the test user to run tests
-
-export USER_PASSWORD="your_password" # example: TempPassword1234!
-```
-
-
-### Getting Environment Values
-
-After deploying the stack, you can find the values mentioned above in Outputs section of the deployed stack:
-
-- **APP_URL**: Key in the Ouputs section of CloudFormation " WebPortalUrl
-- **COGNITO_USER_POOL_ID**: Key in the Ouputs section of CloudFormation : AuthUserPoolIdC0605E59
 
 ## Installation
 
@@ -48,19 +25,19 @@ After deploying the stack, you can find the values mentioned above in Outputs se
 cd source/admin-ui/src/e2e-tests
 
 # Install dependencies
-npm install
+npm ci
 ```
 
 ## Running Tests
 
 ### Run All Tests (Headless)
 ```bash
-npm run cypress:run
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:run
 ```
 
 ### Run Tests with UI (Interactive)
 ```bash
-npm run cypress:open
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:open
 ```
 
 ### Run Specific Test Suites
@@ -68,28 +45,28 @@ npm run cypress:open
 #### Origins Tests
 ```bash
 # Run all origin tests
-npx cypress run --spec "cypress/specs/origin/**/*.cy.ts"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/origin/**/*.cy.ts"
 
 # Run specific origin test
-npx cypress run --spec "cypress/specs/origin/origin-create-delete.cy.ts"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/origin/origin-create-delete.cy.ts"
 ```
 
 #### Mapping Tests
 ```bash
 # Run all mapping tests
-npx cypress run --spec "cypress/specs/mapping/**/*.cy.ts"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/**/*.cy.ts"
 
 # Run specific mapping test
-npx cypress run --spec "cypress/specs/mapping/mapping-types.cy.ts"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/mapping-types.cy.ts"
 ```
 
 #### Transformation Policy Tests
 ```bash
 # Run all transformation policy tests
-npx cypress run --spec "cypress/specs/transformation-policy/**/*.cy.ts"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/**/*.cy.ts"
 
 # Run comprehensive transformation test
-npx cypress run --spec "cypress/specs/transformation-policy/transformation-all-options.cy.ts"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/transformation-all-options.cy.ts"
 ```
 
 ### Run Tests by Tags
@@ -98,10 +75,10 @@ Tests are tagged for easy filtering:
 
 ```bash
 # Run only smoke tests
-npx cypress run --env TAGS="@smoke"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@smoke"
 
 # Run only CRUD tests
-npx cypress run --env TAGS="@crud"
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@crud"
 ```
 
 ## Test Structure
@@ -201,8 +178,8 @@ Tests use automated authentication with test user management:
 #### Authentication Failures
 ```bash
 # Verify environment variables are set
-echo $COGNITO_USER_POOL_ID
-echo $APP_URL
+echo $CURRENT_STACK_NAME
+echo $CURRENT_STACK_REGION
 
 # Check AWS credentials
 aws sts get-caller-identity
@@ -210,6 +187,6 @@ aws sts get-caller-identity
 
 #### Test Timeouts
 - Increase timeout in `cypress.config.ts`
-- Check network connectivity to APP_URL
+- Check network connectivity to the app URL
 - Verify stack is fully deployed and healthy
 

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import sharp from "sharp";
+import { FormatEnum, OutputInfo } from "sharp";
 
 import { ImageFormatTypes, RequestTypes, StatusCodes } from "./enums";
 import { Headers, ImageEdits } from "./types";
@@ -89,9 +89,9 @@ export interface ImageRequestInfo {
 export interface RekognitionCompatibleImage {
   imageBuffer: {
     data: Buffer;
-    info: sharp.OutputInfo;
+    info: OutputInfo;
   };
-  format: keyof sharp.FormatEnum;
+  format: keyof FormatEnum;
 }
 
 export interface ImageHandlerExecutionResult {

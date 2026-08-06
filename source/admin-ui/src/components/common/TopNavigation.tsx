@@ -1,7 +1,7 @@
 import React from 'react';
 import { TopNavigation as CloudscapeTopNavigation } from '@cloudscape-design/components';
 import { signOut } from 'aws-amplify/auth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Amplify } from 'aws-amplify';
 import { useUser } from '../../contexts/UserContext';
 

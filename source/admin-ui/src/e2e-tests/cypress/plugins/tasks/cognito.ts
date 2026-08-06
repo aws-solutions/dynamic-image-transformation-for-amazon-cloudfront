@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminDeleteUserCommand, UpdateUserPoolCommand, DescribeUserPoolCommand, SetUserPoolMfaConfigCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminDeleteUserCommand, DescribeUserPoolCommand, SetUserPoolMfaConfigCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,9 +32,9 @@ export default (config: any) => ({
 
       // 2. Only disable MFA if it's currently enabled
       if (originalMfaConfig !== 'OFF') {
-        await client.send(new UpdateUserPoolCommand({
+        await client.send(new SetUserPoolMfaConfigCommand({
           UserPoolId: userPoolId,
-          MfaConfiguration: 'OFF'
+          MfaConfiguration: 'OFF',
         }));
         console.log('MFA disabled for User Pool');
       } else {

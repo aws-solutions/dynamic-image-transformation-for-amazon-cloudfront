@@ -104,6 +104,8 @@ export class BackEnd extends Construct {
       timeout: Duration.seconds(29),
       role: imageHandlerLambdaFunctionRole,
       entry: path.join(__dirname, "../../../image-handler/index.ts"),
+      projectRoot: path.join(__dirname, "../../../image-handler"),
+      depsLockFilePath: path.join(__dirname, "../../../image-handler/package-lock.json"),
       environment: {
         AUTO_WEBP: props.autoWebP,
         CORS_ENABLED: props.corsEnabled,
@@ -133,9 +135,13 @@ export class BackEnd extends Construct {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
+            // Must be a single chained command: in local (non-Docker) bundling, CDK runs each
+            // array element as a separate `bash -c` with cwd fixed to projectRoot, so a standalone
+            // `cd ${outputDir}` would be discarded and the install would land in projectRoot, not
+            // the asset. npm 10.4.0+ --libc=glibc is needed for the platform-specific deps to be
+            // installed when cross-compiling sharp from mac to linux.
             return [
-              `cd ${outputDir}`,
-              "rm -rf node_modules/sharp && npm install --cpu=x64 --os=linux --libc=glibc sharp", // npm 10.4.0+ --libc=glibc is needed for the platform-specific deps to be installed when cross-compiling sharp from mac to linux
+              `cd ${outputDir} && rm -rf node_modules/sharp && npm install --cpu=x64 --os=linux --libc=glibc sharp`,
             ];
           },
         },

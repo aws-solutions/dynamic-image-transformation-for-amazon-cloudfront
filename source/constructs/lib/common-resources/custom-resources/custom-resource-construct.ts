@@ -183,6 +183,8 @@ export class CustomResourcesConstruct extends Construct {
       memorySize: 128,
       role: this.customResourceRole,
       entry: path.join(__dirname, "../../../../custom-resource/index.ts"),
+      projectRoot: path.join(__dirname, "../../../../custom-resource"),
+      depsLockFilePath: path.join(__dirname, "../../../../custom-resource/package-lock.json"),
       environment: {
         SOLUTION_ID: props.solutionId,
         RETRY_SECONDS: "5",

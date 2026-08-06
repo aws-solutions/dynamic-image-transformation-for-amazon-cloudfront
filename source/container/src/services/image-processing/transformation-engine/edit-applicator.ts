@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import sharp from 'sharp';
+import sharp, { Sharp, Metadata, OutputInfo } from 'sharp';
 import { ImageEdits } from '../interfaces';
 import { RekognitionClient, DetectFacesCommand } from '@aws-sdk/client-rekognition';
 import { getOptions } from '../../../utils/get-options';
@@ -15,7 +15,7 @@ export class EditApplicator {
   private static rekognitionClient = new RekognitionClient(getOptions());
   private static originFetcher: OriginFetcher;
 
-  static async applyEdits(image: sharp.Sharp, edits: ImageEdits, originFetcher: OriginFetcher): Promise<void> {
+  static async applyEdits(image: Sharp, edits: ImageEdits, originFetcher: OriginFetcher): Promise<void> {
     this.originFetcher = originFetcher;
     try {
       const metadata = await image.metadata();
@@ -69,7 +69,7 @@ export class EditApplicator {
   }
 
 
-  private static async applyResize(image: sharp.Sharp, edits: ImageEdits){
+  private static async applyResize(image: Sharp, edits: ImageEdits){
     try {
       if (edits.resize === undefined) {
         edits.resize = {};
@@ -107,13 +107,13 @@ export class EditApplicator {
     return operationsResultingInDeferment.some(op => edits[op] !== undefined);
   }
 
-  private static applySharpen(image: sharp.Sharp, editValue: any){
+  private static applySharpen(image: Sharp, editValue: any){
     // Sharpen is allowed to be used as a boolean, such as sharpen: true, in this case the Sharp library performs a fast, mild sharpen of the image.
     // Sharpen may also be used with explicit sigma, m1, m2, etc values. In which case a slower more accurate shapren is performed.
     image.sharpen(editValue === true ? undefined : editValue);
   }
 
-  private static async applyFormat(image: sharp.Sharp, edits: ImageEdits){
+  private static async applyFormat(image: Sharp, edits: ImageEdits){
     try {
       const format = edits.toFormat || (await image.metadata()).format;
       const options = edits.quality ? { quality: edits.quality } : {};
@@ -132,7 +132,7 @@ export class EditApplicator {
   }
 
 
-  private static async applySmartCrop(image: sharp.Sharp, params: any): Promise<void> {
+  private static async applySmartCrop(image: Sharp, params: any): Promise<void> {
     try {
       const [faceIndex = 0, padding = 0] = Array.isArray(params) ? params : [params?.faceIndex || 0, params?.padding || 0];
       console.debug('SmartCrop params:', { faceIndex, padding });
@@ -163,7 +163,7 @@ export class EditApplicator {
     return { height: box.Height, left: box.Left, top: box.Top, width: box.Width };
   }
 
-  private static async applyWatermark(image: sharp.Sharp, edit: Record<string, any>) {
+  private static async applyWatermark(image: Sharp, edit: Record<string, any>) {
     try {
       const { source, offSetArray } = edit;
       const [top, left, alpha, wRatio, hRatio] = offSetArray;
@@ -183,7 +183,7 @@ export class EditApplicator {
     }
   }
 
-  private static async getOverlayImage(source: string, wRatio: number, hRatio: number, alpha: number, baseMetadata: sharp.Metadata): Promise<{ data: Buffer; info: sharp.OutputInfo }> {
+  private static async getOverlayImage(source: string, wRatio: number, hRatio: number, alpha: number, baseMetadata: Metadata): Promise<{ data: Buffer; info: OutputInfo }> {
     const normalizedSource = this.normalizeSource(source);
     const url = new URL(normalizedSource);
     const targetOrigin = url.host;
@@ -257,7 +257,7 @@ export class EditApplicator {
     return { left, top, width, height };
   }
 
-  private static async getRekognitionCompatibleImage(image: sharp.Sharp): Promise<any> {
+  private static async getRekognitionCompatibleImage(image: Sharp): Promise<any> {
     const buffer = await image.toBuffer({ resolveWithObject: true });
     const format = buffer.info.format;
     

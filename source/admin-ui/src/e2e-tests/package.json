@@ -44,8 +44,8 @@
     "typescript": "^4.8.0"
   },
   "overrides": {
-    "systeminformation": ">=5.31.0",
-    "qs": "^6.14.2",
+    "systeminformation": ">=5.31.7",
+    "qs": "^6.15.2",
     "lodash": "^4.18.0",
     "minimatch@3": "3.1.5",
     "ajv@6": "6.14.0",
@@ -53,6 +53,8 @@
     "flatted": "3.4.2",
     "picomatch@2": "2.3.2",
     "picomatch@4": "4.0.4",
-    "brace-expansion@1": "1.1.13"
+    "brace-expansion@1": "1.1.18",
+    "uuid": "11.1.1",
+    "@babel/core": "7.29.6"
   }
 }

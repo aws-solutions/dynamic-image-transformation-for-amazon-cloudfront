@@ -39,6 +39,8 @@ export class DalConstruct extends Construct {
 
     this.lambda = new DITNodejsFunction(this, "ApiLambda", {
       entry: path.join(__dirname, "../../../../../management-lambda/index.ts"),
+      projectRoot: path.join(__dirname, "../../../../../management-lambda"),
+      depsLockFilePath: path.join(__dirname, "../../../../../management-lambda/package-lock.json"),
       environment: {
         CONFIG_TABLE_NAME: this.table.tableName,
         CORS_ORIGIN: props.corsOrigin,

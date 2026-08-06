@@ -27,10 +27,13 @@ describe('Origin Flow - Create Edit Tests', { tags: ['@crud'] }, () => {
     
     // Wait for edit form to load
     cy.url().should('include', '/edit');
-    
-    // Add origin path
+
+    // Wait for the async origin load to settle before typing; otherwise the
+    // form-state reset races the keystrokes and drops leading characters.
+    cy.get('#origin-name').should('have.value', originData.name);
+
     const originPath = '/images';
-    OriginPage.getOriginPathInput().type(originPath);
+    OriginPage.getOriginPathInput().clear().type(originPath).should('have.value', originPath);
     OriginPage.submitUpdateOrigin();
     
     // Verify update (user sees they're back on origins page with same origin)

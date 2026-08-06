@@ -6,7 +6,7 @@ import {
   Flashbar,
   SideNavigation
 } from '@cloudscape-design/components';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { TopNavigation } from '../components/common/TopNavigation';
 import { BreadcrumbBar } from '../components/common/BreadcrumbBar';
 import { TransformationPolicyHelpPanel } from '../components/help/TransformationPolicyHelpPanel';

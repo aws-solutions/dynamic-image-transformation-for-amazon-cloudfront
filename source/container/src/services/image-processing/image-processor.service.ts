@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import sharp from 'sharp';
+import sharp, { Sharp, SharpOptions } from 'sharp';
 import { ImageProcessingRequest } from '../../types/image-processing-request';
 import { OriginFetcher } from './origin-fetcher';
 import { ImageProcessingError } from './types';
@@ -61,7 +61,7 @@ export class ImageProcessorService {
 
       const isExpectedToBeAnimated = imageRequest.sourceImageContentType == 'image/gif';
       let sharpOptions = {
-        failOnError: true,
+        failOn: 'warning' as const,
         animated: isExpectedToBeAnimated
       }
 
@@ -118,9 +118,9 @@ export class ImageProcessorService {
     });
   }
 
-  private instantiateSharpImage(imageBuffer: Buffer, imageEdits: any, options?: any): sharp.Sharp {
+  private instantiateSharpImage(imageBuffer: Buffer, imageEdits: any, options?: any): Sharp {
     const limitInputPixels = parseInt(process.env.LIMIT_INPUT_PIXELS || '1000000000', 10);
-    const sharpOptions: sharp.SharpOptions = { limitInputPixels, ...options };
+    const sharpOptions: SharpOptions = { limitInputPixels, ...options };
     // Default behavior of DIT is to keep all Metadata. Sharp by default converts the ICC to sRGB. Must chain keepIcc and keepMetadata to prevent this.
     let returnInstance = sharp(imageBuffer, sharpOptions).keepIccProfile().keepMetadata();
     try {

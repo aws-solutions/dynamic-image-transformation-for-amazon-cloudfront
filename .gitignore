@@ -9,7 +9,7 @@
 **/out-tsc
 .scannerwork
 deployment/ecr
-deployment/launch-wizard-assets
+#deployment/launch-wizard-assets
 deployment/ecr_image_tags.json
 
 # dependencies

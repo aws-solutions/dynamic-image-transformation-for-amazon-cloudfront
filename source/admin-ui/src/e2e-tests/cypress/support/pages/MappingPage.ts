@@ -39,15 +39,15 @@ export class MappingPage {
     if (data.origin) {
       cy.get('body').then(() => {
         cy.log('DOM state after description entry');
-        cy.get('.awsui_trigger_dwuol_1tb10_172').should('exist').first().click();
+        cy.get('[class*="awsui_button-trigger"]').contains('Choose an origin').click();
         cy.get('[role="option"]').first().click({ force: true });
-      });      
+      });
     }
 
     // Select policy
     if (data.policy) {
       cy.log('Selecting policy:', data.policy);
-      cy.get('.awsui_trigger_dwuol_1tb10_172').contains('Choose a policy').click();
+      cy.get('[class*="awsui_button-trigger"]').contains('Choose a policy').click();
       cy.get('[role="option"]').first().click({ force: true });
     } else {
       cy.log('No policy specified, skipping policy selection');
@@ -99,7 +99,7 @@ export class MappingPage {
   }
 
   static selectFirstPolicy() {
-    cy.get('.awsui_trigger_dwuol_1tb10_172').contains('Choose a policy').click();
+    cy.get('[class*="awsui_button-trigger"]').contains('Choose a policy').click();
     cy.get('[role="option"]').first().click({ force: true });
   }
 }

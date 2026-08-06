@@ -18,7 +18,7 @@ describe("resize", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = { resize: { width: "99.1", height: "99.9" } };
 
     // Act
@@ -27,7 +27,7 @@ describe("resize", () => {
 
     // Assert
     const resultBuffer = await result.toBuffer();
-    const convertedImage = await sharp(originalImage, { failOnError: false })
+    const convertedImage = await sharp(originalImage, { failOn: "none" })
       .withMetadata()
       .resize({ width: 99, height: 100 })
       .toBuffer();
@@ -40,7 +40,7 @@ describe("resize", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = { resize: { width: 0, height: 0 } };
 
     // Act
@@ -56,7 +56,7 @@ describe("resize", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = { resize: { width: 100, height: null } };
 
     // Act
@@ -65,7 +65,7 @@ describe("resize", () => {
     // Assert
     const result = await imageHandler.applyEdits(image, edits, false);
     const resultBuffer = await result.toBuffer();
-    const convertedImage = await sharp(originalImage, { failOnError: false })
+    const convertedImage = await sharp(originalImage, { failOn: "none" })
       .withMetadata()
       .resize({ width: 100, height: null })
       .toBuffer();

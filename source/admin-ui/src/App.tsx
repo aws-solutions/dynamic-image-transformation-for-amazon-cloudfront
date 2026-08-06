@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
 import '@cloudscape-design/global-styles/index.css';
 import { AppProvider } from './contexts/AppContext';
 import { OriginProvider } from './contexts/OriginContext';
@@ -27,7 +27,7 @@ const TransformationPolicyDetails = lazy(() => import('./pages/TransformationPol
 
 const AppContent: React.FC = () => {
   return (
-    <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+    <Router>
       <div className="App">
         <NotificationBar />
         <Suspense fallback={<LoadingFallback />}>

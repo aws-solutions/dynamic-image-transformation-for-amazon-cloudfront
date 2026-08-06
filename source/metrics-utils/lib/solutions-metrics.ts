@@ -41,6 +41,8 @@ export class SolutionsMetrics extends Construct {
     this.metricsLambdaFunction = new DITNodejsFunction(this, "MetricsLambda", {
       description: "Metrics util",
       entry: path.join(__dirname, "../lambda/index.ts"),
+      projectRoot: path.join(__dirname, ".."),
+      depsLockFilePath: path.join(__dirname, "../package-lock.json"),
       timeout: Duration.seconds(60),
       memorySize: 128,
       environment: {

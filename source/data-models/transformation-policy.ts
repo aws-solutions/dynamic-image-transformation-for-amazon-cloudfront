@@ -37,13 +37,13 @@ const positionSchema = z.union([
 ]);
 
 // Allows either URLs or domain styled watermark sources
-const watermarkUrlSchema = z.string().pipe(z.preprocess((url) => {
-  return url.includes('://') ? url : `https://${url}`;
-}, z.url({
-  hostname: z.regexes.domain,
-  protocol: /^https?$/,
-  error: "Invalid Watermark source domain protocol. Only HTTPS is supported."
-})))
+const watermarkUrlSchema = z.string()
+  .transform((url) => (url.includes('://') ? url : `https://${url}`))
+  .pipe(z.url({
+    hostname: z.regexes.domain,
+    protocol: /^https?$/,
+    error: "Invalid Watermark source domain protocol. Only HTTPS is supported."
+  }))
 
 const watermarkTuple = z.tuple([
   watermarkUrlSchema, // source URL, domain must match with one of the Origins on DIT
