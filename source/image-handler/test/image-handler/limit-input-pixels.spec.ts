@@ -44,7 +44,7 @@ describe("limit-input-pixels", () => {
     const instantiateSpy = jest.spyOn<any, "instantiateSharpImage">(imageHandler, "instantiateSharpImage");
     await imageHandler.process(request);
     expect(instantiateSpy).toHaveBeenCalledWith(request.originalImage, request.edits, {
-      failOnError: false,
+      failOn: "none",
       animated: false,
       limitInputPixels: true,
     });
@@ -67,7 +67,7 @@ describe("limit-input-pixels", () => {
     const instantiateSpy = jest.spyOn<any, "instantiateSharpImage">(imageHandler, "instantiateSharpImage");
     await imageHandler.process(request);
     expect(instantiateSpy).toHaveBeenCalledWith(request.originalImage, request.edits, {
-      failOnError: false,
+      failOn: "none",
       animated: false,
       limitInputPixels: true,
     });
@@ -91,7 +91,7 @@ describe("limit-input-pixels", () => {
     const instantiateSpy = jest.spyOn<any, "instantiateSharpImage">(imageHandler, "instantiateSharpImage");
     await imageHandler.process(request);
     expect(instantiateSpy).toHaveBeenCalledWith(request.originalImage, request.edits, {
-      failOnError: false,
+      failOn: "none",
       animated: false,
       limitInputPixels: true,
     });
@@ -115,7 +115,7 @@ describe("limit-input-pixels", () => {
     const instantiateSpy = jest.spyOn<any, "instantiateSharpImage">(imageHandler, "instantiateSharpImage");
     await imageHandler.process(request);
     expect(instantiateSpy).toHaveBeenCalledWith(request.originalImage, request.edits, {
-      failOnError: false,
+      failOn: "none",
       animated: false,
       limitInputPixels: 1000000,
     });
@@ -139,7 +139,7 @@ describe("limit-input-pixels", () => {
     const instantiateSpy = jest.spyOn<any, "instantiateSharpImage">(imageHandler, "instantiateSharpImage");
     await imageHandler.process(request);
     expect(instantiateSpy).toHaveBeenCalledWith(request.originalImage, request.edits, {
-      failOnError: false,
+      failOn: "none",
       animated: false,
       limitInputPixels: true,
     });
@@ -163,7 +163,7 @@ describe("limit-input-pixels", () => {
     const instantiateSpy = jest.spyOn<any, "instantiateSharpImage">(imageHandler, "instantiateSharpImage");
     await imageHandler.process(request);
     expect(instantiateSpy).toHaveBeenCalledWith(request.originalImage, request.edits, {
-      failOnError: false,
+      failOn: "none",
       animated: false,
       limitInputPixels: 0,
     });
@@ -187,7 +187,7 @@ describe("limit-input-pixels", () => {
     const instantiateSpy = jest.spyOn<any, "instantiateSharpImage">(imageHandler, "instantiateSharpImage");
     await imageHandler.process(request);
     expect(instantiateSpy).toHaveBeenCalledWith(request.originalImage, request.edits, {
-      failOnError: false,
+      failOn: "none",
       animated: false,
       limitInputPixels: true,
     });

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import sharp from 'sharp';
+import { FormatEnum } from 'sharp';
 import { ImageProcessingError } from '../types';
 
 export class SharpUtils {
@@ -20,14 +20,14 @@ export class SharpUtils {
     const limitInputPixels = SHARP_SIZE_LIMIT === '' || isNaN(Number(SHARP_SIZE_LIMIT)) || Number(SHARP_SIZE_LIMIT);
     
     return {
-      failOnError: false,
+      failOn: 'none',
       animated: false,
       limitInputPixels,
       sequentialRead: true
     };
   }
 
-  static convertImageFormatType(imageFormatType: string): keyof sharp.FormatEnum {
+  static convertImageFormatType(imageFormatType: string): keyof FormatEnum | 'avif' {
     switch (imageFormatType.toLowerCase()) {
       case 'jpg':
       case 'jpeg':

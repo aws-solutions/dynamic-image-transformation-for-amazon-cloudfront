@@ -1436,6 +1436,21 @@ fast-check under the MIT license.
 @rollup/rollup-win32-x64-gnu under the MIT license.
 @nodable/entities under the MIT license.
 xml-naming under the MIT license.
+@aws-sdk/checksums under the Apache-2.0 license.
+@img/sharp-freebsd-wasm32 under the Apache-2.0 license.
+@img/sharp-webcontainers-wasm32 under the Apache-2.0 license.
+@unrs/resolver-binding-linux-loong64-gnu under the MIT license.
+@unrs/resolver-binding-linux-loong64-musl under the MIT license.
+@unrs/resolver-binding-openharmony-arm64 under the MIT license.
+es-abstract-get under the MIT license.
+is-document.all under the MIT license.
+@aws/cloudformation-validate under the Apache-2.0 license.
+@radix-ui/react-use-is-hydrated under the MIT license.
+cookie-es under the MIT license.
+get-east-asian-width under the MIT license.
+eventemitter3 under the MIT license.
+environment under the MIT license.
+mimic-function under the MIT license.
 
 
 ********************

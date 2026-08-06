@@ -11,8 +11,8 @@ const mockToPolicies = vi.fn();
 let mockUseTransformationPolicy = vi.fn();
 let mockUseTypedNavigate = vi.fn();
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useParams: () => ({ id: 'test-policy-id' }),

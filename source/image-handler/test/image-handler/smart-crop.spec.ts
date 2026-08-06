@@ -24,7 +24,7 @@ describe("smartCrop", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = { smartCrop: { faceIndex: 0, padding: 0 } };
 
@@ -54,7 +54,7 @@ describe("smartCrop", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", // PNG
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       toFormat: "webp",
       smartCrop: { padding: 60 },
@@ -85,7 +85,7 @@ describe("smartCrop", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = { smartCrop: { faceIndex: 0, padding: 80 } };
 
@@ -122,7 +122,7 @@ describe("smartCrop", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = { smartCrop: { faceIndex: 10, padding: 0 } };
 
@@ -159,7 +159,7 @@ describe("smartCrop", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = { smartCrop: true };
 

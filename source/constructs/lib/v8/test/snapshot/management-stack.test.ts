@@ -6,7 +6,10 @@ import { Template } from "aws-cdk-lib/assertions";
 import { ManagementStack } from "../../stacks";
 import { cleanTemplateForSnapshot } from "./test-utils";
 
-const SUPPORTED_RUNTIMES = ["nodejs22.x", "python3.13"];
+// nodejs24.x covers CDK-generated framework helpers (LogRetention, custom-resource
+// provider framework) whose runtime is set internally by aws-cdk-lib. Our own Lambdas
+// use nodejs22.x via DIT_LAMBDA_RUNTIME.
+const SUPPORTED_RUNTIMES = ["nodejs22.x", "nodejs24.x", "python3.13"];
 
 describe("ManagementStack", () => {
   let app: App;
@@ -15,7 +18,7 @@ describe("ManagementStack", () => {
 
   beforeEach(() => {
     process.env.SOLUTION_ID = "SO0023";
-    process.env.VERSION = "v8.0.4";
+    process.env.VERSION = "v8.0.6";
 
     app = new App();
     stack = new ManagementStack(app, "TestManagementStack", {

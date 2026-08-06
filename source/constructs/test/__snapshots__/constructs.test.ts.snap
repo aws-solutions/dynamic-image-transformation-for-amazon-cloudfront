@@ -806,6 +806,12 @@ function processQueryParams(querystring) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudFront::Function",
     },
@@ -2391,6 +2397,12 @@ function processQueryParams(querystring) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudFront::Function",
     },
@@ -2460,6 +2472,12 @@ function handler(event) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudFront::Function",
     },
@@ -4489,6 +4507,12 @@ function handler(event) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudWatch::Dashboard",
     },

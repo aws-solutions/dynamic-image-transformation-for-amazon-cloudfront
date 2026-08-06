@@ -40,7 +40,7 @@ export interface SharpOptions {
   density?: number;
   ignoreIcc?: boolean;
   animated?: boolean;
-  failOnError?: boolean;
+  failOn?: 'none' | 'truncated' | 'error' | 'warning';
 }
 
 export interface OriginFetchConfig {

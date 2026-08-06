@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useNavigate, generatePath } from 'react-router-dom';
+import { useNavigate, generatePath } from 'react-router';
 import { ROUTES } from '../constants/routes';
 
 export const useTypedNavigate = () => {

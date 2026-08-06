@@ -12,7 +12,7 @@ import {
   SideNavigation,
   Flashbar
 } from '@cloudscape-design/components';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { TopNavigation } from '../components/common/TopNavigation';
 import { BreadcrumbBar } from '../components/common/BreadcrumbBar';
 import { DeleteOriginModal } from '../components/modals/DeleteOriginModal';

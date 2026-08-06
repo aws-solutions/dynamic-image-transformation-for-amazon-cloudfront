@@ -66,7 +66,7 @@ describe('SharpUtils', () => {
 
     it('should return default options', () => {
       const options = SharpUtils.getDefaultSharpOptions();
-      expect(options.failOnError).toBe(false);
+      expect(options.failOn).toBe('none');
       expect(options.animated).toBe(false);
       expect(options.sequentialRead).toBe(true);
     });

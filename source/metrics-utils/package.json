@@ -11,7 +11,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "20.4.5",
-    "aws-cdk-lib": "2.248.0",
+    "aws-cdk-lib": "2.263.0",
     "constructs": "^10.0.0",
     "jest": "^30.0.5",
     "ts-jest": "^29.4.0"
@@ -28,15 +28,18 @@
     "@aws-solutions-constructs/aws-eventbridge-lambda": "^2.59.0",
     "@aws-solutions-constructs/aws-lambda-sqs-lambda": "^2.59.0",
     "@types/aws-lambda": "^8.10.143",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.28.1"
   },
   "overrides": {
     "minimatch@3": "3.1.5",
     "minimatch@9": "9.0.8",
     "picomatch@2": "2.3.2",
     "picomatch@4": "4.0.4",
-    "brace-expansion@1": "1.1.13",
-    "brace-expansion@5": "5.0.5",
-    "yaml@1": "1.10.3"
+    "brace-expansion@1": "1.1.18",
+    "brace-expansion@5": "5.0.9",
+    "yaml@1": "1.10.3",
+    "fast-uri": ">=3.1.4",
+    "@babel/core": "7.29.6",
+    "js-yaml@3": "3.15.0"
   }
 }

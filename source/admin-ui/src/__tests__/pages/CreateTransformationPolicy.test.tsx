@@ -17,8 +17,8 @@ const mockUseTransformationPolicyContext = vi.fn().mockReturnValue({
 const mockAuthServiceSignOut = vi.fn();
 const mockTransformationPolicyServiceGet = vi.fn();
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useParams: () => mockUseParams(),

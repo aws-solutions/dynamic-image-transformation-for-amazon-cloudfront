@@ -3,9 +3,9 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS builder
 
 WORKDIR /app
 
-# Install Node.js 20
+# Install Node.js 22 (Active LTS; sharp >=0.35 requires Node.js >=20.9.0)
 RUN dnf update -y && \
-    dnf install -y nodejs npm && \
+    dnf install -y nodejs22 nodejs22-npm && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -32,9 +32,9 @@ RUN npm run build --workspace=data-models && \
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS deps
 WORKDIR /app
 
-# Install Node.js 20
+# Install Node.js 22 (Active LTS; sharp >=0.35 requires Node.js >=20.9.0)
 RUN dnf update -y && \
-    dnf install -y nodejs npm && \
+    dnf install -y nodejs22 nodejs22-npm && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -63,9 +63,9 @@ RUN npm ci --workspaces --omit=dev --no-audit --no-fund && \
 FROM public.ecr.aws/amazonlinux/amazonlinux:minimal
 WORKDIR /app
 
-# Install Node.js runtime and shadow-utils for user management
+# Install Node.js 22 runtime (Active LTS; sharp >=0.35 requires Node.js >=20.9.0) and shadow-utils for user management
 RUN dnf update -y && \
-    dnf install -y nodejs shadow-utils && \
+    dnf install -y nodejs22 shadow-utils && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
