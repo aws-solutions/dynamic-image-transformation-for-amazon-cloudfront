@@ -137,7 +137,7 @@ export class ImageRequest {
        */
       if (
         imageRequestInfo.contentType !== ContentTypes.SVG ||
-        imageRequestInfo.edits.toFormat ||
+        imageRequestInfo.edits?.toFormat ||
         imageRequestInfo.outputFormat
       ) {
         this.determineOutputFormat(imageRequestInfo, event);
