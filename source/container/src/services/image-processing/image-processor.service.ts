@@ -8,6 +8,18 @@ import { ImageProcessingError } from './types';
 import { ErrorMapper } from './utils/error-mapping';
 import { TransformationMapper } from './transformation-engine/transformation-mapper';
 import { EditApplicator } from './transformation-engine/edit-applicator';
+import { isApng } from './utils/apng-detector';
+
+const ICO_CONTENT_TYPES = new Set([
+  'image/x-icon',
+  'image/vnd.microsoft.icon',
+  'image/ico',
+]);
+const BMP_CONTENT_TYPES = new Set([
+  'image/bmp',
+  'image/x-bmp',
+  'image/x-ms-bmp',
+]);
 
 export class ImageProcessorService {
   private static instance: ImageProcessorService;
@@ -38,11 +50,17 @@ export class ImageProcessorService {
       );
       imageRequest.timings.imageProcessing.originFetchMs = Date.now() - fetchStart;
 
-      if (!imageRequest.transformations?.length) {
+      const isIcoSource = ICO_CONTENT_TYPES.has(imageRequest.sourceImageContentType);
+      const isApngSource = imageRequest.sourceImageContentType === 'image/png' && isApng(imageBuffer);
+      const isSvgSource = imageRequest.sourceImageContentType === 'image/svg+xml';
+      const isBmpSource = BMP_CONTENT_TYPES.has(imageRequest.sourceImageContentType);
+
+      if (!imageRequest.transformations?.length || isIcoSource || isApngSource || isSvgSource || isBmpSource) {
         imageRequest.response.contentType = imageRequest.sourceImageContentType;
         imageRequest.timings.imageProcessing.transformationApplicationMs = 0;
         return imageBuffer;
       }
+
       
       // Extract source dimensions to validate auto-resize transformations
       const metadata = await sharp(imageBuffer).metadata();
@@ -59,7 +77,9 @@ export class ImageProcessorService {
         editCount: Object.keys(imageEdits).length
       }));
 
-      const isExpectedToBeAnimated = imageRequest.sourceImageContentType == 'image/gif';
+      const ANIMATED_INPUT_CONTENT_TYPES = new Set(['image/gif', 'image/webp']);
+      const isExpectedToBeAnimated = ANIMATED_INPUT_CONTENT_TYPES.has(imageRequest.sourceImageContentType);
+
       let sharpOptions = {
         failOn: 'warning' as const,
         animated: isExpectedToBeAnimated
@@ -78,7 +98,18 @@ export class ImageProcessorService {
       
       // We need to resolve final image format from the outputted image. Obtaining this formating from image metadata prior to being outputted is unreliable.
       const finalImage = await image.toBuffer({resolveWithObject: true});
-      imageRequest.response.contentType = 'image/' + finalImage.info.format;
+      // libvips reports AVIF as 'heif' because AVIF is an AV1-compressed HEIF container.
+      // Disambiguate by checking the requested format transformation; serve the correct
+      // MIME so browsers render rather than download.
+      let outputFormat = finalImage.info.format;
+      if (outputFormat === 'heif') {
+        const formatTransform = imageRequest.transformations?.find(t => t.type === 'format');
+        if (formatTransform?.value === 'avif') {
+          outputFormat = 'avif';
+        }
+      }
+      imageRequest.response.contentType = 'image/' + outputFormat;
+
 
       const totalImageProcessingMs = Date.now() - startTime;
       imageRequest.timings.imageProcessing.transformationApplicationMs = 

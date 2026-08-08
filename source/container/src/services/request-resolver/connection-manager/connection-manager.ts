@@ -10,7 +10,7 @@ import { UrlValidator } from '../../../utils/url-validator';
 
 export class ConnectionManager {
   private static readonly TIMEOUT_MS = 5000;
-  private readonly s3Client = new S3Client(getOptions());
+  private readonly s3Client = new S3Client({ ...getOptions(), followRegionRedirects: true });
 
   private validateContentType(contentType: string | undefined): void {
     if (!contentType?.split(';')[0].trim().startsWith('image/')) {

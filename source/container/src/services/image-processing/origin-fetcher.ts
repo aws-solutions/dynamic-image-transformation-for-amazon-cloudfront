@@ -155,9 +155,17 @@ export class OriginFetcher {
       'image/tiff',
       'image/avif',
       'image/heif',
+      'image/x-icon',              
+      'image/vnd.microsoft.icon',  
+      'image/ico',                 
+      'image/svg+xml',
+      'image/bmp',          // Issue #13: BMP passthrough
+      'image/x-bmp',        // Issue #13: legacy variant
+      'image/x-ms-bmp',     // Issue #13: Microsoft variant
     ];
     return validTypes.some(type => contentType.toLowerCase().includes(type));
   }
+
 
   private validateImageMagicNumbers(buffer: Buffer, contentType: string | undefined, url: string): void {
     // Where applicable the first 4 bytes are checked against that formats starting sequence.

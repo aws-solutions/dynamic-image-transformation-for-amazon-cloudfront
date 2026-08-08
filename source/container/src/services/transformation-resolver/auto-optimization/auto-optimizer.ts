@@ -5,7 +5,10 @@ import { Request } from 'express';
 import { Transformation, TransformationPolicy } from '../../../types/transformation';
 import { ImageProcessingRequest } from '../../../types/image-processing-request';
 
+// Priority: WebP first to avoid Chromium AVIF top-level-navigation download bug.
+// AVIF is still served when client explicitly accepts only AVIF.
 const FORMAT_PRIORITY = ['webp', 'avif', 'jpeg', 'png', 'heif', 'tiff', 'raw', 'gif'];
+
 // TODO, DISCUSS WITH TEAM FOR OPTIMAL FORMAT PRIORITIY LIST
 const ANIMATION_CAPABLE_FORMATS = new Set(['webp', 'avif', 'gif']);
 const FORMAT_MAPPING: Record<string, string> = {
@@ -73,12 +76,26 @@ function getFormatOptimizations(req: Request, formatConfig: any, imageRequest?: 
   if (!selectedFormat) {
     return [];
   }
-  
-  // Skip format conversion if source is a GIF and selected format cannot carry animation
-  const sourceIsGif = imageRequest?.sourceImageContentType === 'image/gif';
-  if (sourceIsGif && !ANIMATION_CAPABLE_FORMATS.has(selectedFormat)) {
+
+
+  const sourceContentType = imageRequest?.sourceImageContentType;
+  if (sourceContentType === 'image/x-icon' ||
+      sourceContentType === 'image/vnd.microsoft.icon' ||
+      sourceContentType === 'image/ico' ||
+      sourceContentType === 'image/svg+xml' ||
+      sourceContentType === 'image/bmp' ||
+      sourceContentType === 'image/x-bmp' ||
+      sourceContentType === 'image/x-ms-bmp') {
     return [];
   }
+
+
+  // Skip format conversion if source may be animated (GIF/WebP) and selected format cannot carry animation
+  const sourceMayBeAnimated = sourceContentType === 'image/gif' || sourceContentType === 'image/webp';
+  if (sourceMayBeAnimated && !ANIMATION_CAPABLE_FORMATS.has(selectedFormat)) {
+    return [];
+  }
+
 
   // Check if source image format matches selected format to avoid unnecessary transformation
   if (imageRequest?.sourceImageContentType) {

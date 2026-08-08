@@ -46,14 +46,93 @@ describe('applyAutoOptimizations', () => {
       });
     });
 
-    it('should prioritize formats by priority order (webp, avif, jpeg, png)', () => {
+    it('should prefer webp over avif when both are accepted (post-revert)', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
-      mockRequest.headers = { 'dit-accept': 'image/jpeg,image/avif,image/avif,*/*' };
-      
+      mockRequest.headers = { 'dit-accept': 'image/webp,image/avif,*/*' };
+
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
-      
+
+      expect(result).toHaveLength(1);
+      expect(result[0].value).toBe('webp');
+    });
+
+    it('should still pick avif when only avif is accepted (no webp present)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/avif,image/jpeg,*/*' };
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
+
       expect(result).toHaveLength(1);
       expect(result[0].value).toBe('avif');
+    });
+
+    it('should prefer avif over jpeg when both are accepted', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/jpeg,image/avif,*/*' };
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].value).toBe('avif');
+    });
+
+    it('should skip format optimization when source is ICO (image/x-icon)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp,*/*' };
+      const imageRequest = { sourceImageContentType: 'image/x-icon' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('should skip format optimization when source is image/vnd.microsoft.icon', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp,*/*' };
+      const imageRequest = { sourceImageContentType: 'image/vnd.microsoft.icon' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('should skip format optimization when source is image/ico (legacy MIME)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp,*/*' };
+      const imageRequest = { sourceImageContentType: 'image/ico' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(0);
+    });
+    
+    it('should skip format optimization when source is SVG (Issue #11)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp,*/*' };
+      const imageRequest = { sourceImageContentType: 'image/svg+xml' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(0);
+    });
+    it('should skip format optimization when source is BMP (Issue #13)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp,*/*' };
+      const imageRequest = { sourceImageContentType: 'image/bmp' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('should skip format optimization when source is image/x-ms-bmp', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp,*/*' };
+      const imageRequest = { sourceImageContentType: 'image/x-ms-bmp' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(0);
     });
 
     it('should apply static format when policy format is not auto', () => {
@@ -110,6 +189,51 @@ describe('applyAutoOptimizations', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({ type: 'format', value: 'avif', source: 'auto' });
     });
+
+    it('should skip format conversion when source is animated-capable WebP and selected format is JPEG (Issue #7)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/jpeg' };
+      const imageRequest = { sourceImageContentType: 'image/webp' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      // JPEG cannot carry animation; auto-optimizer must not convert WebP -> JPEG
+      expect(result).toHaveLength(0);
+    });
+
+    it('should skip format conversion when source is WebP and selected format is PNG (Issue #7)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/png' };
+      const imageRequest = { sourceImageContentType: 'image/webp' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('should allow format conversion when source is WebP and selected format is AVIF (animation-capable)', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/avif' };
+      const imageRequest = { sourceImageContentType: 'image/webp' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ type: 'format', value: 'avif', source: 'auto' });
+    });
+
+    it('should return [] (no-op) when source WebP matches selected WebP', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp' };
+      const imageRequest = { sourceImageContentType: 'image/webp' } as ImageProcessingRequest;
+
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
+
+      // Pre-existing same-format guard at auto-optimizer.ts:96-101 still wins
+      expect(result).toHaveLength(0);
+    });
+
+
 
     it('should not restrict format selection for non-GIF sources', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'auto' }];

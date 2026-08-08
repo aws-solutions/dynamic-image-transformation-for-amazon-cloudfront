@@ -7,7 +7,10 @@ import * as path from "path";
 // CloudFront Function types
 interface CloudFrontRequest {
   headers: Record<string, { value: string }>;
+  uri?: string;
+  querystring?: Record<string, { value: string }>;
 }
+
 
 interface CloudFrontEvent {
   request: CloudFrontRequest;
@@ -162,6 +165,175 @@ describe("DIT CloudFront Function", () => {
   });
 
   describe("Accept header normalization", () => {
+    test("should fallback to webp for */* with modern Chrome UA", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "*/*" },
+            "user-agent": { value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp");
+    });
+
+    test("should fallback to webp for image/* with modern Safari UA", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/*,*/*;q=0.8" },
+            "user-agent": { value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp");
+    });
+
+    test("should NOT set dit-accept for */* with unknown/legacy UA", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "*/*" },
+            "user-agent": { value: "curl/7.79.1" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]).toBeUndefined();
+    });
+
+    test("should NOT set dit-accept for */* when User-Agent is missing", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "*/*" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]).toBeUndefined();
+    });
+
+    test("specific MIME types still win over wildcard fallback", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/avif,image/webp,*/*" },
+            "user-agent": { value: "Mozilla/5.0 ... Chrome/120.0.0.0 ..." }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp"); // WebP first per post-revert priority
+    });
+    
+    test("should exclude JPEG when source URL is .png (Issue #2 — preserve alpha)", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          uri: "/cdn-test/media/foo.png",
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/png, image/jpeg, image/gif, image/*" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/png");
+    });
+
+    test("should exclude JPEG when source URL is .gif", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          uri: "/foo.gif",
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/jpeg, image/gif" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/gif");
+    });
+
+    test("should exclude JPEG when source URL is .webp", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          uri: "/foo.webp",
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/jpeg, image/webp" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp");
+    });
+
+    //test("should still pick AVIF over WebP when source is .png and both accepted (priority preserved)", async () => {
+    test("should pick WebP over AVIF when source is .png and both accepted (post-revert priority)", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          uri: "/foo.png",
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/avif, image/webp, image/jpeg" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp");
+
+    });
+
+    test("should NOT exclude JPEG when source URL is .jpg (no alpha to lose)", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          uri: "/foo.jpg",
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/jpeg, image/webp" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      // webp wins via priority; jpeg not excluded because source is jpg
+      expect(result.headers["dit-accept"]?.value).toBe("image/webp");
+    });
+
+    test("should handle uppercase PNG extension", async () => {
+      const event: CloudFrontEvent = {
+        request: {
+          uri: "/Foo.PNG",
+          headers: {
+            host: { value: "test.com" },
+            accept: { value: "image/png, image/jpeg" }
+          },
+          querystring: {}
+        }
+      };
+      const result = await handler(event);
+      expect(result.headers["dit-accept"]?.value).toBe("image/png");
+    });
+
+
+
     test("should select highest priority format from Accept header", async () => {
       const testCases = [
         { input: "image/avif,image/webp,image/png", expected: "image/webp" },

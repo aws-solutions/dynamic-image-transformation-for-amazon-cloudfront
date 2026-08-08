@@ -27,6 +27,23 @@ describe('OriginFetcher', () => {
     it('should handle case insensitive content types', () => {
       expect(fetcher['isValidImageContentType']('IMAGE/JPEG')).toBe(true);
     });
+    it('should accept ICO content types (Issue #6)', () => {
+      expect(fetcher['isValidImageContentType']('image/x-icon')).toBe(true);
+      expect(fetcher['isValidImageContentType']('image/vnd.microsoft.icon')).toBe(true);
+      expect(fetcher['isValidImageContentType']('image/ico')).toBe(true);
+    });
+    it('should accept SVG content type (Issue #11)', () => {
+      expect(fetcher['isValidImageContentType']('image/svg+xml')).toBe(true);
+      expect(fetcher['isValidImageContentType']('image/svg+xml; charset=utf-8')).toBe(true);
+    });
+    
+    it('should accept BMP content types (Issue #13)', () => {
+      expect(fetcher['isValidImageContentType']('image/bmp')).toBe(true);
+      expect(fetcher['isValidImageContentType']('image/x-bmp')).toBe(true);
+      expect(fetcher['isValidImageContentType']('image/x-ms-bmp')).toBe(true);
+    });
+
+
   });
 
   describe('error handling', () => {

@@ -64,7 +64,12 @@ router.get('*', async (req: Request, res: Response) => {
       res.set('Access-Control-Allow-Origin', CORS_ORIGIN);
     }
     res.type(imageRequest.response.contentType || 'image/jpeg');
+    // Force inline rendering. Without this, browsers fall back to URL-extension
+    // heuristics; when the URL ends in .jpeg/.png but DIT serves AVIF/WebP
+    // (per Issue #5 priority), Chrome treats the mismatch as "download."
+    res.set('Content-Disposition', 'inline');
     res.send(processedImage);
+
 
     console.log(JSON.stringify({
       requestId: imageRequest.requestId,
