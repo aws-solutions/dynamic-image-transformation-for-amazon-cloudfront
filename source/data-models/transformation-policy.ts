@@ -3,6 +3,12 @@
 
 import { z } from "zod";
 
+// Caps on smart-crop inputs; keep in sync with the parser mirror in container's smart-crop-parser.ts.
+const SMART_CROP_MAX_LABELS = 50;
+const SMART_CROP_MAX_LABEL_LENGTH = 100;
+const SMART_CROP_MAX_CUSTOM_MODEL_ARN_LENGTH = 1000;
+const SMART_CROP_CUSTOM_MODEL_ARN_PATTERN = /^arn:aws:rekognition:[a-z0-9-]+:\d{12}:project\/[^/]+\/version\/[^/]+\/\d+$/;
+
 const policyIdSchema = z.uuid({ version: "v4" });
 const policyNameSchema = z
   .string()
@@ -86,6 +92,7 @@ export const transformationSchemas = {
   flip: z.boolean(),
   flop: z.boolean(),
   grayscale: z.boolean(),
+  greyscale: z.boolean(),
   resize: z
     .strictObject({
       width: z.int().min(1).max(4000).optional(),
@@ -116,10 +123,65 @@ export const transformationSchemas = {
     }),
   ]),
   smartCrop: z.union([
-    z.boolean(), // true - 0 indexed face with 0 padding
+    // Legacy formats: smartCrop=true or smartCrop={index, padding}
+    z.boolean(),
     z.strictObject({
-      index: z.int().min(0).max(15), // zero-based index of detected faces, 15 faces supported
-      padding: z.int().nonnegative().default(0), // padding expressed in pixels, applied to all sides
+      index: z.int().min(0).max(15),
+      padding: z.int().nonnegative().default(0),
+    }),
+    // Expanded v8.1 format
+    z.strictObject({
+      enabled: z.boolean().optional(),
+      faces: z.boolean().optional(),
+      faceIndex: z.int().min(0).max(15).optional(),
+      labels: z.array(z.string().min(1).max(SMART_CROP_MAX_LABEL_LENGTH)).max(SMART_CROP_MAX_LABELS).optional(),
+      customModelArn: z
+        .string()
+        .max(SMART_CROP_MAX_CUSTOM_MODEL_ARN_LENGTH)
+        .regex(
+          SMART_CROP_CUSTOM_MODEL_ARN_PATTERN,
+          "customModelArn must be a valid Rekognition Custom Labels project version ARN",
+        )
+        .optional(),
+      aspectRatio: z.string().regex(/^\d{1,3}:\d{1,3}$/, "Aspect ratio must be w:h (e.g. 16:9)").refine((val) => {
+        const [w, h] = val.split(':').map(Number);
+        return w >= 1 && w <= 100 && h >= 1 && h <= 100;
+      }, "Aspect ratio dimensions must be between 1 and 100").optional(),
+      padding: z.union([
+        z.int().nonnegative(),
+        z.string().regex(/^\d{1,4}(%|px)$/, "Padding must be e.g. 10%, 50px"),
+      ]).optional(),
+      gravity: z.union([
+        z.enum([
+          'top-left', 'top-center', 'top-right',
+          'center-left', 'center', 'center-right',
+          'bottom-left', 'bottom-center', 'bottom-right',
+        ]),
+        z.string().min(1),
+      ]).optional(),
+      priorities: z.array(z.enum(['aspectRatio', 'padding'], {
+        message: "Only 'aspectRatio' and 'padding' are configurable priorities. targetInclusion and gravity are applied automatically.",
+      })).optional(),
+      retainText: z.boolean().optional(),
+      retainLogo: z.boolean().optional(),
+      fallback: z.enum(['cover', 'contain', 'fill', 'inside', 'outside', 'no-crop']).optional(),
+      minConfidence: z.number().min(0).max(100).optional(),
+    }).refine((data) =>
+      data.faces === true ||
+      data.faceIndex !== undefined ||
+      (data.labels && data.labels.length > 0) ||
+      data.customModelArn !== undefined ||
+      data.retainText === true ||
+      data.retainLogo === true,
+      { message: "At least one detection method is required (faces, faceIndex, labels, customModelArn, retainText, or retainLogo)" },
+    ),
+  ]),
+  contentModeration: z.union([
+    z.literal(true),
+    z.strictObject({
+      minConfidence: z.number().min(0).max(100).optional(),
+      blur: z.number().min(0.3).max(1000).optional(),
+      moderationLabels: z.array(z.string().min(1)).optional(),
     }),
   ]),
   stripExif: z.boolean(),
@@ -142,6 +204,12 @@ const outputSchemas = {
     .refine((arr) => arr.length >= 1, "Must have default quality"),
   format: z.enum(["auto", ...transformationSchemas.format.options]),
   autosize: z.array(z.int().positive()).min(1, "Must have at least one element as derivative width to support"),
+};
+
+const fallbackSchemas = {
+  quality: z.strictObject({ dpr: z.number().min(1.0).max(5.0) }),
+  format: z.strictObject({ format: transformationSchemas.format }),
+  autosize: z.strictObject({ viewportWidth: z.int().min(320).max(3840) }),
 };
 
 const conditionSchema = z.strictObject({
@@ -226,6 +294,11 @@ const policySchema = z
             condition: conditionSchema.optional(),
           }),
           z.strictObject({
+            transformation: z.literal("contentModeration"),
+            value: transformationSchemas.contentModeration,
+            condition: conditionSchema.optional(),
+          }),
+          z.strictObject({
             transformation: z.literal("stripExif"),
             value: transformationSchemas.stripExif,
             condition: conditionSchema.optional(),
@@ -268,9 +341,21 @@ const policySchema = z
     outputs: z
       .array(
         z.discriminatedUnion("type", [
-          z.strictObject({ type: z.literal("quality"), value: outputSchemas.quality }),
-          z.strictObject({ type: z.literal("format"), value: outputSchemas.format }),
-          z.strictObject({ type: z.literal("autosize"), value: outputSchemas.autosize }),
+          z.strictObject({
+            type: z.literal("quality"),
+            value: outputSchemas.quality,
+            fallback: fallbackSchemas.quality.optional(),
+          }),
+          z.strictObject({
+            type: z.literal("format"),
+            value: outputSchemas.format,
+            fallback: fallbackSchemas.format.optional(),
+          }),
+          z.strictObject({
+            type: z.literal("autosize"),
+            value: outputSchemas.autosize,
+            fallback: fallbackSchemas.autosize.optional(),
+          }),
         ])
       )
       .refine((outputs) => {
@@ -320,7 +405,7 @@ const PolicyCreateSchema = z.strictObject({
 const PolicyUpdateSchema = z
   .strictObject({
     policyName: policyNameSchema.optional(),
-    description: descriptionSchema.optional(),
+    description: descriptionSchema.nullable().optional(),
     policyJSON: policySchema.optional(),
     isDefault: z.boolean().optional(),
   })
@@ -346,7 +431,7 @@ export type TransformationPolicyCreate = z.infer<typeof PolicyCreateSchema>;
 export type TransformationPolicyUpdate = z.infer<typeof PolicyUpdateSchema>;
 
 // Schema exports for validation
-export { outputSchemas };
+export { outputSchemas, fallbackSchemas };
 
 // Runtime validators for transformation policy data and create/update requests
 export const validateTransformationPolicy = (data: unknown) => TransformationPolicySchema.safeParse(data);

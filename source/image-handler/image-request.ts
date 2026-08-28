@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 import {
   ContentTypes,
@@ -549,7 +549,11 @@ export class ImageRequest {
         const hash = createHmac("sha256", key).update(stringToSign).digest("hex");
 
         // Signature should be made with the full path.
-        if (signature !== hash) {
+        // Compared in constant time to avoid leaking the expected hash byte-by-byte.
+        // The length pre-check is required: timingSafeEqual throws RangeError on unequal lengths.
+        const signatureBuffer = Buffer.from(signature);
+        const hashBuffer = Buffer.from(hash);
+        if (signatureBuffer.length !== hashBuffer.length || !timingSafeEqual(signatureBuffer, hashBuffer)) {
           throw new ImageHandlerError(StatusCodes.FORBIDDEN, "SignatureDoesNotMatch", "Signature does not match.");
         }
       } catch (error) {

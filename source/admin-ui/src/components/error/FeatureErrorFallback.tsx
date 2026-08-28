@@ -54,14 +54,6 @@ export const OriginListError: React.FC<{ onRetry?: () => void }> = ({ onRetry })
   />
 );
 
-export const DashboardError: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
-  <FeatureErrorFallback
-    title="Dashboard Error"
-    message="Unable to load the dashboard. Please try again."
-    onRetry={onRetry}
-  />
-);
-
 export const MappingListError: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
   <FeatureErrorFallback
     title="Mapping List Error"
@@ -74,6 +66,14 @@ export const OriginMappingError: React.FC<{ onRetry?: () => void }> = ({ onRetry
   <FeatureErrorFallback
     title="Origin Mapping Error"
     message="Unable to load origin mappings. Please try again."
+    onRetry={onRetry}
+  />
+);
+
+export const PlaygroundError: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
+  <FeatureErrorFallback
+    title="Playground Error"
+    message="Unable to load the Playground. Please try again."
     onRetry={onRetry}
   />
 );

@@ -14,7 +14,6 @@ const mockUseTransformationPolicyContext = vi.fn().mockReturnValue({
   createPolicy: mockCreatePolicy,
   updatePolicy: mockUpdatePolicy
 });
-const mockAuthServiceSignOut = vi.fn();
 const mockTransformationPolicyServiceGet = vi.fn();
 
 vi.mock('react-router', async () => {
@@ -25,12 +24,6 @@ vi.mock('react-router', async () => {
     useNavigate: () => mockUseNavigate()
   };
 });
-
-vi.mock('../../services/authService', () => ({
-  AuthService: {
-    signOut: () => mockAuthServiceSignOut()
-  }
-}));
 
 vi.mock('../../contexts/TransformationPolicyContext', () => ({
   TransformationPolicyProvider: ({ children }: any) => children,
@@ -56,15 +49,15 @@ describe('CreateTransformationPolicy', () => {
   it('should render create form with correct header', () => {
     render(<CreateTransformationPolicy />);
     
-    expect(screen.getByText('Create Transformation Policy')).toBeInTheDocument();
-    expect(screen.getByText('Create transformation policy')).toBeInTheDocument();
+    expect(screen.getByText('Create Transformation Policy')).toBeInTheDocument(); // page header
+    expect(screen.getAllByText('Create transformation policy')).toHaveLength(2); // breadcrumb (x2 from BreadcrumbGroup)
   });
 
   it('should render breadcrumbs correctly', () => {
     render(<CreateTransformationPolicy />);
     
-    expect(screen.getByText('Home')).toBeInTheDocument();
-    expect(screen.getAllByText('Transformation Policies')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Home')).toHaveLength(2); // BreadcrumbGroup renders link + ARIA
+    expect(screen.getAllByText('Transformation Policies')).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
   });
 
   it('should render form fields with correct placeholders', () => {
@@ -83,7 +76,7 @@ describe('CreateTransformationPolicy', () => {
   });
 
   it('should handle form input changes', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<CreateTransformationPolicy />);
     
     const nameInput = screen.getByPlaceholderText('e.g., Mobile Optimization Policy');
@@ -173,5 +166,41 @@ describe('CreateTransformationPolicy', () => {
     await user.type(nameInput, 'New Test Policy');
     
     expect(nameInput).toHaveValue('New Test Policy');
+  });
+
+  it('should send null for description when cleared in edit mode', async () => {
+    const user = userEvent.setup();
+    mockUseParams.mockReturnValue({ id: 'test-id' });
+    mockUpdatePolicy.mockResolvedValue({ success: true });
+    mockTransformationPolicyServiceGet.mockResolvedValue({
+      success: true,
+      data: {
+        policyName: 'Test Policy',
+        description: 'Old Description',
+        isDefault: false,
+        policyJSON: { transformations: [{ transformation: 'grayscale', value: true }] }
+      }
+    });
+
+    render(<CreateTransformationPolicy />);
+
+    // Wait for form to populate from fetched data
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Test Policy')).toBeInTheDocument();
+    });
+
+    // Clear the description field
+    const descriptionInput = screen.getByDisplayValue('Old Description');
+    await user.clear(descriptionInput);
+
+    // Submit the form
+    await user.click(screen.getByRole('button', { name: 'Update Policy' }));
+
+    await waitFor(() => {
+      expect(mockUpdatePolicy).toHaveBeenCalledWith(
+        'test-id',
+        expect.objectContaining({ description: null })
+      );
+    });
   });
 });

@@ -12,9 +12,7 @@ describe('Transformation Policy - Watermark Tests', { tags: ['@crud', '@watermar
   });
   
   it('[@crud] should create a policy with commplete watermark configuration', () => {
-    const policyData = TransformationPolicyFactory.createWatermarkPolicy({
-      name: `Basic Watermark Policy`
-    });
+    const policyData = TransformationPolicyFactory.createWatermarkPolicy();
     
     TransformationPolicyPage.clickCreatePolicy();
     TransformationPolicyPage.fillPolicyForm(policyData);
@@ -25,9 +23,7 @@ describe('Transformation Policy - Watermark Tests', { tags: ['@crud', '@watermar
   });
 
   it('[@crud] should create a policy without opacity and widthRatio', () => {
-    const policyData = TransformationPolicyFactory.createWatermarkPolicyWithoutOpacityWidthRatio({
-      name: `Watermark Policy Without Opacity`
-    });
+    const policyData = TransformationPolicyFactory.createWatermarkPolicyWithoutOpacityWidthRatio();
     
     TransformationPolicyPage.clickCreatePolicy();
     TransformationPolicyPage.fillPolicyForm(policyData);

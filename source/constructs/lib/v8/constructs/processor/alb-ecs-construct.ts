@@ -35,6 +35,7 @@ export interface EcsConfig {
   maxCapacity: number | string;
   scaleInAmount: number | string;
   scaleOutAmount: number | string;
+  limitInputPixels: number | string;
 }
 
 /**
@@ -52,6 +53,8 @@ export interface AlbEcsConstructProps {
   logGroup: logs.LogGroup;
   configTableArn?: string;
   originOverrideHeader?: string;
+  userPoolId?: string;
+  userPoolClientId?: string;
 }
 
 /**
@@ -95,8 +98,11 @@ export class AlbEcsConstruct extends Construct {
       props.logGroup,
       this.taskDefinition,
       props.imageUri,
+      props.ecsConfig.limitInputPixels,
       props.configTableArn,
-      props.originOverrideHeader
+      props.originOverrideHeader,
+      props.userPoolId,
+      props.userPoolClientId
     );
 
     // ALB configuration based on deployment mode
@@ -141,6 +147,7 @@ export class AlbEcsConstruct extends Construct {
           "ALB uses HTTP protocol since TLS termination is handled by CloudFront. HTTPS is not configured on the ALB itself.",
       },
     ]);
+
     this.service = new ecs.FargateService(this, "Service", {
       cluster: this.cluster,
       taskDefinition: this.taskDefinition,
@@ -161,8 +168,11 @@ export class AlbEcsConstruct extends Construct {
     logGroup: logs.LogGroup,
     taskDefinition: ecs.TaskDefinition,
     imageUri: string,
+    limitInputPixels: number | string,
     configTableArn?: string,
-    originOverrideHeader?: string
+    originOverrideHeader?: string,
+    userPoolId?: string,
+    userPoolClientId?: string
   ): void {
     const environment: { [key: string]: string } = {
       SOLUTION_ID: process.env.SOLUTION_ID ?? taskDefinition.node.tryGetContext("solutionId"),
@@ -178,8 +188,16 @@ export class AlbEcsConstruct extends Construct {
       environment.CUSTOM_ORIGIN_HEADER = originOverrideHeader;
     }
 
-    // Default to 1 billion pixels to support large GIFs (e.g., 1920x1080x300 frames)
-    environment.LIMIT_INPUT_PIXELS = "1000000000";
+    // Cap Sharp's decode-memory to a per-tier ceiling (50 MP on 2 GB, 100 MP on 4 GB) so an over-limit image is rejected before raster allocation rather than OOMing the task.
+    environment.LIMIT_INPUT_PIXELS = Token.asString(limitInputPixels);
+
+    // Pass Cognito User Pool ID and Client ID for application-level JWT validation in the container
+    if (userPoolId) {
+      environment.COGNITO_USER_POOL_ID = userPoolId;
+    }
+    if (userPoolClientId) {
+      environment.COGNITO_CLIENT_ID = userPoolClientId;
+    }
 
     const container = taskDefinition.addContainer("ImageProcessingContainer", {
       image: ecs.ContainerImage.fromRegistry(imageUri),

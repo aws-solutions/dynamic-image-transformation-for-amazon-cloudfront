@@ -40,6 +40,14 @@ describe('ErrorMapper', () => {
       expect(result.errorType).toBe('SmartCrop::FaceIndexOutOfRange');
     });
 
+    it('should map Sharp pixel-limit error to a 400', () => {
+      const error = new Error('Input image exceeds pixel limit');
+      const result = ErrorMapper.mapError(error);
+      expect(result.statusCode).toBe(400);
+      expect(result.errorType).toBe('BadRequest');
+      expect(result.message).toContain('too large');
+    });
+
     it('should wrap unknown errors as ProcessingFailure', () => {
       const error = new Error('Some unknown error');
       const result = ErrorMapper.mapError(error);

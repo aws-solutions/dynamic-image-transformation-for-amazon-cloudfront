@@ -115,15 +115,11 @@ export class CustomResourcesConstruct extends Construct {
                 "s3:PutBucketTagging",
                 "s3:PutBucketVersioning",
               ],
+              // Scoped to the only bucket-name prefixes this Lambda creates:
+              // the CloudFront logging bucket and the dummy bucket used for region probing.
               resources: [
-                Stack.of(this).formatArn({
-                  partition: Aws.PARTITION,
-                  service: "s3",
-                  region: "",
-                  account: "",
-                  resource: "*",
-                  arnFormat: ArnFormat.COLON_RESOURCE_NAME,
-                }),
+                `arn:${Aws.PARTITION}:s3:::serverless-image-handler-logs-*`,
+                `arn:${Aws.PARTITION}:s3:::sih-dummy-*`,
               ],
             }),
             new PolicyStatement({

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import fs from "fs";
-import { mockS3Commands, mockContext } from "./mock";
+import { consoleInfoSpy, mockContext, mockS3Commands } from "./mock";
 
 import { handler } from "../index";
 import { ImageHandlerError, ImageHandlerEvent, S3GetObjectEvent, StatusCodes } from "../lib";
@@ -728,6 +728,76 @@ describe("index", () => {
 
     // Assert
     writeGetObjectAssertion(event, expect.stringMatching(/^max-age=[0-5],public$/));
+  });
+
+  describe("queryParamLogging", () => {
+    // Finding 61bde3b6 (CWE-532): `signature` is a per-request bearer token and `expires` is
+    // optional, so a signature logged from a request without `expires` is replayable
+    // indefinitely by anyone with read access to the log group. Redaction is unconditional --
+    // a client can send ?signature= whether or not ENABLE_SIGNATURE is set.
+    const signature = "4d41311006641a56de7bca8abdbda91af254506107a2c7b338a13ca2fa95eac3";
+
+    const loggedQueryParams = (): string[] =>
+      consoleInfoSpy.mock.calls
+        .map(([message]) => message)
+        .filter((message) => typeof message === "string" && message.startsWith("QueryParams: "));
+
+    beforeEach(() => {
+      consoleInfoSpy.mockClear();
+      mockS3Commands.getObject.mockResolvedValue({ Body: mockImageBody, ContentType: "image/jpeg" });
+    });
+
+    it("should redact the signature and expires query parameters before logging", async () => {
+      // Arrange
+      const event: ImageHandlerEvent = {
+        path: "/test.jpg",
+        queryStringParameters: { signature, expires: "20990101T000000Z", width: "100" },
+      };
+
+      // Act
+      await handler(event);
+
+      // Assert
+      expect(loggedQueryParams()).toEqual([
+        `QueryParams: {"signature":"***REDACTED***","expires":"***REDACTED***","width":"100"}`,
+      ]);
+      // The raw signature must not reach the logs through any call.
+      expect(JSON.stringify(consoleInfoSpy.mock.calls)).not.toContain(signature);
+    });
+
+    it("should redact the signature when expires is absent", async () => {
+      // Arrange
+      const event: ImageHandlerEvent = { path: "/test.jpg", queryStringParameters: { signature } };
+
+      // Act
+      await handler(event);
+
+      // Assert
+      expect(loggedQueryParams()).toEqual([`QueryParams: {"signature":"***REDACTED***"}`]);
+      expect(JSON.stringify(consoleInfoSpy.mock.calls)).not.toContain(signature);
+    });
+
+    it("should leave non-credential query parameters unchanged", async () => {
+      // Arrange
+      const event: ImageHandlerEvent = { path: "/test.jpg", queryStringParameters: { width: "100" } };
+
+      // Act
+      await handler(event);
+
+      // Assert
+      expect(loggedQueryParams()).toEqual([`QueryParams: {"width":"100"}`]);
+    });
+
+    it("should log an absent query string unchanged", async () => {
+      // Arrange
+      const event: ImageHandlerEvent = { path: "/test.jpg" };
+
+      // Act
+      await handler(event);
+
+      // Assert
+      expect(loggedQueryParams()).toEqual(["QueryParams: undefined"]);
+    });
   });
 
   function setupObjectLambdaB64EncodedTest(eventObject: Object): S3GetObjectEvent {

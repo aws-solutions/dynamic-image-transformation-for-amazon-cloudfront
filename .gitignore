@@ -1,5 +1,7 @@
 # compiled output
 **/dist
+source/solution-utils/get-options.js
+source/solution-utils/get-options.d.ts
 **/global-s3-assets
 **/regional-s3-assets
 **/staging
@@ -41,7 +43,21 @@ git-info
 # amazon q
 .q
 .amazonq
-.kiro
+# kiro - personal/ephemeral files
+.kiro/settings/mcp.json
+.kiro/docs/
+.kiro/steering/*
+!.kiro/steering/metrics.md
+# Generic Docs Directory (non-kiro)
+.docs
+.kiro/handoff
+
+# Claude
+.claude
+CLAUDE.md
 
 # Cypress artifacts
 source/admin-ui/src/e2e-tests/artifacts/
+
+# Bruno e2e tests
+e2e-bruno

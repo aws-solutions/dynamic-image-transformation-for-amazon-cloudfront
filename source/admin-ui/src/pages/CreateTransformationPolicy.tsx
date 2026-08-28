@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
-  AppLayout,
   ContentLayout,
   Header,
   Button,
@@ -14,7 +13,6 @@ import {
   Box,
   Form,
   Alert,
-  SideNavigation,
   ExpandableSection
 } from '@cloudscape-design/components';
 import { TransformationPolicyCreate, Transformation, validateTransformationPolicyCreate } from '@data-models';
@@ -31,11 +29,8 @@ import { OutputConfigModal } from '../components/outputTransformations/OutputCon
 import { AddedOutputsList } from '../components/outputTransformations/AddedOutputsList';
 import { ROUTES } from '../constants/routes';
 import { TransformationPolicyService } from '../services/transformationPolicyService';
-import { NAVIGATION_ITEMS } from '../constants/navigation';
-import { TopNavigation } from '../components/common/TopNavigation';
-import { BreadcrumbBar } from '../components/common/BreadcrumbBar';
 import { TransformationPolicyHelpPanel } from '../components/help/TransformationPolicyHelpPanel';
-import { AuthService } from '../services/authService';
+import { PageLayout } from '../components/layout/PageLayout';
 
 const CreateTransformationPolicy: React.FC = () => {
   const navigate = useNavigate();
@@ -62,8 +57,6 @@ const CreateTransformationPolicy: React.FC = () => {
   const [selectedOutput, setSelectedOutput] = useState<OutputOption | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingOutputIndex, setEditingOutputIndex] = useState<number | null>(null);
-  const [helpPanelOpen, setHelpPanelOpen] = useState(false);
-  const [navigationOpen, setNavigationOpen] = useState(true);
 
   // Load existing data for edit mode
   useEffect(() => {
@@ -89,15 +82,6 @@ const CreateTransformationPolicy: React.FC = () => {
       loadPolicy();
     }
   }, [isEditMode, id]);
-
-  const handleSignOut = async () => {
-    try {
-      await AuthService.signOut();
-      navigate('/auth/logout-complete');
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
 
   const validateField = (field: string, value: string) => {
     const testData = {
@@ -135,9 +119,13 @@ const CreateTransformationPolicy: React.FC = () => {
   const handleCreate = async () => {
     setValidationErrors({});
     
+    // Helper: null (delete) in edit mode, undefined (omit) in create mode
+    const optionalField = (value: string | undefined) =>
+      isEditMode ? (value?.trim() || null) : (value?.trim() || undefined);
+
     const policyData: TransformationPolicyCreate = {
       policyName: policyName.trim(),
-      description: description.trim() || undefined,
+      description: optionalField(description),
       isDefault,
       policyJSON: { 
         ...(transformations.length > 0 && { transformations }),
@@ -329,33 +317,12 @@ const CreateTransformationPolicy: React.FC = () => {
   ];
 
   return (
-    <Box>
-      <TopNavigation onSignOut={handleSignOut} />
-      <BreadcrumbBar 
-        breadcrumbs={breadcrumbs} 
-        onHelpClick={() => setHelpPanelOpen(!helpPanelOpen)} 
-      />
-      <AppLayout
-        navigation={
-          <SideNavigation
-            activeHref={ROUTES.TRANSFORMATION_POLICIES}
-            items={NAVIGATION_ITEMS}
-            onFollow={(event) => {
-              if (!event.detail.external) {
-                event.preventDefault();
-                navigate(event.detail.href);
-              }
-            }}
-          />
-        }
-        navigationOpen={navigationOpen}
-        onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
-        tools={helpPanelOpen ? <TransformationPolicyHelpPanel /> : undefined}
-        toolsOpen={helpPanelOpen}
-        onToolsChange={({ detail }) => setHelpPanelOpen(detail.open)}
-        toolsHide={!helpPanelOpen}
-      content={
-        <ContentLayout
+    <PageLayout
+      activeHref={ROUTES.TRANSFORMATION_POLICIES}
+      breadcrumbs={breadcrumbs}
+      helpPanel={<TransformationPolicyHelpPanel />}
+    >
+      <ContentLayout
           header={
             <Header
               variant="h1"
@@ -573,9 +540,7 @@ const CreateTransformationPolicy: React.FC = () => {
             onAdd={handleOutputConfigured}
           />
         </ContentLayout>
-      }
-    />
-    </Box>
+    </PageLayout>
   );
 };
 

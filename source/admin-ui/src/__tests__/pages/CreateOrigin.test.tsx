@@ -76,7 +76,7 @@ describe('CreateOrigin Page', () => {
   });
 
   it('should submit form with valid data', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<CreateOrigin />);
     
     await user.type(screen.getByPlaceholderText('Enter origin name'), 'Test Origin');

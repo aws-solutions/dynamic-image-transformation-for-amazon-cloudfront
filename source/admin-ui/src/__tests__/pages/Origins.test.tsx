@@ -13,7 +13,7 @@ describe('Origins Page', () => {
   it('should render origins page with navigation and content', async () => {
     render(<Origins />);
     
-    expect(screen.getAllByText('Origins')).toHaveLength(2); // One in breadcrumb, one in navigation
+    expect(screen.getAllByText('Origins')).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
     
     await waitFor(() => {
       expect(screen.getByText('Primary Image Server')).toBeInTheDocument();

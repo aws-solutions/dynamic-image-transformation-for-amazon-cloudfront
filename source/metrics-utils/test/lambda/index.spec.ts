@@ -7,6 +7,7 @@ import { EventBridgeQueryEvent } from "../../lambda/helpers/types";
 
 const mockMetricsHelper = {
   getMetricsData: jest.fn(),
+  scanConfigTable: jest.fn(),
   startQueries: jest.fn(),
   resolveQueries: jest.fn(),
   sendAnonymousMetric: jest.fn(),
@@ -42,26 +43,30 @@ describe("Lambda Handler", () => {
     jest.clearAllMocks();
   });
 
-  xit("should process an EventBridgeQueryEvent", async () => {
-    // Arrange
+  it("should process an EventBridgeQueryEvent", async () => {
     const event: EventBridgeQueryEvent = {
       "detail-type": "Scheduled Event",
       time: new Date().toISOString(),
       "metrics-data-query": [],
     };
 
-    //Mock Response
-    mockMetricsHelper.getMetricsData.mockImplementationOnce(() => {
-      return [];
-    });
-    mockMetricsHelper.startQueries.mockImplementationOnce(() => {
-      return [];
-    });
-    // Act
+    mockMetricsHelper.getMetricsData.mockResolvedValueOnce({ "CloudFront/Requests": [142000] });
+    mockMetricsHelper.scanConfigTable.mockResolvedValueOnce({ "DynamoDB/TransformationPolicyCount": 5 });
+    mockMetricsHelper.sendAnonymousMetric.mockResolvedValueOnce({ Message: "Anonymous data was sent successfully." });
+    mockMetricsHelper.startQueries.mockResolvedValueOnce({ MessageId: "msg-1" });
+
     const response = await handler(event, BASE_CONTEXT);
 
-    // Assert
     expect(mockMetricsHelper.getMetricsData).toHaveBeenCalledWith(event);
+    expect(mockMetricsHelper.scanConfigTable).toHaveBeenCalled();
+    expect(mockMetricsHelper.sendAnonymousMetric).toHaveBeenCalledWith(
+      expect.objectContaining({
+        "CloudFront/Requests": [142000],
+        "DynamoDB/TransformationPolicyCount": 5,
+      }),
+      expect.any(Date),
+      expect.any(Date)
+    );
     expect(mockMetricsHelper.startQueries).toHaveBeenCalledWith(event);
     expect(response).toEqual({
       statusCode: 200,

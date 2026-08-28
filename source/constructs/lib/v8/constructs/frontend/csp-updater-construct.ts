@@ -13,6 +13,7 @@ export interface CSPUpdaterConstructProps {
   distribution: cloudfront.Distribution;
   cognitoDomainUrl: string;
   apiEndpoint: string;
+  imageProcessingDomain?: string;
 }
 
 export class CSPUpdaterConstruct extends Construct {
@@ -32,8 +33,8 @@ export class CSPUpdaterConstruct extends Construct {
             "script-src 'self'",
             "style-src 'self'",
             "font-src 'self' data:",
-            "img-src 'self' data: https:",
-            `connect-src 'self' https://cognito-identity.${Aws.REGION}.amazonaws.com https://cognito-idp.${Aws.REGION}.amazonaws.com ${props.cognitoDomainUrl} ${props.apiEndpoint}`,
+            "img-src 'self' data: blob: https:",
+            `connect-src 'self' https://cognito-identity.${Aws.REGION}.amazonaws.com https://cognito-idp.${Aws.REGION}.amazonaws.com ${props.cognitoDomainUrl} ${props.apiEndpoint}${props.imageProcessingDomain ? ` https://${props.imageProcessingDomain}` : ''}`,
             "default-src 'self'"
           ].join("; ") + ";",
           override: false

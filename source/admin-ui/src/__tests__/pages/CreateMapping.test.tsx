@@ -8,7 +8,6 @@ import { OriginProvider } from '../../contexts/OriginContext';
 import { TransformationPolicyProvider } from '../../contexts/TransformationPolicyContext';
 
 // Mock services
-vi.mock('../../services/authService');
 vi.mock('../../services/mappingService');
 vi.mock('../../services/transformationPolicyService');
 
@@ -125,7 +124,7 @@ describe('CreateMapping', () => {
     
     expect(screen.getByRole('heading', { name: 'Create mapping' })).toBeInTheDocument();
     // Check that Mappings text appears somewhere (could be breadcrumb or nav) - use getAllByText to handle multiple instances
-    expect(screen.getAllByText('Mappings')).toHaveLength(2); // One in breadcrumb, one in navigation
+    expect(screen.getAllByText('Mappings')).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
   });
 
   it('should render form actions', () => {

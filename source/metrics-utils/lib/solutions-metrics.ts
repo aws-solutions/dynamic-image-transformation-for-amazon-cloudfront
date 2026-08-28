@@ -11,7 +11,7 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
 import { LambdaToSqsToLambda } from "@aws-solutions-constructs/aws-lambda-sqs-lambda";
 import { MetricDataQuery } from "@aws-sdk/client-cloudwatch";
-import { QueryDefinition, QueryDefinitionProps, QueryString } from "aws-cdk-lib/aws-logs";
+import { QueryDefinition, QueryDefinitionProps, QueryString, ILogGroup } from "aws-cdk-lib/aws-logs";
 import { ExecutionDay, MetricDataProps, SolutionsMetricProps } from "../lambda/helpers/types";
 import {
   addLambdaBilledDurationMemorySize,
@@ -25,8 +25,9 @@ import {
   addECSOriginTypeMetrics,
   addECSTransformationUsageMetrics,
   addTransformationSourceMetrics,
+  addCFTierDetectionMetrics,
 } from "./query-builders";
-import { DITNodejsFunction } from "../../constructs/lib/v8/constructs/common"
+import { DITNodejsFunction } from "../../constructs/lib/v8/constructs/common";
 
 export class SolutionsMetrics extends Construct {
   private metricDataQueries: MetricDataQuery[];
@@ -54,14 +55,16 @@ export class SolutionsMetrics extends Construct {
         EXECUTION_DAY: props.executionDay ? props.executionDay : ExecutionDay.MONDAY,
         AWS_ACCOUNT_ID: Aws.ACCOUNT_ID,
         AWS_STACK_ID: Aws.STACK_ID,
+        POWERTOOLS_LOGGER_LOG_LEVEL: "INFO",
+        POWERTOOLS_LOGGER_LOG_EVENT: "false",
       },
     });
 
     if (props.configTableArn) {
-      this.metricsLambdaFunction.addEnvironment('CONFIG_TABLE_ARN', props.configTableArn);
+      this.metricsLambdaFunction.addEnvironment("CONFIG_TABLE_ARN", props.configTableArn);
       this.metricsLambdaFunction.addToRolePolicy(
         new PolicyStatement({
-          actions: ['dynamodb:Scan'],
+          actions: ["dynamodb:Scan"],
           resources: [props.configTableArn],
         })
       );
@@ -149,14 +152,16 @@ export class SolutionsMetrics extends Construct {
     });
 
     if (queryDefinitionProps.logGroups && queryDefinitionProps.logGroups.length > 0) {
-	      this.metricsLambdaFunction.addToRolePolicy(
-	        new PolicyStatement({
-	          actions: ["logs:StartQuery", "logs:GetQueryResults"],
-	          resources: queryDefinitionProps.logGroups.map((logGroup) => logGroup.logGroupRef.logGroupArn),
-	        })
-	      );
-	    }
-    
+      this.metricsLambdaFunction.addToRolePolicy(
+        new PolicyStatement({
+          actions: ["logs:StartQuery", "logs:GetQueryResults"],
+          resources: queryDefinitionProps.logGroups
+            .filter((lg): lg is ILogGroup => "logGroupArn" in lg)
+            .map((logGroup) => logGroup.logGroupArn),
+        })
+      );
+    }
+
     this.metricsLambdaFunction.addToRolePolicy(
       new PolicyStatement({
         actions: ["logs:DescribeQueryDefinitions"],
@@ -212,6 +217,7 @@ export class SolutionsMetrics extends Construct {
   addECSOriginTypeMetrics: typeof addECSOriginTypeMetrics;
   addECSTransformationUsageMetrics: typeof addECSTransformationUsageMetrics;
   addTransformationSourceMetrics: typeof addTransformationSourceMetrics;
+  addCFTierDetectionMetrics: typeof addCFTierDetectionMetrics;
 }
 
 Object.assign(SolutionsMetrics.prototype, {
@@ -226,4 +232,5 @@ Object.assign(SolutionsMetrics.prototype, {
   addECSOriginTypeMetrics,
   addECSTransformationUsageMetrics,
   addTransformationSourceMetrics,
+  addCFTierDetectionMetrics,
 });

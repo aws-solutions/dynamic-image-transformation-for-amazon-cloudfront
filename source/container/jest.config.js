@@ -9,7 +9,7 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'            // Future unit tests (excluding docker-health.test.ts)
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
   },
   collectCoverageFrom: [
     'src/**/*.ts',

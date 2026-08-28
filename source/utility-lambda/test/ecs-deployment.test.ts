@@ -35,7 +35,7 @@ describe("EcsDeploymentUtility", () => {
           ApproximateCreationDateTime: 1428537600,
           SequenceNumber: "4421584500000000017450439091",
           SizeBytes: 26,
-          StreamViewType: "NEW_AND_OLD_IMAGES",
+          StreamViewType: "NEW_IMAGE",
         },
         eventSourceARN: "arn:aws:dynamodb:us-east-1:123456789012:table/ExampleTableWithStream/stream/2015-06-27T00:48:05.899",
       },

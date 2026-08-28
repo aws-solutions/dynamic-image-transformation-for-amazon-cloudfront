@@ -430,6 +430,36 @@ describe("setup", () => {
       }
     });
 
+    it("Should throw an error when the signature is the correct length but does not match", async () => {
+      // Arrange
+      // Differs from the valid signature only in the final character, so the length pre-check
+      // passes and the comparison itself has to reject it. Covers the timingSafeEqual branch,
+      // which a shorter signature short-circuits past.
+      const event = {
+        path: "/eyJidWNrZXQiOiJ2YWxpZEJ1Y2tldCIsImtleSI6InZhbGlkS2V5IiwiZWRpdHMiOnsidG9Gb3JtYXQiOiJwbmcifX0=",
+        queryStringParameters: {
+          signature: "4d41311006641a56de7bca8abdbda91af254506107a2c7b338a13ca2fa95eac4",
+        },
+      };
+
+      // Mock
+      mockSecretsManagerCommands.getSecretValue.mockResolvedValue({
+        SecretString: JSON.stringify({
+          [process.env.SECRET_KEY]: "secret",
+        }),
+      });
+
+      // Act
+      const imageRequest = new ImageRequest(s3Client, secretProvider);
+
+      // Assert
+      await expect(imageRequest.setup(event)).rejects.toMatchObject({
+        status: 403,
+        message: "Signature does not match.",
+        code: "SignatureDoesNotMatch",
+      });
+    });
+
     it("Should throw an error when any other error occurs", async () => {
       // Arrange
       const event = {

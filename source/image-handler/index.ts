@@ -22,6 +22,7 @@ import {
   S3Event,
   S3GetObjectEvent,
   S3HeadObjectResult,
+  QueryStringParameters,
   RequestTypes,
   StatusCodes,
 } from "./lib";
@@ -51,7 +52,7 @@ export async function handler(
 
   const normalizedEvent = normalizeEvent(event, ENABLE_S3_OBJECT_LAMBDA);
   console.info(`Path: ${normalizedEvent.path}`);
-  console.info(`QueryParams: ${JSON.stringify(normalizedEvent.queryStringParameters)}`);
+  console.info(`QueryParams: ${JSON.stringify(sanitizeQueryStringParameters(normalizedEvent.queryStringParameters))}`);
 
   const response = handleRequest(normalizedEvent);
   // If deployment is set to use an API Gateway origin
@@ -355,6 +356,30 @@ export function normalizeEvent(event: ImageHandlerEvent | S3Event, s3ObjectLambd
     };
   }
   return event as ImageHandlerEvent;
+}
+
+/**
+ * Removes credential-bearing query parameters before the query string is logged.
+ * `signature` is a per-request bearer token; without `expires` it would be replayable
+ * indefinitely by anyone with read access to the log group.
+ * @param queryStringParameters The normalized event's query string parameters.
+ * @returns A copy of the query string parameters with sensitive values redacted, or the
+ * input unchanged when there are no query string parameters.
+ */
+function sanitizeQueryStringParameters(
+  queryStringParameters?: QueryStringParameters
+): QueryStringParameters | undefined {
+  if (!queryStringParameters) {
+    return queryStringParameters;
+  }
+
+  const sanitized = { ...queryStringParameters };
+  for (const key of ["signature", "expires"] as const) {
+    if (key in sanitized) {
+      sanitized[key] = "***REDACTED***";
+    }
+  }
+  return sanitized;
 }
 
 /**

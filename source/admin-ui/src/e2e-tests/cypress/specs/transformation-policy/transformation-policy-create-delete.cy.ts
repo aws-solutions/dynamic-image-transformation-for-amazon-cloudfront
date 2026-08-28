@@ -12,7 +12,7 @@ describe('Transformation Policy Flow - Create Delete Tests', { tags: ['@crud'] }
   });
 
   it('[@crud] should create and delete a basic transformation policy', () => {
-    const policyData = TransformationPolicyFactory.createBasicPolicy({ name: 'Simple Test Policy' });
+    const policyData = TransformationPolicyFactory.createBasicPolicy();
     
     // Create policy
     TransformationPolicyPage.clickCreatePolicy();

@@ -7,6 +7,7 @@ export interface StackConfig {
   appUrl: string;
   userPoolId: string;
   cognitoOrigin: string;
+  apiEndpoint: string;
 }
 
 export async function getStackConfig(stackName: string, region: string): Promise<StackConfig> {
@@ -25,9 +26,13 @@ export async function getStackConfig(stackName: string, region: string): Promise
   const cognitoDomainPrefix = stack.Outputs?.find((o) => o.OutputKey?.includes("CognitoDomainPrefix"))?.OutputValue;
   if (!cognitoDomainPrefix) throw new Error("Required stack output CognitoDomainPrefix is missing");
 
+  const apiEndpoint = stack.Outputs?.find((o) => o.OutputKey?.includes("APIEndpoint"))?.OutputValue;
+  if (!apiEndpoint) throw new Error("Required stack output APIEndpoint is missing");
+
   return {
     appUrl,
     userPoolId,
     cognitoOrigin: `https://${cognitoDomainPrefix}.auth.${region}.amazoncognito.com`,
+    apiEndpoint,
   };
 }

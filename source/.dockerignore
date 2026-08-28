@@ -37,6 +37,7 @@ npm-debug.log*
 
 # Misc
 .DS_Store
+**/AGENTS.md
 
 # Exclude everything except what's needed
 admin-ui

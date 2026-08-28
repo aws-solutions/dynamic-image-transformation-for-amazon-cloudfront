@@ -9,9 +9,11 @@ import {
   FormField,
   Input,
   Select,
+  Popover,
+  Link,
 } from '@cloudscape-design/components';
 import { OutputOption, Output } from '../../types/interfaces';
-import { outputSchemas } from '@data-models';
+import { outputSchemas, fallbackSchemas, transformationSchemas } from '@data-models';
 import { z } from 'zod';
 
 interface OutputConfigModalProps {
@@ -53,13 +55,13 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
               quality: qualityRatio
             };
           });
-          setConfig({ defaultQuality, dprRules });
+          setConfig({ defaultQuality, dprRules, fallbackDpr: editingOutput.fallback?.dpr });
           break;
         case 'format':
-          setConfig({ format: value });
+          setConfig({ format: value, fallbackFormat: editingOutput.fallback?.format });
           break;
         case 'autosize':
-          setConfig({ enabled: value });
+          setConfig({ enabled: value, fallbackViewportWidth: editingOutput.fallback?.viewportWidth });
           break;
         default:
           setConfig({});
@@ -72,12 +74,27 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
   if (!output) return null;
 
   const handleAdd = () => {
+    const fallback = getFallbackValue();
     const outputData: Output = {
       type: output.id,
-      value: getConfigValue()
+      value: getConfigValue(),
+      ...(fallback && { fallback }),
     };
     onAdd(outputData);
     setConfig({});
+  };
+
+  const getFallbackValue = () => {
+    switch (output.id) {
+      case 'quality':
+        return config.fallbackDpr !== undefined ? { dpr: config.fallbackDpr } : undefined;
+      case 'format':
+        return config.fallbackFormat ? { format: config.fallbackFormat } : undefined;
+      case 'autosize':
+        return config.fallbackViewportWidth !== undefined ? { viewportWidth: config.fallbackViewportWidth } : undefined;
+      default:
+        return undefined;
+    }
   };
 
   const getConfigValue = () => {
@@ -95,7 +112,10 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
       case 'format':
         return config.format || 'auto';
       case 'autosize':
-        return [320, 480, 720, 1080, 1440, 1920, 2048, 3840]; // Default responsive widths
+        // Aligned with the DIT CloudFront function's normalization breakpoints
+        // (source/constructs/lib/v8/functions/dit-header-normalization.js) so that fallback /
+        // client-hint snapping in the ECS auto-optimizer matches the values the CF function emits.
+        return [320, 480, 768, 1024, 1200, 1440, 1920];
       default:
         return true;
     }
@@ -182,6 +202,10 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
             }
           }
         }
+        if (validationTouched.fallbackDpr && config.fallbackDpr !== undefined) {
+          const result = fallbackSchemas.quality.safeParse({ dpr: config.fallbackDpr });
+          if (!result.success) errors.fallbackDpr = result.error.issues[0]?.message || 'Invalid DPR value';
+        }
         break;
       case 'format':
         if (validationTouched.format && config.format) {
@@ -195,6 +219,10 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
         }
         break;
       case 'autosize':
+        if (validationTouched.fallbackViewportWidth && config.fallbackViewportWidth !== undefined) {
+          const result = fallbackSchemas.autosize.safeParse({ viewportWidth: config.fallbackViewportWidth });
+          if (!result.success) errors.fallbackViewportWidth = result.error.issues[0]?.message || 'Invalid viewport width';
+        }
         break;
     }
     
@@ -208,19 +236,21 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
         if (!config.defaultQuality || isNaN(qualityValue)) return false;
         try {
           outputSchemas.quality.parse([qualityValue]);
-          return true;
         } catch {
           return false;
         }
+        if (config.fallbackDpr !== undefined && !fallbackSchemas.quality.safeParse({ dpr: config.fallbackDpr }).success) return false;
+        return true;
       case 'format':
         const formatValue = config.format || 'auto';
         try {
           outputSchemas.format.parse(formatValue);
-          return true;
         } catch {
           return false;
         }
+        return true;
       case 'autosize':
+        if (config.fallbackViewportWidth !== undefined && !fallbackSchemas.autosize.safeParse({ viewportWidth: config.fallbackViewportWidth }).success) return false;
         return true;
       default:
         return true;
@@ -317,42 +347,112 @@ export const OutputConfigModal: React.FC<OutputConfigModalProps> = ({
                 </Button>
               </SpaceBetween>
             </FormField>
+
+            <FormField
+              label="Fallback DPR (Optional)"
+              description="Used when client device pixel ratio cannot be determined (1.0–5.0)"
+              errorText={validationErrors.fallbackDpr}
+              info={
+                <Popover content={
+                  <Box>DIT detects the client's device pixel ratio automatically. If detection fails and no fallback is set, the default quality value is used. Setting a fallback ensures the correct DPR-based quality is always selected.</Box>
+                } triggerType="custom">
+                  <Link variant="info">Info</Link>
+                </Popover>
+              }
+            >
+              <Input
+                type="number"
+                value={config.fallbackDpr?.toString() || ''}
+                onChange={({ detail }) => setConfig({ ...config, fallbackDpr: detail.value === '' ? undefined : parseFloat(detail.value) })}
+                onBlur={() => setValidationTouched({ ...validationTouched, fallbackDpr: true })}
+                placeholder="e.g. 2.0"
+                invalid={!!validationErrors.fallbackDpr}
+              />
+            </FormField>
           </SpaceBetween>
         );
 
       case 'format':
         return (
-          <FormField
-            label="Format Selection"
-            description="Choose format optimization strategy"
-            errorText={validationErrors.format}
-          >
-            <Select
-              selectedOption={{ label: config.format || 'auto', value: config.format || 'auto' }}
-              onChange={({ detail }) => {
-                setConfig({ ...config, format: detail.selectedOption.value });
-                setValidationTouched({ ...validationTouched, format: true });
-              }}
-              options={[
-                { label: 'Auto (recommended)', value: 'auto' },
-                { label: 'JPEG', value: 'jpeg' },
-                { label: 'PNG', value: 'png' },
-                { label: 'WebP', value: 'webp' },
-                { label: 'AVIF', value: 'avif' }
-              ]}
-              invalid={!!validationErrors.format}
-            />
-          </FormField>
+          <SpaceBetween size="m">
+            <FormField
+              label="Format Selection"
+              description="Choose format optimization strategy"
+              errorText={validationErrors.format}
+            >
+              <Select
+                selectedOption={{ label: config.format || 'auto', value: config.format || 'auto' }}
+                onChange={({ detail }) => {
+                  const newConfig: any = { ...config, format: detail.selectedOption.value };
+                  if (detail.selectedOption.value !== 'auto') {
+                    delete newConfig.fallbackFormat;
+                  }
+                  setConfig(newConfig);
+                  setValidationTouched({ ...validationTouched, format: true });
+                }}
+                options={[
+                  { label: 'Auto (recommended)', value: 'auto' },
+                  ...transformationSchemas.format.options.map(f => ({ label: f.toUpperCase(), value: f }))
+                ]}
+                invalid={!!validationErrors.format}
+              />
+            </FormField>
+            {(!config.format || config.format === 'auto') && (
+            <FormField
+              label="Fallback Format (Optional)"
+              description="Used when format is 'auto' and client support cannot be determined"
+              info={
+                <Popover content={
+                  <Box>DIT detects the client's supported image formats automatically. If detection fails and no fallback is set, the format optimization is skipped for that request. Setting a fallback ensures an optimized format is always delivered.</Box>
+                } triggerType="custom">
+                  <Link variant="info">Info</Link>
+                </Popover>
+              }
+            >
+              <Select
+                selectedOption={config.fallbackFormat ? { label: config.fallbackFormat.toUpperCase(), value: config.fallbackFormat } : { label: 'None', value: '' }}
+                onChange={({ detail }) => setConfig({ ...config, fallbackFormat: detail.selectedOption.value || undefined })}
+                options={[
+                  { label: 'None', value: '' },
+                  ...transformationSchemas.format.options.map(f => ({ label: f.toUpperCase(), value: f }))
+                ]}
+              />
+            </FormField>
+            )}
+          </SpaceBetween>
         );
 
       case 'autosize':
         return (
-          <Box>
-            <Box variant="strong">{output.title}</Box>
-            <Box variant="p" color="text-body-secondary">
-              Auto sizing is enabled for responsive images
+          <SpaceBetween size="m">
+            <Box>
+              <Box variant="strong">{output.title}</Box>
+              <Box variant="p" color="text-body-secondary">
+                Auto sizing is enabled for responsive images
+              </Box>
             </Box>
-          </Box>
+            <FormField
+              label="Fallback Viewport Width (Optional)"
+              description="Used when client viewport width cannot be determined (320–3840)"
+              errorText={validationErrors.fallbackViewportWidth}
+              info={
+                <Popover content={
+                  <Box>DIT detects the client's viewport width automatically. If detection fails and no fallback is set, the resize optimization is skipped for that request. Setting a fallback ensures a responsive breakpoint is always selected.</Box>
+                } triggerType="custom">
+                  <Link variant="info">Info</Link>
+                </Popover>
+              }
+            >
+              <Input
+                type="number"
+                value={config.fallbackViewportWidth?.toString() || ''}
+                onChange={({ detail }) => setConfig({ ...config, fallbackViewportWidth: detail.value === '' ? undefined : parseInt(detail.value) })}
+                onBlur={() => setValidationTouched({ ...validationTouched, fallbackViewportWidth: true })}
+                placeholder="e.g. 1024"
+                invalid={!!validationErrors.fallbackViewportWidth}
+              />
+            </FormField>
+          </SpaceBetween>
         );
 
       default:

@@ -11,11 +11,11 @@ This directory contains end-to-end (E2E) tests for the Dynamic Image Transformat
 
 ### Required Environment Variables
 
-All configuration (`appUrl`, `cognitoOrigin`, `COGNITO_USER_POOL_ID`) is inferred automatically from the CloudFormation stack outputs.
+- **CURRENT_STACK_NAME** — name of the deployed CloudFormation stack
+- **CURRENT_STACK_REGION** — AWS region where the stack is deployed
+- **USER_PASSWORD** — password for the Cognito E2E test user
 
-- **appUrl** — `WebPortalUrl` output
-- **COGNITO_USER_POOL_ID** — output key containing `UserPool`
-- **cognitoOrigin** — derived from output key containing `CognitoDomainPrefix`
+All other test configuration (`appUrl`, `cognitoOrigin`, `COGNITO_USER_POOL_ID`) is derived automatically from the CloudFormation stack outputs at test startup.
 
 
 ## Installation
@@ -32,12 +32,12 @@ npm ci
 
 ### Run All Tests (Headless)
 ```bash
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:run
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:run
 ```
 
 ### Run Tests with UI (Interactive)
 ```bash
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:open
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:open
 ```
 
 ### Run Specific Test Suites
@@ -45,28 +45,28 @@ CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:open
 #### Origins Tests
 ```bash
 # Run all origin tests
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/origin/**/*.cy.ts"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/origin/**/*.cy.ts"
 
 # Run specific origin test
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/origin/origin-create-delete.cy.ts"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/origin/origin-create-delete.cy.ts"
 ```
 
 #### Mapping Tests
 ```bash
 # Run all mapping tests
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/**/*.cy.ts"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/**/*.cy.ts"
 
 # Run specific mapping test
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/mapping-types.cy.ts"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/mapping-types.cy.ts"
 ```
 
 #### Transformation Policy Tests
 ```bash
 # Run all transformation policy tests
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/**/*.cy.ts"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/**/*.cy.ts"
 
 # Run comprehensive transformation test
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/transformation-all-options.cy.ts"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/transformation-all-options.cy.ts"
 ```
 
 ### Run Tests by Tags
@@ -75,10 +75,10 @@ Tests are tagged for easy filtering:
 
 ```bash
 # Run only smoke tests
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@smoke"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@smoke"
 
 # Run only CRUD tests
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@crud"
+USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@crud"
 ```
 
 ## Test Structure
@@ -169,6 +169,7 @@ Tests use automated authentication with test user management:
 - **Session Management**: Handles login/logout and session persistence
 - **MFA Handling**: Temporarily disables MFA for testing
 - **Cleanup**: Removes test users after test completion
+- **Password**: Must be supplied via `USER_PASSWORD` env var — not stored in fixtures
 
 
 ## Troubleshooting

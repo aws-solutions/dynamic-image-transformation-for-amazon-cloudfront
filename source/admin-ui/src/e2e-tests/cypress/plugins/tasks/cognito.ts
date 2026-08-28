@@ -5,7 +5,35 @@ import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPass
 import * as fs from 'fs';
 import * as path from 'path';
 
-let originalMfaConfig: any = null;
+let originalMfaConfig: string | null = null;
+
+/**
+ * Restore the User Pool MFA configuration to whatever it was before setup disabled it.
+ * Restoring the captured value (rather than a fixed setting) avoids corrupting pools that
+ * were originally OFF/OPTIONAL. originalMfaConfig is captured in setup:testUser and persists
+ * across the plugin's Node process.
+ */
+async function restoreMfaConfig(client: CognitoIdentityProviderClient, userPoolId: string) {
+  // Nothing to restore, or it was already disabled — leave it disabled.
+  if (!originalMfaConfig || originalMfaConfig === 'OFF') {
+    console.log(`Leaving MFA disabled (original config was ${originalMfaConfig ?? 'unknown'})`);
+    return;
+  }
+
+  try {
+    await client.send(new SetUserPoolMfaConfigCommand({
+      UserPoolId: userPoolId,
+      MfaConfiguration: originalMfaConfig as 'ON' | 'OPTIONAL',
+      // ON/OPTIONAL require at least one enabled second factor; software token was the
+      // pre-existing method for this pool.
+      SoftwareTokenMfaConfiguration: { Enabled: true },
+    }));
+    console.log(`MFA restored to original config: ${originalMfaConfig}`);
+  } catch (mfaError: any) {
+    console.error('Failed to restore MFA:', mfaError.message);
+    // Don't throw - just log the error so cleanup continues
+  }
+}
 
 export default (config: any) => ({
   'setup:testUser': async ({ userPoolId }: { userPoolId: string }) => {
@@ -17,9 +45,12 @@ export default (config: any) => ({
     const usersFixture = JSON.parse(
       fs.readFileSync(path.join(__dirname, '../../fixtures/seeds/users.json'), 'utf8')
     );
-    const { email: TEST_USER_EMAIL, password: TEST_USER_PASSWORD_FALLBACK } = usersFixture.testUser;
-    
-    const TEST_USER_PASSWORD = config.env.USER_PASSWORD || TEST_USER_PASSWORD_FALLBACK;
+    const { email: TEST_USER_EMAIL } = usersFixture.testUser;
+
+    const TEST_USER_PASSWORD = config.env.USER_PASSWORD;
+    if (!TEST_USER_PASSWORD) {
+      throw new Error('USER_PASSWORD env var is required to provision the E2E test user');
+    }
 
     try {
       // 1. Get current User Pool MFA configuration
@@ -71,7 +102,14 @@ export default (config: any) => ({
       return true;
     } catch (error: any) {
       if (error.name === 'UsernameExistsException') {
-        console.log(`Test user ${TEST_USER_EMAIL} already exists, skipping creation`);
+        console.log(`Test user ${TEST_USER_EMAIL} already exists, ensuring password is set`);
+        // Always reset password to ensure it matches expected credentials
+        await client.send(new AdminSetUserPasswordCommand({
+          UserPoolId: userPoolId,
+          Username: TEST_USER_EMAIL,
+          Password: TEST_USER_PASSWORD,
+          Permanent: true
+        }));
         return true;
       }
       throw error;
@@ -97,40 +135,17 @@ export default (config: any) => ({
       }));
       console.log(`Test user ${TEST_USER_EMAIL} deleted successfully`);
 
-      // 2. Enable MFA with authenticator apps after tests
-      try {
-        await client.send(new SetUserPoolMfaConfigCommand({
-          UserPoolId: userPoolId,
-          MfaConfiguration: 'ON',
-          SoftwareTokenMfaConfiguration: {
-            Enabled: true
-          }
-        }));
-        console.log('MFA enabled with authenticator apps after tests');
-      } catch (mfaError: any) {
-        console.error('Failed to enable MFA:', mfaError.message);
-        // Don't throw - just log the error so cleanup continues
-      }
+      // 2. Restore the original MFA configuration
+      await restoreMfaConfig(client, userPoolId);
 
       return true;
     } catch (error: any) {
       if (error.name === 'UserNotFoundException') {
         console.log(`Test user ${TEST_USER_EMAIL} not found, skipping deletion`);
-        
-        // Enable MFA with authenticator apps even if user deletion fails
-        try {
-          await client.send(new SetUserPoolMfaConfigCommand({
-            UserPoolId: userPoolId,
-            MfaConfiguration: 'ON',
-            SoftwareTokenMfaConfiguration: {
-              Enabled: true
-            }
-          }));
-          console.log('MFA enabled with authenticator apps after tests');
-        } catch (mfaError: any) {
-          console.error('Failed to enable MFA:', mfaError.message);
-        }
-        
+
+        // Restore the original MFA configuration even if user deletion failed
+        await restoreMfaConfig(client, userPoolId);
+
         return true;
       }
       throw error;

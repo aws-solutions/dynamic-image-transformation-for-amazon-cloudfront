@@ -565,4 +565,89 @@ describe("Policies API", () => {
       });
     });
   });
+
+  describe("/policies - fallback field validation", () => {
+    test("POST create policy with all fallback fields succeeds and round-trips", async () => {
+      // Verify that a policy with format, quality, and autosize fallback fields is accepted (201)
+      // and that GET returns the exact fallback values stored
+      const policyBody = {
+        policyName: "fallback-roundtrip",
+        policyJSON: {
+          outputs: [
+            { type: "format", value: "auto", fallback: { format: "jpeg" } },
+            { type: "quality", value: [80, [1, 2, 90], [2, 3, 85]], fallback: { dpr: 1.5 } },
+            { type: "autosize", value: [480, 768, 1024], fallback: { viewportWidth: 768 } },
+          ],
+        },
+      };
+
+      const createResponse = await fetch(API_URL + "/policies", {
+        method: "POST",
+        headers: createAuthHeaders(TEST_ACCESS_TOKEN),
+        body: JSON.stringify(policyBody),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as TransformationPolicy;
+
+      // Round-trip: GET the policy and verify fallback values are persisted correctly
+      const getResponse = await fetch(API_URL + `/policies/${created.policyId}`, {
+        method: "GET",
+        headers: createAuthHeaders(TEST_ACCESS_TOKEN),
+      });
+      expect(getResponse.status).toBe(200);
+      const fetched = await getResponse.json() as TransformationPolicy;
+      expect(fetched.policyJSON.outputs).toEqual(policyBody.policyJSON.outputs);
+
+      // Cleanup
+      await fetch(API_URL + `/policies/${created.policyId}`, {
+        method: "DELETE",
+        headers: createAuthHeaders(TEST_ACCESS_TOKEN),
+      });
+    });
+
+    test("POST create policy fails with fallback.dpr out of range (>5.0)", async () => {
+      // fallback.dpr max is 5.0 per schema
+      const response = await fetch(API_URL + "/policies", {
+        method: "POST",
+        headers: createAuthHeaders(TEST_ACCESS_TOKEN),
+        body: JSON.stringify({
+          policyName: "invalid-fallback-dpr",
+          policyJSON: {
+            outputs: [{ type: "quality", value: [80], fallback: { dpr: 6.0 } }],
+          },
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    test("POST create policy fails with fallback.viewportWidth out of range (<320)", async () => {
+      // fallback.viewportWidth min is 320 per schema
+      const response = await fetch(API_URL + "/policies", {
+        method: "POST",
+        headers: createAuthHeaders(TEST_ACCESS_TOKEN),
+        body: JSON.stringify({
+          policyName: "invalid-fallback-viewport",
+          policyJSON: {
+            outputs: [{ type: "autosize", value: [480, 768], fallback: { viewportWidth: 100 } }],
+          },
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
+
+    test("POST create policy fails with unsupported fallback.format value", async () => {
+      // fallback.format only accepts jpg/jpeg/png/webp/avif/gif/tiff — not "bmp"
+      const response = await fetch(API_URL + "/policies", {
+        method: "POST",
+        headers: createAuthHeaders(TEST_ACCESS_TOKEN),
+        body: JSON.stringify({
+          policyName: "invalid-fallback-format",
+          policyJSON: {
+            outputs: [{ type: "format", value: "auto", fallback: { format: "bmp" } }],
+          },
+        }),
+      });
+      expect(response.status).toBe(400);
+    });
+  });
 });

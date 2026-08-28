@@ -20,12 +20,13 @@ export const AVAILABLE_TRANSFORMATIONS: TransformationOption[] = [
   { id: 'normalize', title: 'Normalize', description: 'Normalize image contrast', category: 'effects' },
   
   // Advanced
-  { id: 'smartCrop', title: 'Smart Crop', description: 'Intelligent face-based cropping', category: 'advanced' },
+  { id: 'smartCrop', title: 'Smart Crop', description: 'Content-aware cropping using AI detection', category: 'advanced' },
   { id: 'extract', title: 'Extract', description: 'Extract region from image', category: 'advanced' },
   { id: 'convolve', title: 'Convolve', description: 'Apply convolution filter', category: 'advanced' },
   { id: 'flatten', title: 'Flatten', description: 'Flatten image with background color', category: 'advanced' },
   { id: 'stripExif', title: 'Strip EXIF', description: 'Remove EXIF metadata', category: 'advanced' },
   { id: 'stripIcc', title: 'Strip ICC', description: 'Remove ICC color profile', category: 'advanced' },
   { id: 'animated', title: 'Animated', description: 'Control animated image behavior', category: 'advanced' },
+  { id: 'contentModeration', title: 'Content Moderation', description: 'Detect and blur inappropriate content using ML', category: 'advanced' },
   { id: 'watermark', title: 'Watermark', description: 'Apply watermark overlay to image', category: 'advanced' }
 ];

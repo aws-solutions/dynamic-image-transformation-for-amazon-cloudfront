@@ -28,11 +28,13 @@
     "@aws-sdk/client-cloudformation": "^3.993.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.993.0",
     "@aws-sdk/client-dynamodb": "^3.993.0",
+    "@aws-sdk/credential-providers": "^3.993.0",
     "@aws-sdk/lib-dynamodb": "^3.993.0",
     "@types/aws-lambda": "^8.10.145",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.2.0",
     "esbuild": "^0.28.1",
+    "fast-check": "^4.5.3",
     "jest": "^30.0.5",
     "ts-jest": "^29.4.1",
     "typescript": "^5.9.2"
@@ -45,6 +47,8 @@
     "brace-expansion@5": "5.0.9",
     "handlebars": "4.7.9",
     "picomatch@2": "2.3.2",
-    "picomatch@4": "4.0.4"
-  }
+    "picomatch@4": "4.0.4",
+    "js-yaml@3": "3.15.1"
+  },
+  "resolutions": {}
 }
