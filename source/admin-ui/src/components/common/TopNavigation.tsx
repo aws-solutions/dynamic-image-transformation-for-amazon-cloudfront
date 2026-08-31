@@ -5,13 +5,7 @@ import { useNavigate } from 'react-router';
 import { Amplify } from 'aws-amplify';
 import { useUser } from '../../contexts/UserContext';
 
-interface TopNavigationProps {
-  onSignOut?: () => void;
-}
-
-export const TopNavigation: React.FC<TopNavigationProps> = ({ 
-  onSignOut
-}) => {
+export const TopNavigation: React.FC = () => {
   const { email, user } = useUser();
   const navigate = useNavigate();
 
@@ -29,15 +23,12 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
         const returnTo = `${window.location.origin}/auth/logout-complete`;
         const u = new URL(`https://${cognitoDomain}/logout`);
         u.searchParams.set("client_id", clientId);
-        u.searchParams.set("logout_uri", returnTo); // Use logout_uri, not redirect_uri
-        u.searchParams.set("state", crypto.randomUUID()); // Optional CSRF protection
-        
-        // Full redirect (bypass SPA router)
+        u.searchParams.set("logout_uri", returnTo);
+        u.searchParams.set("state", crypto.randomUUID());
         window.location.assign(u.toString());
       } else {
         navigate('/auth/logout-complete', { replace: true });
       }
-      
     } catch (error) {
       sessionStorage.clear();
       navigate('/auth/logout-complete', { replace: true });
@@ -55,16 +46,9 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
           type: 'menu-dropdown',
           text: userEmail,
           iconName: 'user-profile',
-          items: [
-            {
-              id: 'signout',
-              text: 'Sign out'
-            }
-          ],
+          items: [{ id: 'signout', text: 'Sign out' }],
           onItemClick: ({ detail }) => {
-            if (detail.id === 'signout') {
-              handleSignOut();
-            }
+            if (detail.id === 'signout') handleSignOut();
           }
         }
       ]}

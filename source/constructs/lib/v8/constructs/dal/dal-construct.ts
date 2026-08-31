@@ -1,21 +1,25 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { CfnOutput } from "aws-cdk-lib";
+import { Aws, CfnOutput, CfnResource } from "aws-cdk-lib";
 import {
   AccessLogField,
   AccessLogFormat,
   AuthorizationType,
+  CfnRestApi,
   CognitoUserPoolsAuthorizer,
+  EndpointAccessMode,
   GatewayResponse,
   LambdaRestApi,
   LogGroupLogDestination,
   ResponseType,
+  SecurityPolicy,
 } from "aws-cdk-lib/aws-apigateway";
 import { UserPool } from "aws-cdk-lib/aws-cognito";
 import { TableV2 } from "aws-cdk-lib/aws-dynamodb";
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import path from "path";
 import { addCfnGuardSuppressRules } from "../../../../utils/utils";
@@ -37,18 +41,38 @@ export class DalConstruct extends Construct {
 
     this.table = new SingleTableConstruct(this, "ConfigTable").table;
 
+    // Create secret for pagination token encryption
+    const paginationTokenSecret = new Secret(this, "PaginationTokenSecret", {
+      secretName: "PaginationTokenSecret",
+      generateSecretString: {
+        passwordLength: 64,
+        excludePunctuation: true,
+      },
+    });
+
+    addCfnGuardSuppressRules(paginationTokenSecret.node.defaultChild as CfnResource, [
+      {
+        id: "SECRETSMANAGER_USING_CMK",
+        reason:
+          "Pagination token secret is encrypted with the AWS-managed key for Secrets Manager. A customer-managed KMS key is not required here: the secret holds only a short-lived pagination-token signing value and is readable exclusively by the management API Lambda via a least-privilege grantRead.",
+      },
+    ]);
+
     this.lambda = new DITNodejsFunction(this, "ApiLambda", {
       entry: path.join(__dirname, "../../../../../management-lambda/index.ts"),
       projectRoot: path.join(__dirname, "../../../../../management-lambda"),
       depsLockFilePath: path.join(__dirname, "../../../../../management-lambda/package-lock.json"),
       environment: {
+        ACCOUNT_ID: Aws.ACCOUNT_ID,
         CONFIG_TABLE_NAME: this.table.tableName,
         CORS_ORIGIN: props.corsOrigin,
         POWERTOOLS_LOGGER_LOG_LEVEL: "INFO",
         POWERTOOLS_LOGGER_LOG_EVENT: "false",
+        PAGINATION_TOKEN_SECRET_ARN: paginationTokenSecret.secretArn,
       },
     });
     this.table.grantReadWriteData(this.lambda);
+    paginationTokenSecret.grantRead(this.lambda);
 
     addCfnGuardSuppressRules(this.lambda, [
       {
@@ -127,11 +151,17 @@ export class DalConstruct extends Construct {
       },
     });
 
+    // Enforce a TLS 1.2 floor with PFS ciphers (no CBC/legacy) on the default execute-api endpoint.
+    const cfnRestApi = this.api.node.defaultChild as CfnRestApi;
+    cfnRestApi.addPropertyOverride("SecurityPolicy", SecurityPolicy.TLS12_PFS_2025_EDGE);
+    cfnRestApi.addPropertyOverride("EndpointAccessMode", EndpointAccessMode.BASIC);
+
     addCfnGuardSuppressRules(this.api.deploymentStage, [
       {
         id: "API_GW_CACHE_ENABLED_AND_ENCRYPTED",
-        reason: "API Gateway caching is not required for this management API as it handles low-frequency administrative operations with dynamic responses."
-      }
+        reason:
+          "API Gateway caching is not required for this management API as it handles low-frequency administrative operations with dynamic responses.",
+      },
     ]);
 
     const responseHeaders = {

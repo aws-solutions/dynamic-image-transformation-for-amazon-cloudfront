@@ -40,10 +40,27 @@ export class ImageProcessorService {
 
       if (!imageRequest.transformations?.length) {
         imageRequest.response.contentType = imageRequest.sourceImageContentType;
+        // SVG passthrough serves raw bytes; harden the response against XSS.
+        this.applySvgSafetyHeaders(imageRequest);
         imageRequest.timings.imageProcessing.transformationApplicationMs = 0;
         return imageBuffer;
       }
-      
+
+      if (imageRequest.sourceImageContentType?.includes('svg')) {
+        const hasFormatTransformation = imageRequest.transformations.some(t => t.type === 'format');
+        const hasRasterizingTransformation = imageRequest.transformations.some(t => t.type !== 'quality' && t.type !== 'format');
+        if (!hasFormatTransformation && !hasRasterizingTransformation) {
+          imageRequest.response.contentType = imageRequest.sourceImageContentType;
+          // SVG passthrough (no format/rasterizing transform): serve raw bytes defensively.
+          this.applySvgSafetyHeaders(imageRequest);
+          imageRequest.timings.imageProcessing.transformationApplicationMs = 0;
+          return imageBuffer;
+        }
+        if (!hasFormatTransformation) {
+          imageRequest.transformations.push({ type: 'format', value: 'png', source: 'auto' });
+        }
+      }
+
       // Extract source dimensions to validate auto-resize transformations
       const metadata = await sharp(imageBuffer).metadata();
       this.preventAutoUpscaling(imageRequest, metadata.width);
@@ -59,20 +76,16 @@ export class ImageProcessorService {
         editCount: Object.keys(imageEdits).length
       }));
 
-      const isExpectedToBeAnimated = imageRequest.sourceImageContentType == 'image/gif';
-      let sharpOptions = {
-        failOn: 'warning' as const,
+      // Derive animation from the actual decoded frame count rather than the source content type.
+      // This correctly handles any multi-frame source (animated WebP, APNG, etc.), not just GIF.
+      const isExpectedToBeAnimated = (metadata.pages ?? 1) > 1;
+      const sharpOptions = {
+        failOnError: true,
         animated: isExpectedToBeAnimated
       }
 
       // Instantiate Sharp image with rotation-aware logic
-      let image = this.instantiateSharpImage(imageBuffer, imageEdits, sharpOptions);
-
-      // Override animated to false if the resource does not actually have multiple pages / frames
-      if (isExpectedToBeAnimated && (!metadata.pages || metadata.pages <= 1)) {
-        sharpOptions.animated = false;
-        image = await this.instantiateSharpImage(imageBuffer, imageEdits, sharpOptions);
-      }
+      const image = this.instantiateSharpImage(imageBuffer, imageEdits, sharpOptions);
 
       await EditApplicator.applyEdits(image, imageEdits, this.originFetcher);
       
@@ -83,7 +96,7 @@ export class ImageProcessorService {
       const totalImageProcessingMs = Date.now() - startTime;
       imageRequest.timings.imageProcessing.transformationApplicationMs = 
         totalImageProcessingMs - imageRequest.timings.imageProcessing.originFetchMs;
-      
+
       console.log(JSON.stringify({
         metricType: 'imageTransformation',
         originImageSize: originMetadata.size,
@@ -93,6 +106,29 @@ export class ImageProcessorService {
         transformationTimeMs: totalImageProcessingMs,
         requestId: imageRequest.requestId
       }));
+
+      imageRequest.metrics = {
+        preOptimization: {
+          width: metadata.width ?? null,
+          height: metadata.height ?? null,
+          size: imageBuffer.length,
+          format: originMetadata.format || 'unknown',
+        },
+        postOptimization: {
+          width: finalImage.info.width,
+          height: finalImage.info.height,
+          size: finalImage.info.size,
+          format: finalImage.info.format,
+        },
+        compressionRatio: finalImage.info.size > 0 ? Math.round((imageBuffer.length / finalImage.info.size) * 100) / 100 : null,
+        timings: {
+          originFetchMs: imageRequest.timings.imageProcessing.originFetchMs,
+          transformationApplicationMs: imageRequest.timings.imageProcessing.transformationApplicationMs,
+          requestResolutionMs: imageRequest.timings.requestResolution?.preflightValidationMs ?? 0,
+          transformationResolutionMs: imageRequest.timings.transformationResolution?.durationMs ?? 0,
+          totalRequestMs: Date.now() - imageRequest.timestamp,
+        },
+      };
 
       return finalImage.data;
     } catch (error) {
@@ -118,8 +154,22 @@ export class ImageProcessorService {
     });
   }
 
+  // SVG passthrough serves attacker-controllable bytes as image/svg+xml; force attachment + a locked-down
+  // CSP so it can't execute script via top-level navigation (<img> embedding still works).
+  private applySvgSafetyHeaders(imageRequest: ImageProcessingRequest): void {
+    const contentType = imageRequest.response.contentType ?? imageRequest.sourceImageContentType;
+    if (!contentType?.includes('svg')) return;
+    if (!imageRequest.response.headers) imageRequest.response.headers = {};
+    imageRequest.response.headers['Content-Disposition'] = 'attachment';
+    imageRequest.response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox";
+  }
+
   private instantiateSharpImage(imageBuffer: Buffer, imageEdits: any, options?: any): Sharp {
-    const limitInputPixels = parseInt(process.env.LIMIT_INPUT_PIXELS || '1000000000', 10);
+    // LIMIT_INPUT_PIXELS is set per deployment size by the CDK (50 MP on the 2 GB tier, 100 MP on
+    // the 4 GB tiers) as a decode-memory guard. The fallback matches the smallest tier so an
+    // unset/invalid value fails safe rather than reverting to an effectively unlimited ceiling.
+    const parsedLimit = parseInt(process.env.LIMIT_INPUT_PIXELS || '', 10);
+    const limitInputPixels = Number.isNaN(parsedLimit) ? 50000000 : parsedLimit;
     const sharpOptions: SharpOptions = { limitInputPixels, ...options };
     // Default behavior of DIT is to keep all Metadata. Sharp by default converts the ICC to sRGB. Must chain keepIcc and keepMetadata to prevent this.
     let returnInstance = sharp(imageBuffer, sharpOptions).keepIccProfile().keepMetadata();

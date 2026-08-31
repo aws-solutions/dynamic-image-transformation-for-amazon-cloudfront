@@ -11,17 +11,10 @@ describe('Origin Flow - Create Delete Tests', { tags: ['@crud'] }, () => {
   });
 
   it('[@crud] should create and delete a basic origin', () => {
-    const originData = OriginFactory.createBasicOrigin({ name: 'Simple Test Origin' });
-    
-    // Create origin
-    cy.get('button').contains('Create origin').click();
-    OriginPage.fillOriginForm(originData);
-    OriginPage.submitCreateOrigin();
+    const originData = OriginFactory.createBasicOrigin();
 
-    // Verify creation (user sees origin in list)
-    cy.url().should('include', '/origins');
-    cy.contains(originData.name).should('be.visible');
-    
+    OriginPage.provisionOrigin(originData);
+
     // Delete origin
     OriginPage.deleteOrigin(originData.name);
     

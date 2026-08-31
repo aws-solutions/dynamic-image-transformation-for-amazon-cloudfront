@@ -20,6 +20,9 @@ async function loadConfigAndRenderApp() {
   
   const amplifyV1Config = await response.json();
 
+  // Store image processing domain for Playground
+  window.__imageProcessingDomain = amplifyV1Config.ImageProcessing?.distributionDomain || '';
+
   // map legacy config to expected config format of Amplify gen2
   const amplifyV2Config: ResourcesConfig = {
     Auth: {

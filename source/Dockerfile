@@ -1,11 +1,10 @@
 # Compliant Dockerfile using only approved Amazon ECR Public Gallery images
-FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS builder
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal AS builder
 
 WORKDIR /app
 
-# Install Node.js 22 (Active LTS; sharp >=0.35 requires Node.js >=20.9.0)
-RUN dnf update -y && \
-    dnf install -y nodejs22 nodejs22-npm && \
+# Install Node.js 20 (minimal image excludes Python, eliminating pip/setuptools CVEs from SBOM)
+RUN dnf install -y nodejs20 nodejs20-npm && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -29,12 +28,11 @@ RUN npm run build --workspace=data-models && \
     npm run build --workspace=container
 
 # Production dependencies stage
-FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS deps
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal AS deps
 WORKDIR /app
 
-# Install Node.js 22 (Active LTS; sharp >=0.35 requires Node.js >=20.9.0)
-RUN dnf update -y && \
-    dnf install -y nodejs22 nodejs22-npm && \
+# Install Node.js 20 and findutils (for dependency cleanup below)
+RUN dnf install -y nodejs20 nodejs20-npm findutils && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -60,12 +58,11 @@ RUN npm ci --workspaces --omit=dev --no-audit --no-fund && \
 
 
 # Final minimal stage
-FROM public.ecr.aws/amazonlinux/amazonlinux:minimal
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal
 WORKDIR /app
 
-# Install Node.js 22 runtime (Active LTS; sharp >=0.35 requires Node.js >=20.9.0) and shadow-utils for user management
-RUN dnf update -y && \
-    dnf install -y nodejs22 shadow-utils && \
+# Install Node.js 20 runtime and shadow-utils for user management
+RUN dnf install -y nodejs20 shadow-utils && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 

@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.1.0] - 2026-08-31
+
+### Added
+
+- **Enhanced Smart Cropping** — expanded Amazon Rekognition integration to support smart-cropping across multiple detection methods. In addition to existing face detection, customers can now crop around Rekognition standard labels (e.g. `car, truck, van`), retain text via Rekognition text detection, and train and supply their own Rekognition Custom Model for domain-specific detection. Caching is enabled so DIT can reuse Rekognition results and reduce cost.
+- **Multi-Tier Device Detection** — moved the CloudFront header-normalization function to a multi-tier detection scheme. Added a `Sec-CH-Width` render-width signal and a CloudFront device-class tier (`cloudfront-is-{mobile,tablet,desktop,smarttv}-viewer`, mapped to viewport-width/DPR presets), evaluated as an ordered waterfall with a policy fallback on the ECS service. The device-class tier resolves device dimensions for clients that do not send Client Hints.
+- **Image Transformation Playground** — added a Playground page to the Admin UI that issues transformation and optimization requests against the deployed image endpoint and renders the output alongside per-request performance metrics. Because it calls the live endpoint, policies, origin mappings, and configuration must be deployed for it to resolve.
+- **Content Moderation** — brought automatic detection and blurring of sensitive or inappropriate content to the ECS architecture, matching the capability previously available on the Lambda architecture.
+- **Base64 (`b64`) request style** — added support for `b64`-encoded requests on the ECS architecture's image endpoint.
+- **Auto-optimization fallbacks** — added an optional `fallback` to the `quality`, `format`, and `autosize` output transformations in the transformation-policy schema (fallback DPR, format, and viewport width respectively), applied by the auto-optimizer when the primary optimization cannot be satisfied, with matching configuration in the Admin UI.
+- **Usage metrics** — added metrics tracking for smart-crop usage, content-moderation usage, and client-tier detection.
+
+### Changed
+
+- Refactored the container Docker image build to use minimal Amazon Linux base layers.
+- SVG requests now pass through unmodified when no rasterizing transformation is requested, and are rasterized (defaulting to PNG output) when a sizing or other raster transformation applies.
+- Set a TLS 1.2 floor with PFS ciphers (`TLS12_PFS_2025_EDGE`) on the Admin API's default `execute-api` endpoint.
+- Admin UI now uses a shared page layout across pages.
+
+### Fixed
+
+- Source image is now inspected via image metadata (not extension) to determine whether it is animated when instantiating Sharp.
+- Admin UI redirects to login on token-refresh failure.
+- Admin UI allows removal of optional fields when editing entities.
+- Reworked autosize fallback to prevent double/repeat breakpoint snapping.
+
+### Security
+
+- Restricted origin-override request headers to a `dit-*` prefix and validated `CUSTOM_ORIGIN_HEADER` to prevent SSRF.
+- Enforce an image `Content-Type` on origin fetch to prevent raw-body reads.
+- Constant-time comparison of HMAC request signatures; redacted signatures from query-parameter logging.
+- Scale `LIMIT_INPUT_PIXELS` to the deployment size.
+- Reduced cleartext `originHeaders` exposure and gated debug logging behind log level.
+
 ## [8.0.6] - 2026-08-06
 
 ### Security

@@ -3,16 +3,16 @@
 
 import sharp, { Sharp, Metadata, OutputInfo } from 'sharp';
 import { ImageEdits } from '../interfaces';
-import { RekognitionClient, DetectFacesCommand } from '@aws-sdk/client-rekognition';
-import { getOptions } from '../../../utils/get-options';
 import { SharpUtils } from '../utils/sharp-utils';
 import { ImageFitTypes } from '../enums';
 import { ImageProcessingError } from '../types';
+import { ErrorMapper } from '../utils/error-mapping';
 import { CacheRegistry } from '../../cache/cache-registry';
 import { OriginFetcher } from '../origin-fetcher';
+import { SmartCropService } from '../../smart-crop/smart-crop.service';
+import { ContentModerationService } from '../../content-moderation/content-moderation.service';
 
 export class EditApplicator {
-  private static rekognitionClient = new RekognitionClient(getOptions());
   private static originFetcher: OriginFetcher;
 
   static async applyEdits(image: Sharp, edits: ImageEdits, originFetcher: OriginFetcher): Promise<void> {
@@ -23,7 +23,11 @@ export class EditApplicator {
       console.debug('Attempting to apply the following edits: ', edits);
 
       if (edits.smartCrop) {
-        await this.applySmartCrop(image, edits.smartCrop);
+        await SmartCropService.getInstance().execute(image, edits.smartCrop);
+      }
+
+      if (edits.contentModeration && !isAnimation) {
+        await ContentModerationService.getInstance().execute(image, edits.contentModeration);
       }
 
       // For efficiency we attempt resizing prior to other image transformations. Certain transforms will defer resizing (watermark, crop, etc)
@@ -33,6 +37,8 @@ export class EditApplicator {
         if (SharpUtils.shouldSkipForAnimation(operation, isAnimation)) continue;
           switch (operation) {
             case 'smartCrop':
+              break;
+            case 'contentModeration':
               break;
             case 'composite':
               await this.applyWatermark(image, value);
@@ -64,7 +70,9 @@ export class EditApplicator {
     } catch (error) {
       if (error instanceof ImageProcessingError) throw error;
       console.error('Sharp applyEdits failed:', { edits, error: error.message, stack: error.stack });
-      throw new ImageProcessingError(500, "Image Processing Error", `Image transformation failed`, error);
+      // Route through ErrorMapper so recognized Sharp errors (e.g. the pixel-limit rejection) keep
+      // their correct client status code instead of being flattened to a blanket 500.
+      throw ErrorMapper.mapError(error);
     }
   }
 
@@ -131,37 +139,6 @@ export class EditApplicator {
     }
   }
 
-
-  private static async applySmartCrop(image: Sharp, params: any): Promise<void> {
-    try {
-      const [faceIndex = 0, padding = 0] = Array.isArray(params) ? params : [params?.faceIndex || 0, params?.padding || 0];
-      console.debug('SmartCrop params:', { faceIndex, padding });
-      
-      const { imageBuffer, format } = await this.getRekognitionCompatibleImage(image);
-      const boundingBox = await this.getBoundingBox(imageBuffer.data, faceIndex);
-      const cropArea = this.getCropArea(boundingBox, padding, imageBuffer.info);
-      
-      console.debug('SmartCrop area:', cropArea);
-      image.extract(cropArea);
-      
-      if (format !== imageBuffer.info.format) {
-        image.toFormat(format);
-        console.log('SmartCrop: Converted format back to:', format);
-      }
-    } catch (error) {
-      console.error('SmartCrop failed:', { params, error: error.message, stack: error.stack });
-      throw error;
-    }
-  }
-
-  private static async getBoundingBox(imageBuffer: Buffer, faceIndex: number): Promise<any> {
-    const response = await this.rekognitionClient.send(new DetectFacesCommand({ Image: { Bytes: imageBuffer } }));
-    if (!response.FaceDetails?.length) {
-      return { height: 1, left: 0, top: 0, width: 1 };
-    }
-    const box = response.FaceDetails[faceIndex].BoundingBox;
-    return { height: box.Height, left: box.Left, top: box.Top, width: box.Width };
-  }
 
   private static async applyWatermark(image: Sharp, edit: Record<string, any>) {
     try {
@@ -243,31 +220,6 @@ export class EditApplicator {
     return result;
   }
 
-  private static getCropArea(boundingBox: any, padding: number, boxSize: any): any {
-    let left = Math.floor(boundingBox.left * boxSize.width - padding);
-    let top = Math.floor(boundingBox.top * boxSize.height - padding);
-    let width = Math.floor(boundingBox.width * boxSize.width + padding * 2);
-    let height = Math.floor(boundingBox.height * boxSize.height + padding * 2);
-
-    left = Math.max(0, left);
-    top = Math.max(0, top);
-    width = Math.min(width, boxSize.width - left);
-    height = Math.min(height, boxSize.height - top);
-
-    return { left, top, width, height };
-  }
-
-  private static async getRekognitionCompatibleImage(image: Sharp): Promise<any> {
-    const buffer = await image.toBuffer({ resolveWithObject: true });
-    const format = buffer.info.format;
-    
-    if (!['jpeg', 'png'].includes(format)) {
-      const pngBuffer = await image.png().toBuffer({ resolveWithObject: true });
-      return { imageBuffer: pngBuffer, format };
-    }
-    
-    return { imageBuffer: buffer, format };
-  }
 
   private static normalizeSource(source: string): string {
     // HTTPS is the only supported protocol by DIT. Strip any protocol and replace with https://

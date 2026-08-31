@@ -283,5 +283,20 @@ describe('Origin Schema Validation', () => {
       });
       expect(result.success).toBe(true);
     });
+
+    test('should accept null for originPath (signals deletion)', () => {
+      const result = validateOriginUpdate({ originPath: null });
+      expect(result.success).toBe(true);
+    });
+
+    test('should accept null for originHeaders (signals deletion)', () => {
+      const result = validateOriginUpdate({ originHeaders: null });
+      expect(result.success).toBe(true);
+    });
+
+    test('should accept null alongside other valid updates', () => {
+      const result = validateOriginUpdate({ originName: 'New Name', originPath: null });
+      expect(result.success).toBe(true);
+    });
   });
 });

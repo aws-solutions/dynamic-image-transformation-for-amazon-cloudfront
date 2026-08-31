@@ -141,7 +141,7 @@ export class BackEnd extends Construct {
             // the asset. npm 10.4.0+ --libc=glibc is needed for the platform-specific deps to be
             // installed when cross-compiling sharp from mac to linux.
             return [
-              `cd ${outputDir} && rm -rf node_modules/sharp && npm install --cpu=x64 --os=linux --libc=glibc sharp`,
+              `cd ${outputDir} && rm -rf node_modules/sharp node_modules/@img package-lock.json && npm install --include=optional --cpu=x64 --os=linux --libc=glibc sharp`,
             ];
           },
         },

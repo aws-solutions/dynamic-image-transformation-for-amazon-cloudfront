@@ -1,8 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { DynamoDBClient as DDBClient, ScanCommand, BatchWriteItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBClient as DDBClient,
+  ScanCommand,
+  BatchWriteItemCommand,
+  GetItemCommand,
+} from "@aws-sdk/client-dynamodb";
 import { ScanCommandOutput } from "@aws-sdk/lib-dynamodb";
+import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
 
 export class DynamoDBClient {
   private readonly ddbClient: DDBClient;
@@ -11,8 +17,36 @@ export class DynamoDBClient {
     region: string,
     private readonly tableName: string
   ) {
-    this.ddbClient = new DDBClient({ region });
+    this.ddbClient = new DDBClient({ region, credentials: fromNodeProviderChain() });
     this.tableName = tableName;
+  }
+
+  /**
+   * Reads the stored originHeaders for an origin straight from DynamoDB, as raw attribute values.
+   *
+   * Lets a test assert what is actually persisted rather than what the API chose to return —
+   * necessary because originHeaders values are write-only and never appear in a response.
+   *
+   * Reads consistently: callers write through the API and read back immediately, so an eventually
+   * consistent read could return the pre-write image. That would fail the exact-equality assertions
+   * outright, and worse, silently pass the "update omits originHeaders" case — where the stale image
+   * carries the same header value the test is checking for.
+   *
+   * @returns header name → stored string value, or undefined if the item has no headers
+   */
+  async getStoredOriginHeaders(originId: string): Promise<Record<string, string> | undefined> {
+    const result = await this.ddbClient.send(
+      new GetItemCommand({
+        TableName: this.tableName,
+        Key: { PK: { S: originId } },
+        ConsistentRead: true,
+      })
+    );
+
+    const headers = result.Item?.Data?.M?.originHeaders?.M;
+    if (!headers) return undefined;
+
+    return Object.fromEntries(Object.entries(headers).map(([name, value]) => [name, value.S ?? ""]));
   }
 
   async deleteAllItems() {

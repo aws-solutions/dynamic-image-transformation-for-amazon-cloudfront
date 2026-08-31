@@ -47,10 +47,7 @@ export class TransformationPolicyPage {
         });
         
         // Wait for configuration modal
-        cy.contains('Add Transformation - Step 2 of 2').should('be.visible');
-        
-        // Wait for modal content to fully load
-        cy.wait(1000);
+        cy.contains('Add to Policy').should('be.visible');
         
         // Fill configuration if provided
         if (transformation.config) {
@@ -72,11 +69,10 @@ export class TransformationPolicyPage {
         
         // Wait for output selection modal to be visible and fully loaded
         cy.get('[role="dialog"]').should('be.visible');
-        cy.wait(1000);
+        cy.contains('Quality Optimization').should('be.visible');
         
         // Search at body level since modal is a portal
         cy.get('body').within(() => {
-          cy.contains('Quality Optimization').should('be.visible');
           const radioIndex = this.getOutputOptimizationIndex(output.type);
           
           // Check if enough radio buttons exist, otherwise use first one
@@ -86,8 +82,7 @@ export class TransformationPolicyPage {
           });
         });
         
-        // Wait for second modal (configuration modal) to load
-        cy.wait(1000);
+        // Wait for configuration modal to load deterministically
         cy.contains('Add to Policy').should('be.visible');
         
         // Fill configuration if provided
@@ -241,7 +236,7 @@ export class TransformationPolicyPage {
 
   // Actions
   static submitCreatePolicy() {
-    cy.get('button').contains('Create Policy').click();
+    cy.get('button').contains('Create Policy').should('not.be.disabled').click();
   }
 
   static submitUpdatePolicy() {

@@ -15,8 +15,9 @@ import { ImageProcessingError } from '../services/image-processing/types';
 
 const router = Router();
 
-// Headers to exclude from forwarding
-const EXCLUDED_HEADERS: string[] = ['host', 'accept'];
+// Headers to exclude from forwarding. x-dit-authorization is DIT's own token, never an origin's;
+// `authorization`/`cookie` are deliberately forwarded so clients can fetch images behind auth.
+const EXCLUDED_HEADERS: string[] = ['host', 'accept', 'x-dit-authorization'];
 
 // Memory protection limits
 const MAX_HEADERS = 50;
@@ -62,6 +63,17 @@ router.get('*', async (req: Request, res: Response) => {
     res.set(imageRequest.response.headers);
     if (CORS_ORIGIN) {
       res.set('Access-Control-Allow-Origin', CORS_ORIGIN);
+    }
+    if (res.locals.isAuthenticated && imageRequest.metrics) {
+      res.set('x-dit-metrics', JSON.stringify(imageRequest.metrics));
+      // Keep metrics responses out of the shared CloudFront cache (cache key excludes Authorization)
+      res.set('Cache-Control', 'private, no-store');
+      console.log(JSON.stringify({
+        requestId: imageRequest.requestId,
+        component: 'ImageRouter',
+        operation: 'metrics_attached',
+        ...imageRequest.metrics,
+      }));
     }
     res.type(imageRequest.response.contentType || 'image/jpeg');
     res.send(processedImage);

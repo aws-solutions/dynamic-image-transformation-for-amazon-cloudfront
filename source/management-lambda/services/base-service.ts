@@ -3,7 +3,15 @@
 
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { z, ZodSafeParseResult } from "zod";
-import { BadRequestError, ErrorCodes, generateId, NotFoundError, logger } from "../common";
+import {
+  BadRequestError,
+  ErrorCodes,
+  generateId,
+  NotFoundError,
+  logger,
+  applyMergePatch,
+  redactOriginHeaders,
+} from "../common";
 import {
   type AllowedDataModelEntities,
   type AllowedDBEntities,
@@ -32,6 +40,17 @@ export abstract class BaseService<T extends AllowedDBEntities, K extends Allowed
   }
 
   async get(id: unknown): Promise<K> {
+    return this.getInternal(id);
+  }
+
+  /**
+   * Reads an entity for internal use, bypassing any response shaping a subclass applies in get().
+   *
+   * Subclasses may override get() to withhold sensitive fields from callers (see OriginService).
+   * Internal read-merge-write flows must not go through those overrides, or the withheld placeholder
+   * would be merged and persisted over the stored value.
+   */
+  protected async getInternal(id: unknown): Promise<K> {
     const validatedId = this.validateId(id);
     const item = await this.dao.get(validatedId);
     if (!item) throw new NotFoundError("Item not found");
@@ -68,7 +87,7 @@ export abstract class BaseService<T extends AllowedDBEntities, K extends Allowed
     } else if ("policyName" in validatedRequest) {
       item = { ...item, policyId: id };
     }
-    logger.debug("Creating entity", { item });
+    logger.debug("Creating entity", { item: redactOriginHeaders(item) });
     const dbItem = this.dao.convertToDB(item as K);
     try {
       await this.dao.create(dbItem);
@@ -82,17 +101,30 @@ export abstract class BaseService<T extends AllowedDBEntities, K extends Allowed
   }
 
   async update(id: unknown, updateRequest: unknown): Promise<K> {
-    this.validateId(id);
+    const validatedId = this.validateId(id);
     const validatedRequest = this.validateUpdateRequest(updateRequest);
 
-    const oldData = await this.get(id);
+    const entity = await this.buildUpdatedEntity(validatedId, validatedRequest as AllowedRequestTypes);
+    await this.saveEntity(entity);
+    return entity;
+  }
+
+  /**
+   * Builds the merged entity without persisting. Subclasses can override update()
+   * to validate the merged entity before calling saveEntity().
+   */
+  protected async buildUpdatedEntity(validatedId: string, patch: AllowedRequestTypes): Promise<K> {
+    const existing = await this.getInternal(validatedId);
     const updatedAt = new Date().toISOString();
-    const entity: K = {
-      ...oldData,
-      ...validatedRequest,
-      updatedAt,
-    };
-    logger.debug("Updating entity", { entity });
+    const entity = applyMergePatch(
+      { ...existing, updatedAt } as Record<string, unknown>,
+      patch
+    ) as K;
+    logger.debug("Updating entity", { entity: redactOriginHeaders(entity as Record<string, unknown>) });
+    return entity;
+  }
+
+  protected async saveEntity(entity: K): Promise<void> {
     const item: T = this.dao.convertToDB(entity);
     try {
       await this.dao.update(item);
@@ -102,7 +134,6 @@ export abstract class BaseService<T extends AllowedDBEntities, K extends Allowed
       }
       throw err;
     }
-    return entity;
   }
 
   /**

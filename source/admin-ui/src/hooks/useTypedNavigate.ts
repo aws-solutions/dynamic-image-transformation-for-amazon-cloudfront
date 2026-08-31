@@ -21,6 +21,7 @@ export const useTypedNavigate = () => {
     toPolicies: () => navigate(ROUTES.TRANSFORMATION_POLICIES),
     toPolicyCreate: () => navigate(ROUTES.TRANSFORMATION_POLICY_CREATE),
     toPolicyDetails: (id: string) => navigate(generatePath(ROUTES.TRANSFORMATION_POLICY_DETAILS, { id })),
-    toPolicyEdit: (id: string) => navigate(generatePath(ROUTES.TRANSFORMATION_POLICY_EDIT, { id }))
+    toPolicyEdit: (id: string) => navigate(generatePath(ROUTES.TRANSFORMATION_POLICY_EDIT, { id })),
+    toPlayground: () => navigate(ROUTES.PLAYGROUND),
   };
 };

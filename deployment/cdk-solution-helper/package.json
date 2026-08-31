@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
-    "aws-cdk-lib": "2.263.0"
+    "aws-cdk-lib": "2.265.0"
   },
   "overrides": {
     "semver": "7.5.4",
@@ -37,7 +37,7 @@
     "diff@4": "4.0.4",
     "@babel/core": "7.29.6",
     "fast-uri@3": ">=3.1.4",
-    "js-yaml@3": "3.15.0"
+    "js-yaml@3": "3.15.1"
   },
   "resolutions": {
     "semver": "7.5.4"

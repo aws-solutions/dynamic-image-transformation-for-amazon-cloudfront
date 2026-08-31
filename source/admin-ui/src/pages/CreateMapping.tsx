@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
-  AppLayout,
   ContentLayout,
   Header,
   SpaceBetween,
@@ -12,25 +11,18 @@ import {
   Textarea,
   Select,
   Alert,
-  Container,
-  SideNavigation
+  Container
 } from '@cloudscape-design/components';
 import { MappingProvider, useMappingContext } from '../contexts/MappingContext';
 import { OriginProvider, useOriginContext } from '../contexts/OriginContext';
 import { TransformationPolicyProvider, useTransformationPolicyContext } from '../contexts/TransformationPolicyContext';
 import { PropagationDisclaimer } from '../components/common/PropagationDisclaimer';
-import { useTypedNavigate } from '../hooks/useTypedNavigate';
+import { PageLayout } from '../components/layout/PageLayout';
+import { MappingHelpPanel } from '../components/help/MappingHelpPanel';
 import { useFlashMessages } from '../hooks/useFlashMessages';
 import { MappingService } from '../services/mappingService';
-import { TransformationPolicyService } from '../services/transformationPolicyService';
 import { ROUTES } from '../constants/routes';
-import { NAVIGATION_ITEMS } from '../constants/navigation';
 import { MappingCreate } from '@data-models';
-import { TransformationPolicy } from '@data-models';
-import { TopNavigation } from '../components/common/TopNavigation';
-import { BreadcrumbBar } from '../components/common/BreadcrumbBar';
-import { MappingHelpPanel } from '../components/help/MappingHelpPanel';
-import { AuthService } from '../services/authService';
 import { validateMappingCreateData, validateMappingUpdateData } from '../utils/validation';
 
 const CreateMappingContent: React.FC = () => {
@@ -40,13 +32,8 @@ const CreateMappingContent: React.FC = () => {
   const { createMapping, updateMapping } = useMappingContext();
   const { allOrigins, fetchAllOrigins } = useOriginContext();
   const { allPolicies, fetchAllPolicies } = useTransformationPolicyContext();
-  const { toMappings } = useTypedNavigate();
   const { clearMessages } = useFlashMessages();
 
-  const [navigationOpen, setNavigationOpen] = useState(true);
-  const [helpPanelOpen, setHelpPanelOpen] = useState(false);
-  const [activeHref, setActiveHref] = useState<string>(ROUTES.MAPPINGS);
-  
   const [formData, setFormData] = useState<MappingCreate>({
     mappingName: '',
     description: '',
@@ -112,6 +99,14 @@ const CreateMappingContent: React.FC = () => {
   const handleSubmit = async () => {
     setShowValidation(true);
     setValidationErrors({});
+
+    // Check that at least one pattern field is provided
+    if (!formData.hostHeaderPattern?.trim() && !formData.pathPattern?.trim()) {
+      setValidationErrors({
+        hostHeaderPattern: 'Either host header pattern or path pattern must be provided',
+      });
+      return;
+    }
     
     // Clean form data for validation (convert empty strings to undefined)
     const cleanedFormData = {
@@ -135,14 +130,20 @@ const CreateMappingContent: React.FC = () => {
     setError(null);
 
     try {
+      // Helper: null (delete) in edit mode, undefined (omit) in create mode
+      const optionalField = (value: string | undefined) =>
+        isEditing ? (value?.trim() || null) : (value?.trim() || undefined);
+      const optionalId = (value: string | undefined) =>
+        isEditing ? (value || null) : (value || undefined);
+
       // Convert MappingFormData to MappingCreate/MappingUpdate
       const apiData = {
         mappingName: formData.mappingName.trim(),
-        description: formData.description.trim(),
-        hostHeaderPattern: formData.hostHeaderPattern?.trim() || undefined,
-        pathPattern: formData.pathPattern?.trim() || undefined,
+        description: optionalField(formData.description),
+        hostHeaderPattern: optionalField(formData.hostHeaderPattern),
+        pathPattern: optionalField(formData.pathPattern),
         originId: formData.originId,
-        policyId: formData.policyId || undefined
+        policyId: optionalId(formData.policyId)
       };
 
       const result = isEditing && id
@@ -169,16 +170,7 @@ const CreateMappingContent: React.FC = () => {
 
   const handleCancel = () => {
     clearMessages();
-    toMappings();
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await AuthService.signOut();
-      navigate('/auth/logout-complete');
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
+    navigate(ROUTES.MAPPINGS);
   };
 
   const validateField = (field: keyof MappingCreate, value: string) => {
@@ -250,174 +242,144 @@ const CreateMappingContent: React.FC = () => {
   ];
 
   return (
-    <>
-      <TopNavigation onSignOut={handleSignOut} />
-      <BreadcrumbBar 
-        breadcrumbs={breadcrumbs} 
-        onHelpClick={() => setHelpPanelOpen(!helpPanelOpen)} 
-      />
-      <AppLayout
-        navigation={
-          <SideNavigation
-            activeHref={activeHref}
-            items={NAVIGATION_ITEMS}
-            onFollow={(event) => {
-            if (!event.detail.external) {
-              event.preventDefault();
-              setActiveHref(event.detail.href);
-              if (event.detail.href === ROUTES.ORIGINS) {
-                navigate(ROUTES.ORIGINS);
-              } else if (event.detail.href === ROUTES.MAPPINGS) {
-                navigate(ROUTES.MAPPINGS);
-              } else if (event.detail.href === ROUTES.TRANSFORMATION_POLICIES) {
-                navigate(ROUTES.TRANSFORMATION_POLICIES);
+    <PageLayout
+      activeHref={ROUTES.MAPPINGS}
+      breadcrumbs={breadcrumbs}
+      helpPanel={<MappingHelpPanel />}
+    >
+      <ContentLayout
+        header={
+          <Header variant="h1">
+            {isEditing ? 'Edit mapping' : 'Create mapping'}
+          </Header>
+        }
+      >
+        <SpaceBetween size="l">
+          {error && (
+            <Alert 
+              type="error" 
+              statusIconAriaLabel="Error"
+              dismissible
+              onDismiss={() => setError(null)}
+            >
+              {error}
+            </Alert>
+          )}
+
+          <Container>
+            <SpaceBetween size="l">
+              <PropagationDisclaimer />
+              <Form
+              actions={
+                <SpaceBetween direction="horizontal" size="xs">
+                  <Button variant="link" type="button" onClick={handleCancel}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    onClick={handleSubmit}
+                    loading={loading}
+                    disabled={!formData.mappingName || !formData.originId || loadingMapping}
+                  >
+                    {isEditing ? 'Update mapping' : 'Create mapping'}
+                  </Button>
+                </SpaceBetween>
               }
-            }
-          }}
-        />
-      }
-      navigationOpen={navigationOpen}
-      onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
-      tools={helpPanelOpen ? <MappingHelpPanel /> : undefined}
-      toolsOpen={helpPanelOpen}
-      onToolsChange={({ detail }) => setHelpPanelOpen(detail.open)}
-      toolsHide={!helpPanelOpen}
-      content={
-        <ContentLayout
-          header={
-            <Header variant="h1">
-              {isEditing ? 'Edit mapping' : 'Create mapping'}
-            </Header>
-          }
-        >
-          <SpaceBetween size="l">
-            {error && (
-              <Alert 
-                type="error" 
-                statusIconAriaLabel="Error"
-                dismissible
-                onDismiss={() => setError(null)}
               >
-                {error}
-              </Alert>
-            )}
+                <SpaceBetween size="l">
+                  <FormField
+                    label="Name"
+                    description="A unique name for this mapping"
+                    errorText={validationErrors.mappingName || (showValidation && !formData.mappingName ? "Name is required" : undefined)}
+                    controlId="mapping-name"
+                  >
+                    <Input
+                      value={formData.mappingName}
+                      onChange={({ detail }) => updateFormData('mappingName', detail.value)}
+                      onBlur={() => validateField('mappingName', formData.mappingName)}
+                      placeholder="Enter mapping name"
+                    />
+                  </FormField>
 
-            <Container>
-              <SpaceBetween size="l">
-                <PropagationDisclaimer />
-                <Form
-                actions={
-                  <SpaceBetween direction="horizontal" size="xs">
-                    <Button variant="link" type="button" onClick={handleCancel}>
-                      Cancel
-                    </Button>
-                    <Button 
-                      variant="primary" 
-                      onClick={handleSubmit}
-                      loading={loading}
-                      disabled={!formData.mappingName || !formData.originId || loadingMapping}
-                    >
-                      {isEditing ? 'Update mapping' : 'Create mapping'}
-                    </Button>
-                  </SpaceBetween>
-                }
-                >
-                  <SpaceBetween size="l">
-                    <FormField
-                      label="Name"
-                      description="A unique name for this mapping"
-                      errorText={validationErrors.mappingName || (showValidation && !formData.mappingName ? "Name is required" : undefined)}
-                      controlId="mapping-name"
-                    >
-                      <Input
-                        value={formData.mappingName}
-                        onChange={({ detail }) => updateFormData('mappingName', detail.value)}
-                        onBlur={() => validateField('mappingName', formData.mappingName)}
-                        placeholder="Enter mapping name"
-                      />
-                    </FormField>
+                  <FormField
+                    label="Description (optional)"
+                    description="Optional description for this mapping"
+                    errorText={validationErrors.description}
+                    controlId="mapping-description"
+                  >
+                    <Textarea
+                      value={formData.description}
+                      onChange={({ detail }) => updateFormData('description', detail.value)}
+                      onBlur={() => validateField('description', formData.description)}
+                      placeholder="Enter mapping description"
+                      rows={3}
+                    />
+                  </FormField>
 
-                    <FormField
-                      label="Description (optional)"
-                      description="Optional description for this mapping"
-                      errorText={validationErrors.description}
-                      controlId="mapping-description"
-                    >
-                      <Textarea
-                        value={formData.description}
-                        onChange={({ detail }) => updateFormData('description', detail.value)}
-                        onBlur={() => validateField('description', formData.description)}
-                        placeholder="Enter mapping description"
-                        rows={3}
-                      />
-                    </FormField>
+                  <FormField
+                    label="Origin"
+                    description="Select the origin server for this mapping"
+                    errorText={validationErrors.originId || (showValidation && !formData.originId ? "Origin is required" : undefined)}
+                    controlId="mapping-origin"
+                  >
+                    <Select
+                      selectedOption={originOptions.find(opt => opt.value === formData.originId) || null}
+                      onChange={({ detail }) => updateFormData('originId', detail.selectedOption?.value || '')}
+                      options={originOptions}
+                      placeholder="Choose an origin"
+                      empty="No origins available"
+                      filteringType="auto"
+                    />
+                  </FormField>
 
-                    <FormField
-                      label="Origin"
-                      description="Select the origin server for this mapping"
-                      errorText={validationErrors.originId || (showValidation && !formData.originId ? "Origin is required" : undefined)}
-                      controlId="mapping-origin"
-                    >
-                      <Select
-                        selectedOption={originOptions.find(opt => opt.value === formData.originId) || null}
-                        onChange={({ detail }) => updateFormData('originId', detail.selectedOption?.value || '')}
-                        options={originOptions}
-                        placeholder="Choose an origin"
-                        empty="No origins available"
-                        filteringType="auto"
-                      />
-                    </FormField>
+                  <FormField
+                    label="Host header pattern"
+                    description="Pattern to match against the Host header"
+                    controlId="mapping-host-pattern"
+                    errorText={validationErrors.hostHeaderPattern}
+                  >
+                    <Input
+                      value={formData.hostHeaderPattern}
+                      onChange={({ detail }) => updateFormData('hostHeaderPattern', detail.value)}
+                      onBlur={() => validateField('hostHeaderPattern', formData.hostHeaderPattern)}
+                      placeholder="e.g., *.example.com"
+                    />
+                  </FormField>
 
-                    <FormField
-                      label="Host header pattern"
-                      description="Pattern to match against the Host header"
-                      controlId="mapping-host-pattern"
-                      errorText={validationErrors.hostHeaderPattern}
-                    >
-                      <Input
-                        value={formData.hostHeaderPattern}
-                        onChange={({ detail }) => updateFormData('hostHeaderPattern', detail.value)}
-                        onBlur={() => validateField('hostHeaderPattern', formData.hostHeaderPattern)}
-                        placeholder="e.g., *.example.com"
-                      />
-                    </FormField>
+                  <FormField
+                    label="Path pattern"
+                    description="Pattern to match against the request path"
+                    controlId="mapping-path-pattern"
+                    errorText={validationErrors.pathPattern}
+                  >
+                    <Input
+                      value={formData.pathPattern}
+                      onChange={({ detail }) => updateFormData('pathPattern', detail.value)}
+                      onBlur={() => validateField('pathPattern', formData.pathPattern)}
+                      placeholder="e.g., /api/*"
+                    />
+                  </FormField>
 
-                    <FormField
-                      label="Path pattern"
-                      description="Pattern to match against the request path"
-                      controlId="mapping-path-pattern"
-                      errorText={validationErrors.pathPattern}
-                    >
-                      <Input
-                        value={formData.pathPattern}
-                        onChange={({ detail }) => updateFormData('pathPattern', detail.value)}
-                        onBlur={() => validateField('pathPattern', formData.pathPattern)}
-                        placeholder="e.g., /api/*"
-                      />
-                    </FormField>
-
-                    <FormField
-                      label="Transformation Policy (optional)"
-                      description="Optional transformation policy to apply to this mapping"
-                      controlId="mapping-policy"
-                    >
-                      <Select
-                        selectedOption={formData.policyId ? policyOptions.find(opt => opt.value === formData.policyId) || null : null}
-                        onChange={({ detail }) => updateFormData('policyId', detail.selectedOption?.value || '')}
-                        options={policyOptions}
-                        placeholder="Choose a policy"
-                        filteringType="auto"
-                      />
-                    </FormField>
-                  </SpaceBetween>
-                </Form>
-              </SpaceBetween>
-            </Container>
-          </SpaceBetween>
-        </ContentLayout>
-      }
-    />
-    </>
+                  <FormField
+                    label="Transformation Policy (optional)"
+                    description="Optional transformation policy to apply to this mapping"
+                    controlId="mapping-policy"
+                  >
+                    <Select
+                      selectedOption={policyOptions.find(opt => opt.value === formData.policyId) || null}
+                      onChange={({ detail }) => updateFormData('policyId', detail.selectedOption?.value || '')}
+                      options={policyOptions}
+                      placeholder="Choose a policy"
+                      filteringType="auto"
+                    />
+                  </FormField>
+                </SpaceBetween>
+              </Form>
+            </SpaceBetween>
+          </Container>
+        </SpaceBetween>
+      </ContentLayout>
+    </PageLayout>
   );
 };
 

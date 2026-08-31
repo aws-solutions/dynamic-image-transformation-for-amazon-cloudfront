@@ -98,6 +98,130 @@ describe('transformation-limiter', () => {
     });
   });
 
+  describe('applyPrecedence contentModeration tighten-only merge', () => {
+    it('should keep the stricter (lower) minConfidence when URL tries to raise it', () => {
+      // policy min 75 + url min 100 -> effective 75 (URL cannot loosen)
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { minConfidence: 100 }, source: 'url' }],
+        [{ type: 'contentModeration', value: { minConfidence: 75 }, source: 'policy' }]
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('contentModeration');
+      expect(result[0].source).toBe('url');
+      expect(result[0].value.minConfidence).toBe(75);
+    });
+
+    it('should adopt the stricter (lower) minConfidence when URL lowers it', () => {
+      // policy min 75 + url min 50 -> effective 50 (URL may tighten)
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { minConfidence: 50 }, source: 'url' }],
+        [{ type: 'contentModeration', value: { minConfidence: 75 }, source: 'policy' }]
+      );
+
+      expect(result[0].value.minConfidence).toBe(50);
+    });
+
+    it('should union moderation labels when policy has a non-empty list', () => {
+      // policy ['Violence'] + url ['Smoking'] -> both present
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { moderationLabels: ['Smoking'] }, source: 'url' }],
+        [{ type: 'contentModeration', value: { moderationLabels: ['Violence'] }, source: 'policy' }]
+      );
+
+      expect(result[0].value.moderationLabels).toEqual(expect.arrayContaining(['Violence', 'Smoking']));
+      expect(result[0].value.moderationLabels).toHaveLength(2);
+    });
+
+    it('should keep flag-all ([]) when policy list is empty even if URL narrows it', () => {
+      // policy [] (flag all = strictest) + url ['Smoking'] -> stays []
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { moderationLabels: ['Smoking'] }, source: 'url' }],
+        [{ type: 'contentModeration', value: { moderationLabels: [] }, source: 'policy' }]
+      );
+
+      expect(result[0].value.moderationLabels).toEqual([]);
+    });
+
+    it('should keep the stronger (higher) blur when URL tries to reduce it', () => {
+      // policy blur 50 + url blur 10 -> effective 50 (URL cannot weaken blur)
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { blur: 10 }, source: 'url' }],
+        [{ type: 'contentModeration', value: { blur: 50 }, source: 'policy' }]
+      );
+
+      expect(result[0].value.blur).toBe(50);
+    });
+
+    it('should resolve defaults when policy value is `true` before merging', () => {
+      // policy `true` (defaults min 75) + url min 100 -> effective 75
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { minConfidence: 100 }, source: 'url' }],
+        [{ type: 'contentModeration', value: true, source: 'policy' }]
+      );
+
+      expect(result[0].value.minConfidence).toBe(75);
+      expect(result[0].value.blur).toBe(50);
+      expect(result[0].value.moderationLabels).toEqual([]);
+    });
+
+    it('should not bump policy blur when the URL omits blur (Finding 1)', () => {
+      // url sets only minConfidence -> blur stays policy 10, not the injected default 50
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { minConfidence: 90 }, source: 'url' }],
+        [{ type: 'contentModeration', value: { blur: 10 }, source: 'policy' }]
+      );
+
+      expect(result[0].value.blur).toBe(10);
+      expect(result[0].value.minConfidence).toBe(75);
+    });
+
+    it('should not lower policy minConfidence when the URL omits it (Finding 1)', () => {
+      // url sets only blur -> minConfidence stays policy 90, not the injected default 75
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { blur: 100 }, source: 'url' }],
+        [{ type: 'contentModeration', value: { minConfidence: 90 }, source: 'policy' }]
+      );
+
+      expect(result[0].value.minConfidence).toBe(90);
+      expect(result[0].value.blur).toBe(100);
+    });
+
+    it('should keep policy labels when the URL omits moderationLabels', () => {
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { minConfidence: 100 }, source: 'url' }],
+        [{ type: 'contentModeration', value: { moderationLabels: ['Violence'] }, source: 'policy' }]
+      );
+
+      expect(result[0].value.moderationLabels).toEqual(['Violence']);
+    });
+
+    it('should add URL contentModeration as-is when policy has none', () => {
+      // policy has no contentModeration + url adds it -> present, unmerged
+      const result = applyPrecedence(
+        [{ type: 'contentModeration', value: { minConfidence: 90 }, source: 'url' }],
+        [{ type: 'quality', value: 80, source: 'policy' }]
+      );
+
+      expect(result).toHaveLength(2);
+      const moderation = result.find(t => t.type === 'contentModeration');
+      expect(moderation).toBeDefined();
+      expect(moderation!.source).toBe('url');
+      expect(moderation!.value).toEqual({ minConfidence: 90 });
+    });
+
+    it('should still wholesale-override unrelated transformation types', () => {
+      const result = applyPrecedence(
+        [{ type: 'quality', value: 80, source: 'url' }],
+        [{ type: 'quality', value: 90, source: 'policy' }]
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].value).toBe(80);
+      expect(result[0].source).toBe('url');
+    });
+  });
+
   describe('enforceLimits', () => {
     it('should return all transformations when under limit', () => {
       const transformations: Transformation[] = [

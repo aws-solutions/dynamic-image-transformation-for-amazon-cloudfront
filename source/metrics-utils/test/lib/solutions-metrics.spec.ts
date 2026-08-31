@@ -308,6 +308,48 @@ test("Test correct version identifier on lambda environment variables", () => {
   });
 });
 
+test("addCFTierDetectionMetrics creates a QueryDefinition with us-east-1 log group ARN", () => {
+  const stack = new cdk.Stack(undefined, undefined, {
+    env: { account: "123456789012", region: "ap-southeast-2" },
+  });
+
+  const solutionsMetrics = new SolutionsMetrics(stack, "test-cf-tier", {});
+  solutionsMetrics.addCFTierDetectionMetrics({ functionName: "dit-header-normalization-ap-southeast-2" });
+
+  const template = Template.fromStack(stack);
+
+  // LogGroupNames only carries the log group name (CDK strips the ARN prefix),
+  // so assert the IAM policy resource instead — that uses the full ARN and
+  // proves us-east-1 is hardcoded regardless of the stack's deployment region.
+  template.hasResourceProperties("AWS::IAM::Policy", {
+    PolicyDocument: {
+      Statement: Match.arrayWith([
+        {
+          Action: ["logs:StartQuery", "logs:GetQueryResults"],
+          Effect: "Allow",
+          Resource: {
+            "Fn::Join": [
+              "",
+              [
+                "arn:aws:logs:us-east-1:",
+                { Ref: "AWS::AccountId" },
+                ":log-group:/aws/cloudfront/function/dit-header-normalization-ap-southeast-2:*",
+              ],
+            ],
+          },
+        },
+      ]),
+    },
+  });
+
+  // Also verify the query string targets DIT-DETECT events
+  template.hasResource("AWS::Logs::QueryDefinition", {
+    Properties: {
+      QueryString: Match.stringLikeRegexp("DIT-DETECT"),
+    },
+  });
+});
+
 function assertPolicyStatementContains(template: Template, pattern: any[]) {
   template.hasResourceProperties("AWS::IAM::Policy", {
     PolicyDocument: {

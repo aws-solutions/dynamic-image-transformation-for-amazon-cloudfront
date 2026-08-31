@@ -28,6 +28,12 @@ export class ErrorMapper {
       statusCode: 400,
       errorType: 'SmartCrop::FaceIndexOutOfRange',
       messageTransform: () => 'You have provided a FaceIndex value that exceeds the length of the zero-based detectedFaces array.'
+    },
+    {
+      pattern: 'Input image exceeds pixel limit',
+      statusCode: 400,
+      errorType: 'BadRequest',
+      messageTransform: () => 'The input image is too large to process. Please provide a smaller image.'
     }
   ];
 

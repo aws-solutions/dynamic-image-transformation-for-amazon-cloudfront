@@ -3,6 +3,7 @@
 
 import { TransformationPolicyPage } from '../../support/pages/TransformationPolicyPage';
 import { TransformationPolicyFactory } from '../../support/factories/TransformationPolicyFactory';
+import { TIMEOUTS } from '../../utils/constants';
 
 describe('Transformation Policy Flow - Create Edit Tests', { tags: ['@crud'] }, () => {
   beforeEach(() => {
@@ -13,7 +14,6 @@ describe('Transformation Policy Flow - Create Edit Tests', { tags: ['@crud'] }, 
 
   it('[@crud] should create and edit a basic transformation policy with output optimization', () => {
     const policyData = TransformationPolicyFactory.createBasicPolicy({ 
-      name: 'Test Edit Policy',
       outputs: [{ type: 'webp', config: { quality: 80 } }]
     });
     
@@ -31,7 +31,10 @@ describe('Transformation Policy Flow - Create Edit Tests', { tags: ['@crud'] }, 
     
     // Wait for edit form to load
     cy.url().should('include', '/edit');
-    
+
+    // Wait for form data to load from API before interacting
+    cy.get('input[placeholder="e.g., Mobile Optimization Policy"]').should('have.value', policyData.name);
+
     // Add quality transformation (similar to basic policy from policy-types)
     cy.get('button').contains('Add Transformation').click();
     
@@ -44,7 +47,7 @@ describe('Transformation Policy Flow - Create Edit Tests', { tags: ['@crud'] }, 
     });
     
     // Wait for configuration modal
-    cy.contains('Add Transformation - Step 2 of 2').should('be.visible');
+    cy.contains('Add to Policy').should('be.visible');
     
     // Fill quality value (80)
     cy.get('input[type="number"]').type('80');
@@ -57,8 +60,8 @@ describe('Transformation Policy Flow - Create Edit Tests', { tags: ['@crud'] }, 
     
     TransformationPolicyPage.submitUpdatePolicy();
     
-    // Verify update (user sees they're back on policies page with same policy)
-    cy.url().should('include', '/transformation-policies');
+    // Verify update — wait for list page (not just any /transformation-policies/* URL)
+    cy.url({ timeout: TIMEOUTS.REDIRECT }).should('match', /\/transformation-policies$/);
     cy.contains(policyData.name).should('be.visible');
   });
 });

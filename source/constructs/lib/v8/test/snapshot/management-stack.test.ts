@@ -18,7 +18,7 @@ describe("ManagementStack", () => {
 
   beforeEach(() => {
     process.env.SOLUTION_ID = "SO0023";
-    process.env.VERSION = "v8.0.6";
+    process.env.VERSION = "v8.1.0";
 
     app = new App();
     stack = new ManagementStack(app, "TestManagementStack", {
@@ -49,5 +49,24 @@ describe("ManagementStack", () => {
       const runtime = lambdaFunctions[functionName].Properties.Runtime;
       expect(SUPPORTED_RUNTIMES).toContain(runtime);
     });
+  });
+
+  test("ApiLambda should have ACCOUNT_ID and PAGINATION_TOKEN_SECRET_ARN environment variables", () => {
+    const lambdaFunctions = template.findResources("AWS::Lambda::Function");
+    const apiLambda = Object.entries(lambdaFunctions).find(([logicalId]) =>
+      logicalId.includes("ApiLambda")
+    );
+
+    expect(apiLambda).toBeDefined();
+
+    const [, lambdaResource] = apiLambda!;
+    const environment = lambdaResource.Properties.Environment;
+
+    expect(environment).toBeDefined();
+    expect(environment.Variables).toBeDefined();
+
+    expect(environment.Variables.ACCOUNT_ID).toBeDefined();
+    expect(environment.Variables.ACCOUNT_ID).toEqual({ Ref: "AWS::AccountId" });
+    expect(environment.Variables.PAGINATION_TOKEN_SECRET_ARN).toBeDefined();
   });
 });

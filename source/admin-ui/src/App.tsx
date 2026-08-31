@@ -24,6 +24,7 @@ const LogoutComplete = lazy(() => import('./pages/LogoutComplete'));
 const TransformationPolicies = lazy(() => import('./pages/TransformationPolicies'));
 const CreateTransformationPolicy = lazy(() => import('./pages/CreateTransformationPolicy'));
 const TransformationPolicyDetails = lazy(() => import('./pages/TransformationPolicyDetails'));
+const Playground = lazy(() => import('./pages/Playground'));
 
 const AppContent: React.FC = () => {
   return (
@@ -67,6 +68,7 @@ const AppContent: React.FC = () => {
                       <CreateTransformationPolicy />
                     </TransformationPolicyProvider>
                   } />
+                  <Route path="playground" element={<Playground />} />
                 </Routes>
               </AuthWrapper>
             } />

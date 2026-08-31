@@ -32,7 +32,7 @@
     "@types/jest": "^29.5.6",
     "@types/node": "^20.10.4",
     "aws-cdk": "^2.1018.0",
-    "aws-cdk-lib": "2.263.0",
+    "aws-cdk-lib": "2.265.0",
     "constructs": "^10.3.0",
     "esbuild": "^0.28.1",
     "jest": "^29.7.0",
@@ -64,6 +64,7 @@
     "yaml@1": "1.10.3",
     "fast-uri": ">=3.1.4",
     "@babel/core": "7.29.6",
-    "js-yaml@3": "3.15.0"
-  }
+    "js-yaml@3": "3.15.1"
+  },
+  "resolutions": {}
 }

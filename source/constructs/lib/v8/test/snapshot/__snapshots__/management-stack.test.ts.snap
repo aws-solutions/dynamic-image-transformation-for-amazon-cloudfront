@@ -138,10 +138,10 @@ exports[`ManagementStack Snapshot Test 1`] = `
       "Type": "String",
     },
     "OriginOverrideHeader": {
-      "AllowedPattern": "^$|^[a-zA-Z0-9-]+$",
-      "ConstraintDescription": "Must be a valid HTTP header name or empty",
+      "AllowedPattern": "^$|^dit-[a-zA-Z0-9-]+$",
+      "ConstraintDescription": "Must be empty or a valid HTTP header name beginning with the 'dit-' prefix",
       "Default": "",
-      "Description": "HTTP header used to override the image origin (if present in request, mapping lookup is skipped). This is meant for advanced use-cases only, please refer to implementation guide.",
+      "Description": "HTTP header used to override the image origin (if present in request, mapping lookup is skipped). Must begin with the 'dit-' prefix so it can only be set on the trusted CloudFront->origin path. This is meant for advanced use-cases only, please refer to implementation guide.",
       "Type": "String",
     },
   },
@@ -152,7 +152,7 @@ exports[`ManagementStack Snapshot Test 1`] = `
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
           },
-          "S3Key": "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip",
+          "S3Key": "98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip",
         },
         "Description": "/opt/awscli/aws",
       },
@@ -164,6 +164,12 @@ exports[`ManagementStack Snapshot Test 1`] = `
         "DestinationBucketName": {
           "Ref": "WebDistributionAdminUIDistributionToS3S3BucketBEF73512",
         },
+        "DistributionId": {
+          "Ref": "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+        },
+        "DistributionPaths": [
+          "/*",
+        ],
         "OutputObjectKeys": true,
         "Prune": true,
         "ServiceToken": {
@@ -278,6 +284,21 @@ exports[`ManagementStack Snapshot Test 1`] = `
                     "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
                   },
                   "/"",
+                ],
+              ],
+            },
+            "<<marker:0xbaba:6>>": {
+              "Fn::Join": [
+                "",
+                [
+                  """,
+                  {
+                    "Fn::GetAtt": [
+                      "ImageProcessingNestedStackImageProcessingNestedStackResource96AF94AE",
+                      "Outputs.TestManagementStackImageProcessingImageProcessingDistributionBF8F094CDomainName",
+                    ],
+                  },
+                  """,
                 ],
               ],
             },
@@ -578,7 +599,7 @@ Temporary Password: <strong>{####}</strong>
         "Environment": {
           "Variables": {
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.0.6",
+            "SOLUTION_VERSION": "v8.1.0",
           },
         },
         "Handler": "index.handler",
@@ -844,7 +865,7 @@ Temporary Password: <strong>{####}</strong>
                 "Fn::Join": [
                   "",
                   [
-                    "upgrade-insecure-requests; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: https:; connect-src 'self' https://cognito-identity.",
+                    "upgrade-insecure-requests; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob: https:; connect-src 'self' https://cognito-identity.",
                     {
                       "Ref": "AWS::Region",
                     },
@@ -880,7 +901,14 @@ Temporary Password: <strong>{####}</strong>
                     {
                       "Ref": "DataAccessLayerDITApiDeploymentStageprod1B577AB5",
                     },
-                    "/; default-src 'self';",
+                    "/ https://",
+                    {
+                      "Fn::GetAtt": [
+                        "ImageProcessingNestedStackImageProcessingNestedStackResource96AF94AE",
+                        "Outputs.TestManagementStackImageProcessingImageProcessingDistributionBF8F094CDomainName",
+                      ],
+                    },
+                    "; default-src 'self';",
                   ],
                 ],
               },
@@ -1083,6 +1111,14 @@ Temporary Password: <strong>{####}</strong>
                 },
               ],
             },
+            {
+              "Action": [
+                "cloudfront:GetInvalidation",
+                "cloudfront:CreateInvalidation",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -1115,6 +1151,9 @@ Temporary Password: <strong>{####}</strong>
         },
         "Environment": {
           "Variables": {
+            "ACCOUNT_ID": {
+              "Ref": "AWS::AccountId",
+            },
             "CONFIG_TABLE_NAME": {
               "Ref": "DataAccessLayerConfigTableFC483DD7",
             },
@@ -1132,10 +1171,13 @@ Temporary Password: <strong>{####}</strong>
                 ],
               ],
             },
+            "PAGINATION_TOKEN_SECRET_ARN": {
+              "Ref": "DataAccessLayerPaginationTokenSecretB6D5EDF7",
+            },
             "POWERTOOLS_LOGGER_LOG_EVENT": "false",
             "POWERTOOLS_LOGGER_LOG_LEVEL": "INFO",
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.0.6",
+            "SOLUTION_VERSION": "v8.1.0",
           },
         },
         "Handler": "index.handler",
@@ -1271,6 +1313,16 @@ Temporary Password: <strong>{####}</strong>
                   ],
                 },
               ],
+            },
+            {
+              "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "DataAccessLayerPaginationTokenSecretB6D5EDF7",
+              },
             },
           ],
           "Version": "2012-10-17",
@@ -1447,7 +1499,7 @@ Temporary Password: <strong>{####}</strong>
           "SSEType": "KMS",
         },
         "StreamSpecification": {
-          "StreamViewType": "NEW_AND_OLD_IMAGES",
+          "StreamViewType": "NEW_IMAGE",
         },
       },
       "Type": "AWS::DynamoDB::GlobalTable",
@@ -1455,7 +1507,9 @@ Temporary Password: <strong>{####}</strong>
     },
     "DataAccessLayerDITApi51636B57": {
       "Properties": {
+        "EndpointAccessMode": "BASIC",
         "Name": "DITApi",
+        "SecurityPolicy": "SecurityPolicy_TLS12_PFS_2025_EDGE",
       },
       "Type": "AWS::ApiGateway::RestApi",
     },
@@ -1635,7 +1689,7 @@ Temporary Password: <strong>{####}</strong>
       "Type": "AWS::IAM::Role",
       "UpdateReplacePolicy": "Retain",
     },
-    "DataAccessLayerDITApiDeploymentF2E2DE9Fbc4c2a73824095272c467282d96cc74d": {
+    "DataAccessLayerDITApiDeploymentF2E2DE9F79ac68189523638f23f31c0c677cc656": {
       "DependsOn": [
         "DataAccessLayerCORSResponse4xx88C1D1E3",
         "DataAccessLayerCORSResponse5xx07AEF476",
@@ -1678,7 +1732,7 @@ Temporary Password: <strong>{####}</strong>
           "Format": "{"requestId":"$context.requestId","extendedRequestId":"$context.extendedRequestId","sourceIp":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","method":"$context.httpMethod","resourcePath":"$context.resourcePath","protocol":"$context.protocol","status":"$context.status","requestTime":"$context.requestTime","responseLength":"$context.responseLength"}",
         },
         "DeploymentId": {
-          "Ref": "DataAccessLayerDITApiDeploymentF2E2DE9Fbc4c2a73824095272c467282d96cc74d",
+          "Ref": "DataAccessLayerDITApiDeploymentF2E2DE9F79ac68189523638f23f31c0c677cc656",
         },
         "MethodSettings": [
           {
@@ -1974,6 +2028,25 @@ Temporary Password: <strong>{####}</strong>
       },
       "Type": "AWS::ApiGateway::Authorizer",
     },
+    "DataAccessLayerPaginationTokenSecretB6D5EDF7": {
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "SECRETSMANAGER_USING_CMK",
+          ],
+        },
+      },
+      "Properties": {
+        "GenerateSecretString": {
+          "ExcludePunctuation": true,
+          "PasswordLength": 64,
+        },
+        "Name": "PaginationTokenSecret",
+      },
+      "Type": "AWS::SecretsManager::Secret",
+      "UpdateReplacePolicy": "Delete",
+    },
     "DataAccessLayerProdLogs1C739F5D": {
       "DeletionPolicy": "Retain",
       "Metadata": {
@@ -1993,6 +2066,12 @@ Temporary Password: <strong>{####}</strong>
       "DeletionPolicy": "Delete",
       "Properties": {
         "Parameters": {
+          "referencetoTestManagementStackAuthUserPoolB413245DRef": {
+            "Ref": "AuthUserPool8115E87F",
+          },
+          "referencetoTestManagementStackAuthUserPoolWebUIClient83658C1DRef": {
+            "Ref": "AuthUserPoolWebUIClient86DE5DEB",
+          },
           "referencetoTestManagementStackCorsOriginParameter7234A77ARef": {
             "Ref": "CorsOriginParameter",
           },
@@ -2019,6 +2098,12 @@ Temporary Password: <strong>{####}</strong>
           },
           "referencetoTestManagementStackOriginOverrideHeader4D0E20B0Ref": {
             "Ref": "OriginOverrideHeader",
+          },
+          "referencetoTestManagementStackWebDistributionAdminUIDistributionToS3CloudFrontDistribution2D7D114ADomainName": {
+            "Fn::GetAtt": [
+              "WebDistributionAdminUIDistributionToS3CloudFrontDistribution6FD651BA",
+              "DomainName",
+            ],
           },
         },
         "TemplateURL": "Omitted to remove snapshot dependency on hash",
@@ -2159,7 +2244,7 @@ Temporary Password: <strong>{####}</strong>
         "Environment": {
           "Variables": {
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.0.6",
+            "SOLUTION_VERSION": "v8.1.0",
           },
         },
         "Handler": "index.handler",

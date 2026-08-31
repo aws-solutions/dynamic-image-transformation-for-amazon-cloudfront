@@ -29,7 +29,7 @@
     "brace-expansion@2": "2.1.4",
     "diff@4": "4.0.4",
     "body-parser": "1.20.6",
-    "esbuild": "0.28.1",
+    "esbuild": "$esbuild",
     "brace-expansion@5": "5.0.9"
   },
   "scripts": {
@@ -50,6 +50,7 @@
     "@types/node": "^20.10.4",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
+    "esbuild": "^0.28.0",
     "eslint": "^8.50.0",
     "eslint-config-prettier": "^8.10.0",
     "eslint-config-standard": "^17.1.0",
@@ -58,6 +59,7 @@
     "eslint-plugin-jsdoc": "^46.8.2",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^4.2.1",
+    "fast-check": "^4.6.0",
     "prettier": "~2.8.8",
     "prettier-plugin-organize-imports": "^4.2.0"
   }

@@ -41,7 +41,8 @@
     "brace-expansion@1": "1.1.18",
     "brace-expansion@2": "2.1.4",
     "picomatch@2": "2.3.2",
-    "picomatch@4": "4.0.4"
+    "picomatch@4": "4.0.4",
+    "js-yaml@3": "3.15.1"
   },
   "resolutions": {
     "semver": "^7.7.3"

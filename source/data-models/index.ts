@@ -31,4 +31,5 @@ export {
   type TransformationPolicyUpdate,
   transformationSchemas,
   outputSchemas,
+  fallbackSchemas,
 } from "./transformation-policy";

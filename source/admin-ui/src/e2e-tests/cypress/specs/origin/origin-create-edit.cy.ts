@@ -11,33 +11,24 @@ describe('Origin Flow - Create Edit Tests', { tags: ['@crud'] }, () => {
   });
 
   it('[@crud] should create and edit a basic origin', () => {
-    const originData = OriginFactory.createBasicOrigin({ name: 'Edit Test Origin' });
-    
-    // Create origin
-    cy.get('button').contains('Create origin').click();
-    OriginPage.fillOriginForm(originData);
-    OriginPage.submitCreateOrigin();
+    const originData = OriginFactory.createBasicOrigin();
 
-    // Verify creation (user sees origin in list)
-    cy.url().should('include', '/origins');
-    cy.contains(originData.name).should('be.visible');
-    
+    OriginPage.provisionOrigin(originData);
+
     // Edit origin
     OriginPage.editOrigin(originData.name);
     
     // Wait for edit form to load
     cy.url().should('include', '/edit');
-
-    // Wait for the async origin load to settle before typing; otherwise the
-    // form-state reset races the keystrokes and drops leading characters.
     cy.get('#origin-name').should('have.value', originData.name);
-
+    
+    // Add origin path
     const originPath = '/images';
-    OriginPage.getOriginPathInput().clear().type(originPath).should('have.value', originPath);
+    OriginPage.getOriginPathInput().clear().type(originPath);
     OriginPage.submitUpdateOrigin();
     
-    // Verify update (user sees they're back on origins page with same origin)
-    cy.url().should('include', '/origins');
+    // Verify update — wait for list page (not just any /origins/* URL)
+    cy.url().should('match', /\/origins$/);
     cy.contains(originData.name).should('be.visible');
   });
 });

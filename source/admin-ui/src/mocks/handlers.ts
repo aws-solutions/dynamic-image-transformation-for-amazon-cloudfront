@@ -171,6 +171,18 @@ const mockMappings: Mapping[] = [
 let origins = [...mockOrigins];
 let mappings = [...mockMappings];
 
+/**
+ * Mirrors the management API: originHeaders values are write-only, so responses carry the header
+ * names with redacted values. Keeps mocked behavior honest about what the browser can actually see.
+ */
+const redactOriginHeaders = (origin: Origin): Origin => {
+  if (!origin.originHeaders) return origin;
+  return {
+    ...origin,
+    originHeaders: Object.fromEntries(Object.keys(origin.originHeaders).map((name) => [name, '***REDACTED***']))
+  };
+};
+
 export const handlers = [
   // Origins API - match both local and full API Gateway URLs
   http.get('/api/origins', ({ request }) => {
@@ -184,7 +196,7 @@ export const handlers = [
     const hasMore = endIndex < origins.length;
     
     return HttpResponse.json({
-      items: paginatedOrigins,
+      items: paginatedOrigins.map(redactOriginHeaders),
       nextToken: hasMore ? endIndex.toString() : undefined
     });
   }),
@@ -204,7 +216,7 @@ export const handlers = [
     console.log(`MSW: Returning origins ${startIndex}-${endIndex-1} of ${origins.length}, hasMore: ${hasMore}`);
     
     return HttpResponse.json({
-      items: paginatedOrigins,
+      items: paginatedOrigins.map(redactOriginHeaders),
       nextToken: hasMore ? endIndex.toString() : undefined
     });
   }),
@@ -214,7 +226,7 @@ export const handlers = [
     if (!origin) {
       return new HttpResponse(null, { status: 404 });
     }
-    return HttpResponse.json(origin);
+    return HttpResponse.json(redactOriginHeaders(origin));
   }),
 
   http.post('/api/origins', async ({ request }) => {
@@ -226,7 +238,7 @@ export const handlers = [
       updatedAt: new Date().toISOString(),
     };
     origins.push(origin);
-    return HttpResponse.json(origin, { status: 201 });
+    return HttpResponse.json(redactOriginHeaders(origin), { status: 201 });
   }),
 
   http.put('/api/origins/:id', async ({ params, request }) => {
@@ -240,7 +252,7 @@ export const handlers = [
       ...updates,
       updatedAt: new Date().toISOString(),
     };
-    return HttpResponse.json(origins[index]);
+    return HttpResponse.json(redactOriginHeaders(origins[index]));
   }),
 
   http.delete('/api/origins/:id', ({ params }) => {

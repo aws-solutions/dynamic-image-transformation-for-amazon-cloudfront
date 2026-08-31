@@ -9,7 +9,6 @@ import { OriginProvider } from '../../contexts/OriginContext';
 import { TransformationPolicyProvider } from '../../contexts/TransformationPolicyContext';
 
 // Mock services
-vi.mock('../../services/authService');
 vi.mock('../../services/mappingService');
 
 // Mock hooks
@@ -141,10 +140,9 @@ describe('MappingDetails', () => {
   it('should show mapping configuration details', () => {
     renderWithProviders(<MappingDetails />);
     
-    // Use queryByText to avoid errors when elements don't exist
-    expect(screen.queryByText(/routing/i) || screen.queryByText(/configuration/i)).toBeInTheDocument();
-    expect(screen.queryByText(/host.*header.*pattern/i) || screen.queryByText(/host/i)).toBeInTheDocument();
-    expect(screen.queryByText(/path.*pattern/i) || screen.queryByText(/path/i)).toBeInTheDocument();
+    expect(screen.getByText('Routing Rules')).toBeInTheDocument();
+    expect(screen.getByText('Host Header Pattern')).toBeInTheDocument();
+    expect(screen.getByText('Path Pattern')).toBeInTheDocument();
   });
 
   it('should display origin and policy information', () => {
@@ -180,7 +178,7 @@ describe('MappingDetails', () => {
     renderWithProviders(<MappingDetails />);
     
     const mappingsElements = screen.getAllByText('Mappings');
-    expect(mappingsElements.length).toBe(2); // breadcrumb and navigation
+    expect(mappingsElements).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
     const testMappingElements = screen.getAllByText('Test Mapping');
     expect(testMappingElements.length).toBeGreaterThan(0);
   });

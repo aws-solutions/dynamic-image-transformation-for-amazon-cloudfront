@@ -23,9 +23,10 @@
     "@aws-sdk/client-cloudformation": "^3.993.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.993.0",
     "@aws-sdk/client-lambda": "^3.993.0",
+    "@aws-sdk/client-s3": "^3.993.0",
     "@aws-sdk/client-sts": "^3.993.0",
-    "jest": "^29.0.0",
-    "cypress": "^15.5.0"
+    "cypress": "^15.5.0",
+    "jest": "^29.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.0.0",
@@ -55,6 +56,8 @@
     "picomatch@4": "4.0.4",
     "brace-expansion@1": "1.1.18",
     "uuid": "11.1.1",
-    "@babel/core": "7.29.6"
+    "@babel/core": "7.29.6",
+    "js-yaml@3": "3.15.1",
+    "js-yaml@4": "4.3.1"
   }
 }

@@ -10,6 +10,7 @@
     "sourceMap": true,
     "types": ["node", "jest"],
     "strictFunctionTypes": true,
+    "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
       "@dit/data-models": ["../data-models"],
@@ -21,6 +22,7 @@
     "node_modules",
     "dist",
     "**/*.spec.ts",
+    "**/*.test.ts",
     "coverage",
     "jest.config.js",
     "docker-compose.yml",

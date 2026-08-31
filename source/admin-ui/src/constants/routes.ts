@@ -17,4 +17,5 @@ export const ROUTES = {
   TRANSFORMATION_POLICY_CREATE: '/transformation-policies/create',
   TRANSFORMATION_POLICY_DETAILS: '/transformation-policies/:id',
   TRANSFORMATION_POLICY_EDIT: '/transformation-policies/:id/edit',
+  PLAYGROUND: '/playground',
 } as const;

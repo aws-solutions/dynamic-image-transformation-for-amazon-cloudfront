@@ -85,5 +85,10 @@ describe('transformationParsers', () => {
     it('should pass through stripIcc value', () => {
       expect(transformationParsers.stripIcc(false)).toBe(false);
     });
+
+    it('should pass through watermark array', () => {
+      const watermarkValue = ['https://example.com/logo.png', [10, 10, 0.8, 0.3, 0.3]];
+      expect(transformationParsers.watermark(watermarkValue)).toEqual(watermarkValue);
+    });
   });
 });

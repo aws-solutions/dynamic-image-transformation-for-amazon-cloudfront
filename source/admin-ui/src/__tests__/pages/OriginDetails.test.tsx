@@ -27,7 +27,7 @@ describe('OriginDetails Page', () => {
 
   it('should render loading state initially', () => {
     render(<OriginDetails />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getAllByText('Loading...')).toHaveLength(2); // breadcrumb + content
   });
 
   it('should render origin details after loading', async () => {

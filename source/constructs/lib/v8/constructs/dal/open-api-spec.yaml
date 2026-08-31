@@ -2,7 +2,7 @@
 openapi: 3.0.3
 info:
   title: Dynamic Image Transformation Management API
-  version: 8.0.6
+  version: 8.1.0
   description: API for managing image transformation policies, origins, and mappings for the Dynamic Image Transformation service.
 tags:
   - name: Transformation Policies
