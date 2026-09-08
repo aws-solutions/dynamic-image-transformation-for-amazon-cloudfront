@@ -22,6 +22,11 @@ describe("index", () => {
         expected: "format=value3",
       },
       {
+        // dpr is an allowed param
+        input: { width: { value: "100" }, dpr: { value: "2" } },
+        expected: "dpr=2&width=100",
+      },
+      {
         // Multi value keys use the last option
         input: {
           signature: { value: "value1" },

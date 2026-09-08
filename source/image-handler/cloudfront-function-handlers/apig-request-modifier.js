@@ -16,7 +16,7 @@ function processQueryParams(querystring) {
         return [];
     }
 
-    const ALLOWED_PARAMS = ['signature', 'expires', 'format', 'fit', 'width', 'height', 'rotate', 'flip', 'flop', 'grayscale'];
+    const ALLOWED_PARAMS = ['signature', 'expires', 'format', 'fit', 'width', 'height', 'rotate', 'flip', 'flop', 'grayscale', 'dpr'];
     
     let qs = [];
     for (const key in querystring) {

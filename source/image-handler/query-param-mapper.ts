@@ -21,7 +21,13 @@ export class QueryParamMapper {
     greyscale: { path: [], key: "greyscale", transform: stringToBoolean },
   };
 
-  public static readonly QUERY_PARAM_KEYS = Object.keys(this.QUERY_PARAM_MAPPING);
+  // dpr is handled separately from QUERY_PARAM_MAPPING because it scales the
+  // resize dimensions rather than mapping to its own edit key.
+  private static readonly DPR_PARAM = "dpr";
+
+  private static readonly MAX_DPR = 4;
+
+  public static readonly QUERY_PARAM_KEYS = [...Object.keys(this.QUERY_PARAM_MAPPING), this.DPR_PARAM];
 
   /**
    * Initializer function for creating a new Thumbor mapping, used by the image
@@ -55,6 +61,8 @@ export class QueryParamMapper {
         }
       });
 
+      this.applyDpr(result, queryParameters[QueryParamMapper.DPR_PARAM]);
+
       return result;
     } catch (error) {
       console.error(error);
@@ -63,6 +71,28 @@ export class QueryParamMapper {
         "QueryParameterParsingError",
         "Query parameter parsing failed"
       );
+    }
+  }
+
+  /**
+   * Scales the resize dimensions by the requested device pixel ratio.
+   * Invalid values (non-numeric, zero, or negative) are ignored; values above MAX_DPR are clamped.
+   * @param edits The edits object produced from the query parameters.
+   * @param dprValue The raw dpr query parameter value.
+   */
+  private applyDpr(edits: ImageEdits, dprValue?: string): void {
+    if (dprValue === undefined || !edits.resize) {
+      return;
+    }
+    const dpr = parseFloat(dprValue);
+    if (isNaN(dpr) || dpr <= 0) {
+      return;
+    }
+    const clampedDpr = Math.min(dpr, QueryParamMapper.MAX_DPR);
+    for (const dimension of ["width", "height"]) {
+      if (typeof edits.resize[dimension] === "number") {
+        edits.resize[dimension] = Math.round(edits.resize[dimension] * clampedDpr);
+      }
     }
   }
 }

@@ -13,6 +13,7 @@ export interface QueryStringParameters {
   fit?: string;
   width?: string;
   height?: string;
+  dpr?: string;
   rotate?: string;
   flip?: string;
   flop?: string;

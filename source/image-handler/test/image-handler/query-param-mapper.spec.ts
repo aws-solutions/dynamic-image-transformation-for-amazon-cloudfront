@@ -103,6 +103,85 @@ describe("QueryParamMapper", () => {
       });
     });
 
+    it("should scale width and height by dpr", () => {
+      const result = mapper.mapQueryParamsToEdits({
+        width: "100",
+        height: "200",
+        dpr: "2",
+      });
+      expect(result).toEqual({
+        resize: {
+          width: 200,
+          height: 400,
+        },
+      });
+    });
+
+    it("should support fractional dpr and round the result", () => {
+      const result = mapper.mapQueryParamsToEdits({
+        width: "101",
+        dpr: "1.5",
+      });
+      expect(result).toEqual({
+        resize: {
+          width: 152,
+        },
+      });
+    });
+
+    it("should support dpr values below 1", () => {
+      const result = mapper.mapQueryParamsToEdits({
+        width: "100",
+        dpr: "0.5",
+      });
+      expect(result).toEqual({
+        resize: {
+          width: 50,
+        },
+      });
+    });
+
+    it("should clamp dpr to a maximum of 4", () => {
+      const result = mapper.mapQueryParamsToEdits({
+        width: "100",
+        dpr: "10",
+      });
+      expect(result).toEqual({
+        resize: {
+          width: 400,
+        },
+      });
+    });
+
+    it("should ignore invalid dpr values", () => {
+      const nan = mapper.mapQueryParamsToEdits({ width: "100", dpr: "abc" });
+      const zero = mapper.mapQueryParamsToEdits({ width: "100", dpr: "0" });
+      const negative = mapper.mapQueryParamsToEdits({ width: "100", dpr: "-2" });
+
+      expect(nan).toEqual({ resize: { width: 100 } });
+      expect(zero).toEqual({ resize: { width: 100 } });
+      expect(negative).toEqual({ resize: { width: 100 } });
+    });
+
+    it("should ignore dpr when no resize dimensions are present", () => {
+      const result = mapper.mapQueryParamsToEdits({ dpr: "2" });
+      expect(result).toEqual({});
+    });
+
+    it("should not scale null dimensions with dpr", () => {
+      const result = mapper.mapQueryParamsToEdits({
+        width: "0",
+        height: "200",
+        dpr: "2",
+      });
+      expect(result).toEqual({
+        resize: {
+          width: null,
+          height: 400,
+        },
+      });
+    });
+
     it("should throw ImageHandlerError on parsing failure", () => {
       // Mock console.error to avoid logging during test
       console.error = jest.fn();
@@ -148,6 +227,7 @@ describe("QueryParamMapper", () => {
       expect(QueryParamMapper.QUERY_PARAM_KEYS).toContain("flip");
       expect(QueryParamMapper.QUERY_PARAM_KEYS).toContain("flop");
       expect(QueryParamMapper.QUERY_PARAM_KEYS).toContain("grayscale");
+      expect(QueryParamMapper.QUERY_PARAM_KEYS).toContain("dpr");
     });
   });
 });
