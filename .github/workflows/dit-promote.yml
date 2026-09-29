@@ -1,0 +1,116 @@
+name: DIT - Promote to Production
+
+run-name: "DIT Promote | ${{ inputs.tag || 'latest from development' }} -> production"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to promote (leave empty to use latest from ENV#development)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 699475938885.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: punchh/dynamic-image-transformation
+  DYNAMO_TABLE: punchh-ServicesVersion
+  DYNAMO_ROLE_ARN: arn:aws:iam::569345298987:role/punchh-ServicesVersionRole
+  DYNAMO_SK: STACK#default#REPO#dynamic-image-transformation
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production-approval
+    timeout-minutes: 10
+    steps:
+      - name: Configure AWS credentials for DynamoDB
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: ${{ env.DYNAMO_ROLE_ARN }}
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+
+      - name: Resolve tag to promote
+        id: resolve
+        run: |
+          MANUAL_TAG="${{ inputs.tag }}"
+
+          if [[ -n "$MANUAL_TAG" ]]; then
+            TAG="$MANUAL_TAG"
+            echo "Using manual tag: $TAG"
+          else
+            TAG=$(aws dynamodb get-item \
+              --table-name "$DYNAMO_TABLE" \
+              --key "{\"PK\":{\"S\":\"ENV#development\"},\"SK\":{\"S\":\"$DYNAMO_SK\"}}" \
+              --output json | jq -r '.Item.tags.L[-1].S // empty')
+
+            if [[ -z "$TAG" ]]; then
+              echo "::error::No tag found in DynamoDB for ENV#development"
+              exit 1
+            fi
+            echo "Resolved latest development tag: $TAG"
+          fi
+
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials for ECR
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: arn:aws:iam::699475938885:role/ecr-access/punchh/amazon-cloudfront-dit
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+          mask-aws-account-id: 'false'
+
+      - name: Verify image exists in ECR
+        run: |
+          if ! aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG not found in ECR repository $ECR_REPOSITORY"
+            exit 1
+          fi
+          echo "✅ Verified $ECR_REGISTRY/$ECR_REPOSITORY:$TAG exists"
+
+      - name: Configure AWS credentials for DynamoDB
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: ${{ env.DYNAMO_ROLE_ARN }}
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+
+      - name: Promote tag in DynamoDB
+        run: |
+          PK="ENV#production"
+
+          EXISTING=$(aws dynamodb get-item \
+            --table-name "$DYNAMO_TABLE" \
+            --key "{\"PK\":{\"S\":\"$PK\"},\"SK\":{\"S\":\"$DYNAMO_SK\"}}" \
+            --output json 2>/dev/null || true)
+
+          if [ -z "$EXISTING" ]; then EXISTING="{}"; fi
+
+          if echo "$EXISTING" | jq -e '.Item.tags.L' >/dev/null 2>&1; then
+            CURRENT_TAGS=$(echo "$EXISTING" | jq -r '[.Item.tags.L[].S]')
+          else
+            CURRENT_TAGS="[]"
+          fi
+
+          TAGS_JSON=$(echo "$CURRENT_TAGS" | jq -c --arg tag "$TAG" \
+            '(. + [$tag]) | .[-5:] | {"L": [.[] | {"S": .}]}')
+
+          aws dynamodb update-item \
+            --table-name "$DYNAMO_TABLE" \
+            --key "{\"PK\":{\"S\":\"$PK\"},\"SK\":{\"S\":\"$DYNAMO_SK\"}}" \
+            --update-expression "SET tags = :tags, updatedAt = :ts, promotedFrom = :pf" \
+            --expression-attribute-values "{\":tags\": $TAGS_JSON, \":ts\": {\"S\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}, \":pf\": {\"S\": \"development\"}}" \
+            --return-values NONE
+
+          echo "✅ Tag $TAG promoted to ENV#production in DynamoDB"
+          echo ""
+          echo "Next step: run 'DIT - CD Pipeline' with environment=shared-services-prod to deploy $TAG"
