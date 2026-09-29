@@ -113,4 +113,4 @@ jobs:
 
           echo "✅ Tag $TAG promoted to ENV#production in DynamoDB"
           echo ""
-          echo "Next step: run 'DIT - CD Pipeline' with environment=shared-services-prod to deploy $TAG"
+          echo "Next step: run 'DIT - CD Pipeline' with environment=shared-services-prod to deploy $TAG" 
