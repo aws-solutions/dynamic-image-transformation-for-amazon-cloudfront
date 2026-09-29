@@ -121,42 +121,220 @@ describe("MetricsHelper", () => {
     expect(result).toEqual(mockSQSResponse);
   });
 
-  it("should resolve a query", async () => {
-    const mockQueryId = "queryId";
-    const mockResult = { field: "testField", value: "testValue" };
-    const mockResponse: GetQueryResultsCommandOutput = {
-      status: "Complete",
-      results: [[mockResult]],
-      $metadata: {},
-    };
-    clientHelperMock.getCwLogsClient.mockReturnValue({
-      send: jest.fn().mockResolvedValue(mockResponse),
-    } as any);
+  describe("resolveQuery / resolveQueries", () => {
+    it("should resolve a query", async () => {
+      const mockQueryId = "queryId";
+      const mockResult = { field: "testField", value: "testValue" };
+      const mockResponse: GetQueryResultsCommandOutput = {
+        status: "Complete",
+        results: [[mockResult]],
+        $metadata: {},
+      };
+      clientHelperMock.getCwLogsClient.mockReturnValue({
+        send: jest.fn().mockResolvedValue(mockResponse),
+      } as any);
 
-    const result = await metricsHelper.resolveQuery(mockQueryId);
+      const result = await metricsHelper.resolveQuery(mockQueryId);
 
-    expect(clientHelperMock.getCwLogsClient().send).toHaveBeenCalled();
-    expect(result).toEqual([mockResult]);
+      expect(clientHelperMock.getCwLogsClient().send).toHaveBeenCalled();
+      expect(result).toEqual([mockResult]);
+    });
+
+    it("should resolve multiple queries from SQS event", async () => {
+      const mockEvent: SQSEvent = {
+        Records: [{ body: JSON.stringify({ queryIds: ["queryId1", "queryId2"] }) }],
+      } as SQSEvent;
+      const mockResult = { field: "testField", value: "testValue" };
+      const mockResponse: GetQueryResultsCommandOutput = {
+        status: "Complete",
+        results: [[mockResult]],
+        $metadata: {},
+      };
+      clientHelperMock.getCwLogsClient.mockReturnValue({
+        send: jest.fn().mockResolvedValue(mockResponse),
+      } as any);
+
+      const result = await metricsHelper.resolveQueries(mockEvent);
+
+      expect(clientHelperMock.getCwLogsClient().send).toHaveBeenCalledTimes(2);
+      expect(result).toEqual([mockResult, mockResult]);
+    });
+
+    it("should resolve a query against an explicit region", async () => {
+      const mockQueryId = "queryId";
+      const mockResult = { field: "testField", value: "testValue" };
+      const mockResponse: GetQueryResultsCommandOutput = {
+        status: "Complete",
+        results: [[mockResult]],
+        $metadata: {},
+      };
+      const mockSend = jest.fn().mockResolvedValue(mockResponse);
+      clientHelperMock.getCwLogsClient.mockReturnValue({ send: mockSend } as any);
+
+      await metricsHelper.resolveQuery(mockQueryId, "us-east-1");
+
+      expect(clientHelperMock.getCwLogsClient).toHaveBeenCalledWith("us-east-1");
+    });
+
+    it("should resolve a query with no region using the default client", async () => {
+      const mockResponse: GetQueryResultsCommandOutput = {
+        status: "Complete",
+        results: [[{ field: "f", value: "1" }]],
+        $metadata: {},
+      };
+      clientHelperMock.getCwLogsClient.mockReturnValue({ send: jest.fn().mockResolvedValue(mockResponse) } as any);
+
+      await metricsHelper.resolveQuery("queryId");
+
+      expect(clientHelperMock.getCwLogsClient).toHaveBeenCalledWith(undefined);
+    });
+
+    it("should route cross-region query IDs to the correct region in resolveQueries", async () => {
+      const mockEvent: SQSEvent = {
+        Records: [{
+          body: JSON.stringify({
+            queryIds: ["qid-ecs", "qid-cf"],
+            crossRegionQueryIds: { "us-east-1": ["qid-cf"] },
+          }),
+        }],
+      } as SQSEvent;
+      const mockResponse: GetQueryResultsCommandOutput = {
+        status: "Complete",
+        results: [[{ field: "f", value: "1" }]],
+        $metadata: {},
+      };
+      clientHelperMock.getCwLogsClient.mockReturnValue({ send: jest.fn().mockResolvedValue(mockResponse) } as any);
+
+      await metricsHelper.resolveQueries(mockEvent);
+
+      expect(clientHelperMock.getCwLogsClient).toHaveBeenCalledWith(undefined);   // qid-ecs
+      expect(clientHelperMock.getCwLogsClient).toHaveBeenCalledWith("us-east-1"); // qid-cf
+    });
   });
 
-  it("should resolve multiple queries from SQS event", async () => {
-    const mockEvent: SQSEvent = {
-      Records: [{ body: JSON.stringify({ queryIds: ["queryId1", "queryId2"] }) }],
-    } as SQSEvent;
-    const mockResult = { field: "testField", value: "testValue" };
-    const mockResponse: GetQueryResultsCommandOutput = {
-      status: "Complete",
-      results: [[mockResult]],
-      $metadata: {},
-    };
-    clientHelperMock.getCwLogsClient.mockReturnValue({
-      send: jest.fn().mockResolvedValue(mockResponse),
-    } as any);
+  describe("scanConfigTable", () => {
+    const mockSend = jest.fn();
 
-    const result = await metricsHelper.resolveQueries(mockEvent);
+    beforeEach(() => {
+      process.env.CONFIG_TABLE_ARN = "arn:aws:dynamodb:us-east-1:123456789012:table/ConfigTable";
+      jest.spyOn(metricsHelper, "getDynamoDbClient").mockReturnValue({ send: mockSend } as any);
+    });
 
-    expect(clientHelperMock.getCwLogsClient().send).toHaveBeenCalledTimes(2);
-    expect(result).toEqual([mockResult, mockResult]);
+    afterEach(() => {
+      delete process.env.CONFIG_TABLE_ARN;
+    });
+
+    const makePolicyItem = (policyJSON: object) => ({
+      GSI1PK: { S: "POLICY" },
+      Data: { M: { policyJSON: { S: JSON.stringify(policyJSON) } } },
+    });
+
+    it("should return empty object when CONFIG_TABLE_ARN is not set", async () => {
+      delete process.env.CONFIG_TABLE_ARN;
+      const result = await metricsHelper.scanConfigTable();
+      expect(result).toEqual({});
+    });
+
+    it("should count smart crop enabled with boolean true", async () => {
+      mockSend.mockResolvedValue({
+        Items: [makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: true }] })],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropEnabled"]).toBe(1);
+      expect(result["DynamoDB/SmartCropFaces"]).toBe(1);
+    });
+
+    it("should count smart crop faces with legacy object (index)", async () => {
+      mockSend.mockResolvedValue({
+        Items: [makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: { index: 0, padding: 10 } }] })],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropEnabled"]).toBe(1);
+      expect(result["DynamoDB/SmartCropFaces"]).toBe(1);
+    });
+
+    it("should count smart crop faces with expanded object (faces: true)", async () => {
+      mockSend.mockResolvedValue({
+        Items: [makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: { faces: true } }] })],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropEnabled"]).toBe(1);
+      expect(result["DynamoDB/SmartCropFaces"]).toBe(1);
+    });
+
+    it("should count smart crop faces with faceIndex", async () => {
+      mockSend.mockResolvedValue({
+        Items: [makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: { faceIndex: 0 } }] })],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropFaces"]).toBe(1);
+    });
+
+    it("should count smart crop labels", async () => {
+      mockSend.mockResolvedValue({
+        Items: [makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: { labels: ["Cat", "Dog"] } }] })],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropEnabled"]).toBe(1);
+      expect(result["DynamoDB/SmartCropLabels"]).toBe(1);
+      expect(result["DynamoDB/SmartCropFaces"]).toBe(0);
+    });
+
+    it("should count smart crop custom labels", async () => {
+      mockSend.mockResolvedValue({
+        Items: [
+          makePolicyItem({
+            outputs: [],
+            transformations: [{ transformation: "smartCrop", value: { customModelArn: "arn:aws:rekognition:us-east-1:123:project/my-model/version/1" } }],
+          }),
+        ],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropCustomLabels"]).toBe(1);
+    });
+
+    it("should count smart crop retainText and retainLogo", async () => {
+      mockSend.mockResolvedValue({
+        Items: [
+          makePolicyItem({
+            outputs: [],
+            transformations: [{ transformation: "smartCrop", value: { retainText: true, retainLogo: true } }],
+          }),
+        ],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropRetainText"]).toBe(1);
+      expect(result["DynamoDB/SmartCropRetainLogo"]).toBe(1);
+    });
+
+    it("should report zero smart crop counters when no smartCrop transformation exists", async () => {
+      mockSend.mockResolvedValue({
+        Items: [makePolicyItem({ outputs: [{ type: "quality", value: [80] }], transformations: [{ transformation: "resize", value: { width: 200 } }] })],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropEnabled"]).toBe(0);
+      expect(result["DynamoDB/SmartCropFaces"]).toBe(0);
+      expect(result["DynamoDB/SmartCropLabels"]).toBe(0);
+      expect(result["DynamoDB/SmartCropCustomLabels"]).toBe(0);
+      expect(result["DynamoDB/SmartCropRetainText"]).toBe(0);
+      expect(result["DynamoDB/SmartCropRetainLogo"]).toBe(0);
+    });
+
+    it("should accumulate counters across multiple policies", async () => {
+      mockSend.mockResolvedValue({
+        Items: [
+          makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: true }] }),
+          makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: { labels: ["Cat"] } }] }),
+          makePolicyItem({ outputs: [], transformations: [{ transformation: "smartCrop", value: { retainText: true, retainLogo: true } }] }),
+        ],
+      });
+      const result = await metricsHelper.scanConfigTable();
+      expect(result["DynamoDB/SmartCropEnabled"]).toBe(3);
+      expect(result["DynamoDB/SmartCropFaces"]).toBe(1);
+      expect(result["DynamoDB/SmartCropLabels"]).toBe(1);
+      expect(result["DynamoDB/SmartCropRetainText"]).toBe(1);
+      expect(result["DynamoDB/SmartCropRetainLogo"]).toBe(1);
+    });
   });
 
   it("should properly populate anonymous metric data", async () => {
@@ -185,5 +363,35 @@ describe("MetricsHelper", () => {
         body: expect.stringContaining(`"DataStartTime":"2020-09-10 04:00:00.000"`),
       })
     );
+  });
+
+  describe("processQueryResults — crossRegionQueryIds pruning", () => {
+    const makeSQSBody = (overrides = {}) => ({
+      queryIds: ["qid-ecs", "qid-cf"],
+      endTime: Date.now(),
+      crossRegionQueryIds: { "us-east-1": ["qid-cf"] },
+      ...overrides,
+    });
+
+    it("should prune crossRegionQueryIds to only still-failing IDs on retry", () => {
+      const body = makeSQSBody();
+      // qid-ecs resolved, qid-cf still running
+      metricsHelper.processQueryResults([{ field: "Requests_TotalImages", value: "9823" }, undefined], body);
+
+      expect(body.crossRegionQueryIds).toEqual({ "us-east-1": ["qid-cf"] });
+      expect(body.queryIds).toEqual(["qid-cf"]);
+    });
+
+    it("should set crossRegionQueryIds to undefined when no cross-region IDs remain after pruning", () => {
+      const body = makeSQSBody({
+        queryIds: ["qid-ecs", "qid-cf"],
+        crossRegionQueryIds: { "us-east-1": ["qid-cf"] },
+      });
+      // qid-cf resolved, qid-ecs still running → crossRegionQueryIds should become undefined
+      metricsHelper.processQueryResults([undefined, { field: "Tier1_ClientHintsWidth", value: "42" }], body);
+      
+      expect(body.queryIds).toEqual(["qid-ecs"]);
+      expect(body.crossRegionQueryIds).toBeUndefined();
+    });
   });
 });

@@ -41,6 +41,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
           setEmail(null);
           break;
+        case 'tokenRefresh_failure':
+          setUser(null);
+          setEmail(null);
+          signInWithRedirect();
+          break;
       }
     });
     

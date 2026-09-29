@@ -16,8 +16,9 @@ import { buildCacheControl, buildErrorCacheControl } from '../utils/cache-contro
 
 const router = Router();
 
-// Headers to exclude from forwarding
-const EXCLUDED_HEADERS: string[] = ['host', 'accept'];
+// Headers to exclude from forwarding. x-dit-authorization is DIT's own token, never an origin's;
+// `authorization`/`cookie` are deliberately forwarded so clients can fetch images behind auth.
+const EXCLUDED_HEADERS: string[] = ['host', 'accept', 'x-dit-authorization'];
 
 // Memory protection limits
 const MAX_HEADERS = 50;

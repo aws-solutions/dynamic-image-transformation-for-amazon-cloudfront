@@ -117,6 +117,21 @@ describe('filterClientHeaders', () => {
     expect(result).toEqual({ 'x-custom': 'value' });
   });
 
+  it("Should exclude only DIT's own token, forwarding client authorization and cookie", () => {
+    // authorization/cookie are the client's credentials for the client's own origin, and
+    // customers depend on forwarding them to fetch images behind auth. Only DIT's own
+    // x-dit-authorization is stripped.
+    const headers = {
+      authorization: 'Bearer origin-token',
+      cookie: 'session=abc123',
+      'X-DIT-Authorization': 'Bearer eyJhbGciOiJSUzI1NiJ9.cognito-access-token',
+    };
+
+    const result = filterClientHeaders(headers);
+
+    expect(result).toEqual({ authorization: 'Bearer origin-token', cookie: 'session=abc123' });
+  });
+
   it('Should limit to 50 headers', () => {
     const headers: Record<string, string> = {};
     for (let i = 0; i < 60; i++) {

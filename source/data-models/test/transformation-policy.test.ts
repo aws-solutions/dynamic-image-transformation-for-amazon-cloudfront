@@ -6,7 +6,7 @@
  * Validates complete policy objects including transformations and output optimizations.
  */
 
-import { validateTransformationPolicyCreate } from "../transformation-policy";
+import { validateTransformationPolicyCreate, transformationSchemas } from "../transformation-policy";
 
 describe("Transformation Policy Validation", () => {
   describe("Real-world policy scenarios", () => {
@@ -594,6 +594,317 @@ describe("Transformation Policy Validation", () => {
 
       const result = validateTransformationPolicyCreate(policy);
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("smartCrop schema", () => {
+    const parse = (value: unknown) => transformationSchemas.smartCrop.safeParse(value);
+
+    // Valid Rekognition Custom Labels project-version ARN.
+    const VALID_CUSTOM_MODEL_ARN =
+      "arn:aws:rekognition:us-east-1:123456789012:project/model/version/model.v1/1700000000000";
+
+    // Schema accepts all valid configurations
+    describe("valid configurations", () => {
+      it("should accept legacy boolean true", () => {
+        expect(parse(true).success).toBe(true);
+      });
+
+      it("should accept legacy {index, padding} object", () => {
+        expect(parse({ index: 5, padding: 20 }).success).toBe(true);
+      });
+
+      it("should accept expanded format with faces only", () => {
+        expect(parse({ faces: true }).success).toBe(true);
+      });
+
+      it("should accept expanded format with all fields", () => {
+        expect(parse({
+          enabled: true,
+          faces: true,
+          faceIndex: 3,
+          labels: ["Person", "Car"],
+          customModelArn: VALID_CUSTOM_MODEL_ARN,
+          aspectRatio: "16:9",
+          padding: "10%",
+          gravity: "top-center",
+          priorities: ["aspectRatio", "padding"],
+          retainText: true,
+          retainLogo: false,
+          fallback: "contain",
+          minConfidence: 85,
+        }).success).toBe(true);
+      });
+
+      it("should accept all padding formats", () => {
+        expect(parse({ faces: true, padding: 50 }).success).toBe(true);
+        expect(parse({ faces: true, padding: "10%" }).success).toBe(true);
+        expect(parse({ faces: true, padding: "50px" }).success).toBe(true);
+      });
+
+      it("should accept all directional gravity positions", () => {
+        const positions = [
+          "top-left", "top-center", "top-right",
+          "center-left", "center", "center-right",
+          "bottom-left", "bottom-center", "bottom-right",
+        ];
+        for (const pos of positions) {
+          expect(parse({ faces: true, gravity: pos }).success).toBe(true);
+        }
+      });
+
+      it("should accept label-based gravity", () => {
+        expect(parse({ faces: true, gravity: "Person" }).success).toBe(true);
+      });
+
+      it("should accept all fallback modes", () => {
+        for (const mode of ["cover", "contain", "fill", "inside", "outside", "no-crop"]) {
+          expect(parse({ faces: true, fallback: mode }).success).toBe(true);
+        }
+      });
+
+      it("should accept priority list in any valid permutation", () => {
+        expect(parse({ faces: true, priorities: ["padding", "aspectRatio"] }).success).toBe(true);
+        expect(parse({ faces: true, priorities: ["aspectRatio"] }).success).toBe(true);
+      });
+
+      it("should accept boundary values", () => {
+        expect(parse({ faceIndex: 0 }).success).toBe(true);
+        expect(parse({ faceIndex: 15 }).success).toBe(true);
+        expect(parse({ faces: true, minConfidence: 0 }).success).toBe(true);
+        expect(parse({ faces: true, minConfidence: 100 }).success).toBe(true);
+        expect(parse({ faces: true, aspectRatio: "1:1" }).success).toBe(true);
+        expect(parse({ faces: true, aspectRatio: "100:100" }).success).toBe(true);
+      });
+
+      it("should reject empty expanded object (no detection methods)", () => {
+        const result = parse({});
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toContain("At least one detection method is required");
+        }
+      });
+    });
+
+    // Detection method requirement
+    describe("detection method requirement", () => {
+      it("should accept when faces is true", () => {
+        expect(parse({ faces: true }).success).toBe(true);
+      });
+
+      it("should accept when faceIndex is set", () => {
+        expect(parse({ faceIndex: 0 }).success).toBe(true);
+      });
+
+      it("should accept when labels are provided", () => {
+        expect(parse({ labels: ["Person"] }).success).toBe(true);
+      });
+
+      it("should accept when customModelArn is set", () => {
+        expect(parse({ customModelArn: VALID_CUSTOM_MODEL_ARN }).success).toBe(true);
+      });
+
+      it("should accept when retainText is true", () => {
+        expect(parse({ retainText: true }).success).toBe(true);
+      });
+
+      it("should accept when retainLogo is true", () => {
+        expect(parse({ retainLogo: true }).success).toBe(true);
+      });
+
+      it("should reject when only non-detection fields are set", () => {
+        expect(parse({ aspectRatio: "16:9", padding: "10%", gravity: "center", fallback: "cover" }).success).toBe(false);
+      });
+
+      it("should reject when faces is explicitly false with no other detection", () => {
+        expect(parse({ faces: false }).success).toBe(false);
+      });
+
+      it("should reject when enabled is true but no detection method", () => {
+        expect(parse({ enabled: true }).success).toBe(false);
+      });
+    });
+
+    // Invalid input rejection (smartCrop)
+    describe("invalid configurations", () => {
+      it("should reject faceIndex outside 0-15", () => {
+        expect(parse({ faceIndex: -1 }).success).toBe(false);
+        expect(parse({ faceIndex: 16 }).success).toBe(false);
+      });
+
+      it("should reject minConfidence outside 0-100", () => {
+        expect(parse({ minConfidence: -1 }).success).toBe(false);
+        expect(parse({ minConfidence: 101 }).success).toBe(false);
+      });
+
+      it("should reject malformed aspect ratio", () => {
+        expect(parse({ aspectRatio: "16x9" }).success).toBe(false);
+        expect(parse({ aspectRatio: "0:0" }).success).toBe(false);
+        expect(parse({ aspectRatio: "1000:1" }).success).toBe(false);
+      });
+
+      it("should reject invalid fallback mode", () => {
+        expect(parse({ fallback: "stretch" }).success).toBe(false);
+      });
+
+      it("should reject invalid constraint type in priorities", () => {
+        expect(parse({ priorities: ["zoom"] }).success).toBe(false);
+      });
+
+      it("should reject malformed padding strings", () => {
+        expect(parse({ padding: "abc" }).success).toBe(false);
+        expect(parse({ padding: "10em" }).success).toBe(false);
+        expect(parse({ padding: "10%x,20%y" }).success).toBe(false);
+        expect(parse({ padding: "30pxx,50pxy" }).success).toBe(false);
+      });
+
+      it("should reject unknown fields in expanded format", () => {
+        expect(parse({ unknownField: true }).success).toBe(false);
+      });
+
+      it("should accept labels at the count cap (50) and reject 51", () => {
+        expect(parse({ labels: Array.from({ length: 50 }, (_, i) => `L${i}`) }).success).toBe(true);
+        expect(parse({ labels: Array.from({ length: 51 }, (_, i) => `L${i}`) }).success).toBe(false);
+      });
+
+      it("should reject a label longer than 100 characters", () => {
+        expect(parse({ labels: ["a".repeat(101)] }).success).toBe(false);
+      });
+
+      it("should reject a malformed customModelArn", () => {
+        expect(parse({ customModelArn: "not-an-arn" }).success).toBe(false);
+        // account id not 12 digits
+        expect(parse({ customModelArn: "arn:aws:rekognition:us-east-1:123:project/m/version/1" }).success).toBe(false);
+        // wrong service
+        expect(parse({ customModelArn: "arn:aws:s3:::my-bucket" }).success).toBe(false);
+      });
+
+      it("should reject a customModelArn over the length cap", () => {
+        const longArn = `arn:aws:rekognition:us-east-1:123456789012:project/${"x".repeat(1000)}/version/v/1`;
+        expect(parse({ customModelArn: longArn }).success).toBe(false);
+      });
+    });
+  });
+
+  describe("contentModeration schema", () => {
+    const parse = (value: unknown) => transformationSchemas.contentModeration.safeParse(value);
+
+    describe("valid configurations", () => {
+      it("should accept boolean true", () => {
+        expect(parse(true).success).toBe(true);
+      });
+
+      it("should accept empty object (all defaults)", () => {
+        expect(parse({}).success).toBe(true);
+      });
+
+      it("should accept partial object with minConfidence only", () => {
+        expect(parse({ minConfidence: 60 }).success).toBe(true);
+      });
+
+      it("should accept partial object with blur only", () => {
+        expect(parse({ blur: 100 }).success).toBe(true);
+      });
+
+      it("should accept partial object with moderationLabels only", () => {
+        expect(parse({ moderationLabels: ["Smoking", "Violence"] }).success).toBe(true);
+      });
+
+      it("should accept full object with all fields", () => {
+        expect(parse({ minConfidence: 60, blur: 100, moderationLabels: ["Smoking"] }).success).toBe(true);
+      });
+
+      it("should accept boundary values for minConfidence", () => {
+        expect(parse({ minConfidence: 0 }).success).toBe(true);
+        expect(parse({ minConfidence: 100 }).success).toBe(true);
+      });
+
+      it("should accept boundary values for blur", () => {
+        expect(parse({ blur: 0.3 }).success).toBe(true);
+        expect(parse({ blur: 1000 }).success).toBe(true);
+      });
+    });
+
+    describe("invalid configurations", () => {
+      it("should reject boolean false", () => {
+        expect(parse(false).success).toBe(false);
+      });
+
+      it("should reject minConfidence below 0", () => {
+        expect(parse({ minConfidence: -1 }).success).toBe(false);
+      });
+
+      it("should reject minConfidence above 100", () => {
+        expect(parse({ minConfidence: 101 }).success).toBe(false);
+      });
+
+      it("should reject blur below 0.3", () => {
+        expect(parse({ blur: 0.2 }).success).toBe(false);
+      });
+
+      it("should reject blur above 1000", () => {
+        expect(parse({ blur: 1001 }).success).toBe(false);
+      });
+
+      it("should reject empty string in moderationLabels", () => {
+        expect(parse({ moderationLabels: [""] }).success).toBe(false);
+      });
+
+      it("should reject unknown fields (strictObject)", () => {
+        expect(parse({ unknownField: true }).success).toBe(false);
+      });
+    });
+
+    describe("policy-level integration", () => {
+      it("should accept contentModeration with boolean true in a policy", () => {
+        const result = validateTransformationPolicyCreate({
+          policyName: "Moderation Policy",
+          policyJSON: {
+            transformations: [{ transformation: "contentModeration", value: true }],
+          },
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it("should accept contentModeration with config object in a policy", () => {
+        const result = validateTransformationPolicyCreate({
+          policyName: "Moderation Policy",
+          policyJSON: {
+            transformations: [{
+              transformation: "contentModeration",
+              value: { minConfidence: 60, blur: 100, moderationLabels: ["Smoking"] },
+            }],
+          },
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it("should accept contentModeration coexisting with smartCrop", () => {
+        const result = validateTransformationPolicyCreate({
+          policyName: "Combined Policy",
+          policyJSON: {
+            transformations: [
+              { transformation: "contentModeration", value: true },
+              { transformation: "smartCrop", value: { faces: true } },
+            ],
+          },
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it("should accept contentModeration with a condition", () => {
+        const result = validateTransformationPolicyCreate({
+          policyName: "Conditional Moderation",
+          policyJSON: {
+            transformations: [{
+              transformation: "contentModeration",
+              value: true,
+              condition: { field: "category", value: "user-generated" },
+            }],
+          },
+        });
+        expect(result.success).toBe(true);
+      });
     });
   });
 });

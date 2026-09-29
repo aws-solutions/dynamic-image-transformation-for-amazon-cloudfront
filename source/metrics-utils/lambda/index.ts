@@ -4,6 +4,7 @@
 // eslint-disable-next-line import/no-unresolved
 import { SQSEvent, Context } from "aws-lambda";
 import { MetricsHelper } from "./helpers/metrics-helper";
+import { logger } from "./helpers/logger";
 import {
   EventBridgeQueryEvent,
   ExecutionDay,
@@ -43,7 +44,7 @@ export async function handler(event: EventBridgeQueryEvent | SQSEvent, _context:
     console.info("Processing SQS event.");
     const body: SQSEventBody = JSON.parse(event.Records[0].body);
     const resolvedQueries = await metricsHelper.resolveQueries(event);
-    console.debug(`Resolved Queries: ${JSON.stringify(resolvedQueries)}`);
+    logger.debug(`Resolved Queries: ${JSON.stringify(resolvedQueries)}`);
     const metricsData: MetricData = metricsHelper.processQueryResults(resolvedQueries, body);
     if (Object.keys(metricsData).length > 0) {
       await metricsHelper.sendAnonymousMetric(

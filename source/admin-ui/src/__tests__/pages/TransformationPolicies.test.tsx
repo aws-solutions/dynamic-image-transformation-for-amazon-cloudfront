@@ -3,12 +3,6 @@ import { screen } from '@testing-library/react';
 import { render } from '../test-utils';
 import TransformationPolicies from '../../pages/TransformationPolicies';
 
-vi.mock('../../services/authService', () => ({
-  AuthService: {
-    signOut: vi.fn().mockResolvedValue(undefined)
-  }
-}));
-
 vi.mock('../../contexts/TransformationPolicyContext', () => ({
   TransformationPolicyProvider: ({ children }: any) => children,
   useTransformationPolicyContext: () => ({
@@ -27,12 +21,12 @@ describe('TransformationPolicies', () => {
   it('should render navigation and layout', () => {
     render(<TransformationPolicies />);
     
-    expect(screen.getByRole('navigation')).toBeInTheDocument();
+    expect(screen.getAllByRole('navigation')).toHaveLength(2); // BreadcrumbGroup + SideNavigation
   });
 
   it('should render breadcrumbs', () => {
     render(<TransformationPolicies />);
     
-    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.getAllByText('Home')).toHaveLength(2); // BreadcrumbGroup renders link + ARIA
   });
 });

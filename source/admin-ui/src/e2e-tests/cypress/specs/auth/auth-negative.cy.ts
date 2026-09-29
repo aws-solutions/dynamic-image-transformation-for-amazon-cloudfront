@@ -10,7 +10,7 @@ describe('Authentication - Negative Tests', { tags: ['@auth', '@negative'] }, ()
   });
 
   it('should show error for invalid password', () => {
-    cy.loginAttempt('invalidPasswordUser');
+    cy.loginAttempt('invalidPasswordUser', `${Cypress.env('USER_PASSWORD')}_wrong`);
     cy.origin(Cypress.env('cognitoOrigin'), () => {
       cy.contains('Invalid input: Incorrect username or password.').should('be.visible');
     });
@@ -27,12 +27,11 @@ describe('Authentication - Negative Tests', { tags: ['@auth', '@negative'] }, ()
         return true;
       });
       
-      cy.fixture('seeds/users').then((users) => {
-        cy.get('input[name="password"]').type(users.testUser.password);
-        cy.get('button[type="submit"]').click();
+      cy.get('input[name="username"]').clear();
+      cy.get('input[name="password"]').type('dummyPassword');
+      cy.get('button[type="submit"]').click();
         
-        cy.contains('Missing email address.').should('be.visible');
-      });
+      cy.contains('Missing email address.').should('be.visible');
     });
   });
 
@@ -67,8 +66,10 @@ describe('Authentication - Negative Tests', { tags: ['@auth', '@negative'] }, ()
         return true;
       });
       
+      cy.get('input[name="username"]').clear();
+      cy.get('input[name="password"]').clear();
       cy.get('button[type="submit"]').click();
-      
+
       cy.contains('Missing email address.').should('be.visible');
       cy.contains('Missing password.').should('be.visible');
     });

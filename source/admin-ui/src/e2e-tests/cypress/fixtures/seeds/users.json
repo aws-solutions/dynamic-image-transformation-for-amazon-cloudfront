@@ -1,26 +1,20 @@
 {
   "testUser": {
-    "email": "cypress-test@example.com",
-    "password": "TempPassword123!"
+    "email": "cypress-test@example.com"
   },
   "invalidUser": {
-    "email": "invalid-user@example.com",
-    "password": "TempPassword123!"
+    "email": "invalid-user@example.com"
   },
   "invalidPasswordUser": {
-    "email": "cypress-test@example.com",
-    "password": "WrongPassword123!"
+    "email": "cypress-test@example.com"
   },
   "invalidEmailUser": {
-    "email": "invalid-email-format",
-    "password": "TempPassword123!"
+    "email": "invalid-email-format"
   },
   "emptyUsername": {
-    "email": "",
-    "password": "TempPassword123!"
+    "email": ""
   },
   "emptyPassword": {
-    "email": "cypress-test@example.com",
-    "password": ""
+    "email": "cypress-test@example.com"
   }
 }

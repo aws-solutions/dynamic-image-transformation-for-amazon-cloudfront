@@ -27,6 +27,9 @@ export class TransformationMapper {
         case 'watermark':
           this.mapWatermark(edits, transformation);
           break;
+        case 'contentModeration':
+          edits.contentModeration = transformation.value;
+          break;
         case "stripExif":
           edits.stripExif = true;
           break;

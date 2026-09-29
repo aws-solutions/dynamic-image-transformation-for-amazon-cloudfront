@@ -109,6 +109,32 @@ describe('UserContext', () => {
     });
   });
 
+  it('should redirect to login on tokenRefresh_failure event', async () => {
+    let hubListener: any;
+    vi.mocked(Hub.listen).mockImplementation((channel, callback) => {
+      hubListener = callback;
+      return vi.fn();
+    });
+
+    vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any);
+    vi.mocked(fetchUserAttributes).mockResolvedValue({ email: mockEmail });
+    vi.mocked(signInWithRedirect).mockResolvedValue(undefined as any);
+
+    const { result } = renderHook(() => useUser(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.user).toEqual(mockUser);
+    });
+
+    hubListener({ payload: { event: 'tokenRefresh_failure' } });
+
+    await waitFor(() => {
+      expect(result.current.user).toBeNull();
+      expect(result.current.email).toBeNull();
+      expect(signInWithRedirect).toHaveBeenCalled();
+    });
+  });
+
   it('should handle fetchUserAttributes error gracefully', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any);
     vi.mocked(fetchUserAttributes).mockRejectedValue(new Error('Fetch error'));

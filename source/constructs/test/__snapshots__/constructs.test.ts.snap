@@ -806,6 +806,12 @@ function processQueryParams(querystring) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudFront::Function",
     },
@@ -2391,6 +2397,12 @@ function processQueryParams(querystring) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudFront::Function",
     },
@@ -2460,6 +2472,12 @@ function handler(event) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudFront::Function",
     },
@@ -2810,6 +2828,8 @@ function handler(event) {
                 "MON",
               ],
             },
+            "POWERTOOLS_LOGGER_LOG_EVENT": "false",
+            "POWERTOOLS_LOGGER_LOG_LEVEL": "INFO",
             "QUERY_PREFIX": {
               "Fn::Join": [
                 "",
@@ -3426,18 +3446,32 @@ function handler(event) {
                     "s3:PutBucketVersioning",
                   ],
                   "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Join": [
-                      "",
-                      [
-                        "arn:",
-                        {
-                          "Ref": "AWS::Partition",
-                        },
-                        ":s3:::*",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":s3:::serverless-image-handler-logs-*",
+                        ],
                       ],
-                    ],
-                  },
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":s3:::sih-dummy-*",
+                        ],
+                      ],
+                    },
+                  ],
                 },
                 {
                   "Action": "s3:ListBucket",
@@ -4489,6 +4523,12 @@ function handler(event) {
             ],
           ],
         },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "S0ABC",
+          },
+        ],
       },
       "Type": "AWS::CloudWatch::Dashboard",
     },

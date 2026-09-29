@@ -7,7 +7,7 @@ export const transformationParsers = {
   convolve: (params: any) => params,
   sharpen: (params: any) => params,
   smartCrop: (params: any) => params,
-  
+  contentModeration: (params: any) => params,
   // Simple value parsers for flat parameters
   animated: (value: any) => value,
   quality: (value: any) => value,
@@ -19,6 +19,7 @@ export const transformationParsers = {
   flip: (value: any) => value,
   flop: (value: any) => value,
   grayscale: (value: any) => value,
+  greyscale: (value: any) => value,
   tint: (value: any) => value,
   rotate: (value: any) => value,
   stripExif: (value: any) => value,

@@ -36,21 +36,25 @@ export class OriginFetcher {
       throw new ImageProcessingError(400, 'InvalidUrl', 'Unsupported URL protocol', `URL '${url}' uses an unsupported protocol. Only http://, https://, and s3:// are supported.`);
     }
 
-    this.validateImageMagicNumbers(result.buffer, result.contentType, url);
+    // Normalize once so a parameter (e.g. '; charset=...') can't dodge the downstream exact-key
+    // lookups and skip magic-number validation, reopening the SSRF raw-body read (finding a3ede07f).
+    const mediaType = result.contentType ? this.normalizeMediaType(result.contentType) : undefined;
+
+    this.validateImageMagicNumbers(result.buffer, mediaType, url);
     const fetchDurationMs = Date.now() - startTime;
-    
+
     console.log(JSON.stringify({
       requestId: requestId || 'unknown',
       component: 'OriginFetcher',
       operation: 'image_fetched',
       originType: S3UrlHelper.isS3Url(url) ? 's3' : 'http',
       url: this.sanitizeUrl(url),
-      contentType: result.contentType,
+      contentType: mediaType,
       sizeBytes: result.buffer.length,
       fetchDurationMs
     }));
-    
-    const format = result.contentType?.replace('image/', '');
+
+    const format = mediaType?.replace('image/', '');
     return {
       buffer: result.buffer,
       metadata: {
@@ -61,6 +65,7 @@ export class OriginFetcher {
   }
 
   private async fetchFromS3(url: string, headers?: Record<string, string>): Promise<{ buffer: Buffer; contentType?: string }> {
+    // S3 enforces its own deadline via the SDK client timeout (getOptions()), not this AbortController.
     try {
       const { bucket, key } = S3UrlHelper.parseS3Url(url);
       console.log(`Attempting to fetch from bucket: ${bucket} and key: ${key}`)      
@@ -85,8 +90,19 @@ export class OriginFetcher {
       const buffer = Buffer.isBuffer(response.Body) 
         ? response.Body 
         : Buffer.from(await response.Body.transformToByteArray());
-      
-      return { buffer, contentType: response.ContentType };
+
+      // Fail closed on missing/non-image Content-Type, mirroring fetchFromHttp (Guardian Post 4a).
+      const contentType = response.ContentType;
+      if (!contentType || !this.isValidImageContentType(contentType)) {
+        throw new ImageProcessingError(
+          415,
+          'InvalidContentType',
+          `Invalid content type: ${contentType ?? 'missing'}`,
+          `S3 origin '${url}' returned unsupported Content-Type '${contentType ?? 'missing'}'.`
+        );
+      }
+
+      return { buffer, contentType };
     } catch (error) {
       if (error instanceof Error && error.message === 'Invalid S3 URL format') {
         throw new ImageProcessingError(400, 'InvalidS3Url', 'Invalid S3 URL format', `Failed to parse S3 URL '${url}': ${error.message}`);
@@ -96,10 +112,12 @@ export class OriginFetcher {
   }
 
   private async fetchFromHttp(url: string, headers?: Record<string, string>): Promise<{ buffer: Buffer; contentType?: string }> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.httpTimeout);
+    const controller = new AbortController();
+    // Keep the timer armed through the body read (cleared only in finally), else a trickling origin
+    // holds the socket past httpTimeout; an abort mid-read surfaces as 504 RequestTimeout (Post 8).
+    const timeoutId = setTimeout(() => controller.abort(), this.httpTimeout);
 
+    try {
       const fetchHeaders: Record<string, string> = {
         'User-Agent': 'DIT-v8-ImageProcessor/1.0',
         ...headers
@@ -107,12 +125,12 @@ export class OriginFetcher {
 
       const response = await fetch(url, {
         method: 'GET',
+        // Don't follow redirects: a redirect hop isn't re-validated and could reach a destination
+        // that bypassed origin validation. Matches the HEAD preflight, which already uses 'error'.
         headers: fetchHeaders,
         signal: controller.signal,
-        redirect: 'follow'
+        redirect: 'error'
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new ImageProcessingError(
@@ -123,48 +141,80 @@ export class OriginFetcher {
         );
       }
 
+      // Fail closed on a missing or non-image Content-Type: without this, a zero-transformation
+      // request returns an internal response body unmodified, i.e. an SSRF read (finding a3ede07f).
       const contentType = response.headers.get('content-type');
-      if (contentType && !this.isValidImageContentType(contentType)) {
+      if (!contentType || !this.isValidImageContentType(contentType)) {
         throw new ImageProcessingError(
           415,
           'InvalidContentType',
-          `Invalid content type: ${contentType}`,
-          `Origin '${url}' returned unsupported Content-Type '${contentType}'.`
+          `Invalid content type: ${contentType ?? 'missing'}`,
+          `Origin '${url}' returned unsupported Content-Type '${contentType ?? 'missing'}'.`
         );
       }
 
+      // Still under the abort timer: an abort here rejects → mapped to 504 below.
       const arrayBuffer = await response.arrayBuffer();
       return { buffer: Buffer.from(arrayBuffer), contentType: contentType || undefined };
     } catch (error) {
       if (error.name === 'AbortError') {
         throw new ImageProcessingError(504, 'RequestTimeout', 'Origin request timeout', `HTTP request to '${url}' exceeded ${this.httpTimeout}ms timeout.`);
       }
+      // fetch() surfaces a blocked redirect as a TypeError with this cause; map it to 502 rather
+      // than letting it fall through to a generic 500.
+      if (error?.cause?.message === 'unexpected redirect') {
+        throw new ImageProcessingError(502, 'RedirectNotAllowed', 'Origin redirect not allowed', `Origin '${url}' returned a redirect, which is not followed for security reasons.`);
+      }
       throw this.handleFetchError(error, url);
+    } finally {
+      // Always clear on every path (success, non-ok, abort, throw) so the handle is never leaked.
+      clearTimeout(timeoutId);
     }
   }
 
 
 
+  /** Lower-cased media type with any parameters (e.g. '; charset=...') stripped. */
+  private normalizeMediaType(contentType: string): string {
+    return contentType.split(';')[0].trim().toLowerCase();
+  }
+
   private isValidImageContentType(contentType: string): boolean {
     const validTypes = [
       'image/jpeg',
-      'image/jpg', 
+      'image/jpg',
       'image/png',
       'image/webp',
       'image/gif',
       'image/tiff',
       'image/avif',
       'image/heif',
+      'image/svg+xml',
     ];
-    return validTypes.some(type => contentType.toLowerCase().includes(type));
+    // Exact match, not substring: 'application/json; charset=image/jpeg' must not pass (finding a3ede07f).
+    return validTypes.includes(this.normalizeMediaType(contentType));
   }
 
   private validateImageMagicNumbers(buffer: Buffer, contentType: string | undefined, url: string): void {
     // Where applicable the first 4 bytes are checked against that formats starting sequence.
     // For formats with inconsistent or non-existant starting sequences(av1, raw, etc) this validation is skipped.
 
+    // SVG is text with no reliable byte signature, so it can't be magic-validated; accepted residual.
+    if (contentType?.includes('svg')) return;
+
     if (buffer.length < 4) {
       throw new ImageProcessingError(415, 'InvalidImage', 'Invalid image file', `Image from '${url}' is only ${buffer.length} bytes, too small to be a valid image.`);
+    }
+
+    // avif/heif are ISOBMFF: every valid file has the ASCII 'ftyp' box at byte 4. We check only for
+    // that, not the brand — the brand set isn't exhaustive, so a brand allowlist would eventually
+    // reject legitimate images. Requiring 'ftyp' is enough to stop the raw-body read: an arbitrary
+    // non-image body (JSON, HTML, text) won't carry 'ftyp' at offset 4.
+    if (contentType === 'image/avif' || contentType === 'image/heif') {
+      if (buffer.length < 8 || buffer.subarray(4, 8).toString('ascii') !== 'ftyp') {
+        throw new ImageProcessingError(415, 'InvalidImage', 'Invalid image file', `Image from '${url}': Content-Type '${contentType}' but no ISOBMFF 'ftyp' box was found.`);
+      }
+      return;
     }
 
     const magicToFormat = {

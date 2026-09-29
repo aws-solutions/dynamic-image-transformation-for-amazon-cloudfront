@@ -30,6 +30,7 @@ export const AddedTransformationsList: React.FC<AddedTransformationsListProps> =
       smartCrop: 'Smart Crop', stripExif: 'Strip EXIF', stripIcc: 'Strip ICC',
       flip: 'Flip', flop: 'Flop', normalize: 'Normalize', animated: 'Animated',
       tint: 'Tint', flatten: 'Flatten', convolve: 'Convolve', extract: 'Extract',
+      contentModeration: 'Content Moderation',
       watermark: 'Watermark'
     };
     return titles[transformation.transformation] || transformation.transformation;

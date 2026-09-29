@@ -11,6 +11,7 @@ export interface OutputOption {
 export interface Output {
   type: string;
   value: any;
+  fallback?: any;
 }
 
 export interface TransformationOption {

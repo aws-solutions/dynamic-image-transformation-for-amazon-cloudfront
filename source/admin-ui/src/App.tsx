@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
 import '@cloudscape-design/global-styles/index.css';
 import { AppProvider } from './contexts/AppContext';
 import { OriginProvider } from './contexts/OriginContext';
@@ -24,10 +24,11 @@ const LogoutComplete = lazy(() => import('./pages/LogoutComplete'));
 const TransformationPolicies = lazy(() => import('./pages/TransformationPolicies'));
 const CreateTransformationPolicy = lazy(() => import('./pages/CreateTransformationPolicy'));
 const TransformationPolicyDetails = lazy(() => import('./pages/TransformationPolicyDetails'));
+const Playground = lazy(() => import('./pages/Playground'));
 
 const AppContent: React.FC = () => {
   return (
-    <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+    <Router>
       <div className="App">
         <NotificationBar />
         <Suspense fallback={<LoadingFallback />}>
@@ -67,6 +68,7 @@ const AppContent: React.FC = () => {
                       <CreateTransformationPolicy />
                     </TransformationPolicyProvider>
                   } />
+                  <Route path="playground" element={<Playground />} />
                 </Routes>
               </AuthWrapper>
             } />

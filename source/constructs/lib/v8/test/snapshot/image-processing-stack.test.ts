@@ -16,7 +16,7 @@ describe("ImageProcessingStack", () => {
 
   beforeEach(() => {
     process.env.SOLUTION_ID = "SO0023";
-    process.env.VERSION = "v8.0.4";
+    process.env.VERSION = "v8.1.1";
 
     app = new App();
 

@@ -20,6 +20,11 @@ export const NAVIGATION_ITEMS = [
     href: ROUTES.MAPPINGS
   },
   {
+    type: 'link' as const,
+    text: 'Playground',
+    href: ROUTES.PLAYGROUND
+  },
+  {
     type: 'divider' as const
   },
   {

@@ -212,14 +212,14 @@ describe('Mapping Schema Validation', () => {
       });
       const result = validateMapping(mapping);
       expect(result.success).toBe(false);
-      expect(result.error?.issues[0].message).toBe('Exactly one of hostHeaderPattern or pathPattern must be provided');
+      expect(result.error?.issues[0].message).toBe('Mapping cannot have both hostHeaderPattern and pathPattern');
     });
 
     test('should reject mapping with neither hostHeaderPattern nor pathPattern', () => {
       const mapping = createValidMapping();
       const result = validateMapping(mapping);
       expect(result.success).toBe(false);
-      expect(result.error?.issues[0].message).toBe('Exactly one of hostHeaderPattern or pathPattern must be provided');
+      expect(result.error?.issues[0].message).toBe('Mapping must have at least one of hostHeaderPattern or pathPattern');
     });
 
     test('should require mappingId, originId, createdAt', () => {
@@ -295,7 +295,7 @@ describe('Mapping Schema Validation', () => {
     test('should reject empty update request', () => {
       const result = validateMappingUpdate({});
       expect(result.success).toBe(false);
-      expect(result.error?.issues[0].message).toBe('At least one field must be provided for update, and cannot have both hostHeaderPattern and pathPattern');
+      expect(result.error?.issues[0].message).toBe('At least one field must be provided for update, cannot set both patterns, and cannot remove both patterns simultaneously');
     });
 
     test('should validate update with hostHeaderPattern only', () => {
@@ -334,7 +334,31 @@ describe('Mapping Schema Validation', () => {
         pathPattern: '/api/*'
       });
       expect(result.success).toBe(false);
-      expect(result.error?.issues[0].message).toBe('At least one field must be provided for update, and cannot have both hostHeaderPattern and pathPattern');
+    });
+
+    test('should accept null for policyId (signals removal)', () => {
+      const result = validateMappingUpdate({ policyId: null });
+      expect(result.success).toBe(true);
+    });
+
+    test('should accept null for description (signals deletion)', () => {
+      const result = validateMappingUpdate({ description: null });
+      expect(result.success).toBe(true);
+    });
+
+    test('should accept null for hostHeaderPattern when setting pathPattern', () => {
+      const result = validateMappingUpdate({ hostHeaderPattern: null, pathPattern: '/new/*' });
+      expect(result.success).toBe(true);
+    });
+
+    test('should accept null for pathPattern when setting hostHeaderPattern', () => {
+      const result = validateMappingUpdate({ pathPattern: null, hostHeaderPattern: '*.example.com' });
+      expect(result.success).toBe(true);
+    });
+
+    test('should reject null for both patterns simultaneously', () => {
+      const result = validateMappingUpdate({ hostHeaderPattern: null, pathPattern: null });
+      expect(result.success).toBe(false);
     });
   });
 

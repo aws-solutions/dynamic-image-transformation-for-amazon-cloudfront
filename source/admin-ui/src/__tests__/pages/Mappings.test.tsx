@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import Mappings from '../../pages/Mappings';
 import { MappingProvider } from '../../contexts/MappingContext';
@@ -9,13 +9,10 @@ import { OriginProvider } from '../../contexts/OriginContext';
 import { TransformationPolicyProvider } from '../../contexts/TransformationPolicyContext';
 import { AppProvider } from '../../contexts/AppContext';
 
-// Mock services
-vi.mock('../../services/authService');
-
-// Mock react-router-dom hooks
+// Mock react-router hooks
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -49,7 +46,7 @@ describe('Mappings', () => {
     renderWithProviders(<Mappings />);
     
     // Test page structure and navigation elements
-    expect(screen.getAllByText('Mappings')).toHaveLength(2); // breadcrumb + header
+    expect(screen.getAllByText('Mappings')).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
     
     // Test create button presence and functionality
     const createButton = screen.getByRole('button', { name: /create.*mapping/i });
@@ -61,6 +58,6 @@ describe('Mappings', () => {
     
     // Additional UI structure assertions
     expect(screen.getByRole('main')).toBeInTheDocument();
-    expect(screen.getByRole('navigation')).toBeInTheDocument();
+    expect(screen.getAllByRole('navigation')).toHaveLength(2); // BreadcrumbGroup + SideNavigation
   });
 });

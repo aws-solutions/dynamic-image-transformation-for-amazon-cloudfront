@@ -15,9 +15,9 @@ export interface TransformationConditional {
 }
 
 type OutputConfig = 
-  | { type: 'quality'; value: [number, ...[number, number, number][]] }
-  | { type: 'format'; value: string }
-  | { type: 'autosize'; value: number[] };
+  | { type: 'quality'; value: [number, ...[number, number, number][]]; fallback?: { dpr: number } }
+  | { type: 'format'; value: string; fallback?: { format: string } }
+  | { type: 'autosize'; value: number[]; fallback?: { viewportWidth: number } };
 
 export interface TransformationPolicy {
   policyId: string;

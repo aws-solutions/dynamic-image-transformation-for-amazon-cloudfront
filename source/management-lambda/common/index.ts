@@ -10,5 +10,12 @@ export {
   MalformedJsonError,
   TooManyRequestsError,
 } from "./error";
-export { generateId, translateConfig } from "./utils";
+export {
+  generateId,
+  translateConfig,
+  applyMergePatch,
+  redactOriginHeaders,
+  REDACTED_HEADER_VALUE,
+} from "./utils";
 export { logger } from "./logger";
+export { PaginationTokenService } from "./pagination-token-service";

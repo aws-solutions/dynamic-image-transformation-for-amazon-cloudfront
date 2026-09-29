@@ -45,10 +45,10 @@ export class ManagementStack extends Stack {
     const originOverrideHeader = new CfnParameter(this, "OriginOverrideHeader", {
       type: "String",
       description:
-        "HTTP header used to override the image origin (if present in request, mapping lookup is skipped). This is meant for advanced use-cases only, please refer to implementation guide.",
+        "HTTP header used to override the image origin (if present in request, mapping lookup is skipped). Must begin with the 'dit-' prefix so it can only be set on the trusted CloudFront->origin path. This is meant for advanced use-cases only, please refer to implementation guide.",
       default: "",
-      constraintDescription: "Must be a valid HTTP header name or empty",
-      allowedPattern: "^$|^[a-zA-Z0-9-]+$",
+      constraintDescription: "Must be empty or a valid HTTP header name beginning with the 'dit-' prefix",
+      allowedPattern: "^$|^dit-[a-zA-Z0-9-]+$",
     });
 
     const corsOriginParameter = new CfnParameter(this, "CorsOriginParameter", {
@@ -72,10 +72,31 @@ export class ManagementStack extends Stack {
       corsOrigin: `https://${webConstruct.distribution.domainName}`,
     });
 
+    const metricsConstruct = new MetricsConstruct(this, "Metrics", {
+      solutionId: props!.solutionId,
+      solutionVersion: props!.solutionVersion,
+      anonymousData: "Yes",
+      useExistingCloudFrontDistribution: "n/a",
+      deploymentSize: deploymentSize.valueAsString,
+    });
+
+    const imageProcessingStack = new ImageProcessingStack(this, "ImageProcessing", {
+      configTable: dalConstruct.table,
+      uuid: metricsConstruct.uuid,
+      configTableArn: dalConstruct.table.tableArn,
+      deploymentSize: deploymentSize.valueAsString,
+      originOverrideHeader: originOverrideHeader.valueAsString,
+      corsOrigin: corsOriginParameter.valueAsString,
+      userPoolId: authConstruct.userPool.userPoolId,
+      userPoolClientId: authConstruct.userPoolClient.userPoolClientId,
+      adminUiDomain: webConstruct.distribution.domainName,
+    });
+
     new CSPUpdaterConstruct(this, "CSPUpdater", {
       distribution: webConstruct.distribution,
       cognitoDomainUrl: authConstruct.cognitoDomainUrl,
       apiEndpoint: dalConstruct.api.url,
+      imageProcessingDomain: imageProcessingStack.distributionDomain,
     });
 
     new s3deploy.BucketDeployment(this, "AdminUIDeployment", {
@@ -105,11 +126,16 @@ export class ManagementStack extends Stack {
               },
             },
           },
+          ImageProcessing: {
+            distributionDomain: imageProcessingStack.distributionDomain,
+          },
         }),
       ],
       destinationBucket: webConstruct.bucket,
       prune: true,
-      logRetention: LOG_RETENTION_DAYS
+      logRetention: LOG_RETENTION_DAYS,
+      distribution: webConstruct.distribution,
+      distributionPaths: ["/*"],
     });
 
     // use the stack node and find all lambda functions in the construct tree
@@ -132,23 +158,6 @@ export class ManagementStack extends Stack {
           ]);
         }
     })
-
-    const metricsConstruct = new MetricsConstruct(this, "Metrics", {
-      solutionId: props!.solutionId,
-      solutionVersion: props!.solutionVersion,
-      anonymousData: "Yes",
-      useExistingCloudFrontDistribution: "n/a",
-      deploymentSize: deploymentSize.valueAsString,
-    });
-
-    new ImageProcessingStack(this, "ImageProcessing", {
-      configTable: dalConstruct.table,
-      uuid: metricsConstruct.uuid,
-      configTableArn: dalConstruct.table.tableArn,
-      deploymentSize: deploymentSize.valueAsString,
-      originOverrideHeader: originOverrideHeader.valueAsString,
-      corsOrigin: corsOriginParameter.valueAsString
-    });
 
     new CfnOutput(this, "WebPortalUrl", {
       value: `https://${webConstruct.distribution.domainName}`,

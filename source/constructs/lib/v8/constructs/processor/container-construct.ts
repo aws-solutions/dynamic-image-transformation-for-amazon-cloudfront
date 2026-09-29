@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Duration, aws_ecr as ecr, aws_iam as iam, RemovalPolicy, Stack } from "aws-cdk-lib";
+import { Aws, Duration, aws_ecr as ecr, aws_iam as iam, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { DockerImageAsset, Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { Construct } from "constructs";
 
@@ -172,8 +172,23 @@ export class ContainerConstruct extends Construct {
     taskRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["rekognition:DetectFaces"],
+        actions: [
+          "rekognition:DetectFaces",
+          "rekognition:DetectLabels",
+          "rekognition:DetectText",
+          "rekognition:DetectModerationLabels",
+        ],
         resources: ["*"],
+      })
+    );
+
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["rekognition:DetectCustomLabels"],
+        resources: [
+          `arn:${Aws.PARTITION}:rekognition:${Aws.REGION}:${Aws.ACCOUNT_ID}:project/*/version/*/*`,
+        ],
       })
     );
 

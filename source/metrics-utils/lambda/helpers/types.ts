@@ -7,13 +7,16 @@ import { QueryDefinitionProps } from "aws-cdk-lib/aws-logs";
 // eslint-disable-next-line import/no-unresolved
 import { EventBridgeEvent, SQSEvent } from "aws-lambda";
 export type QueryProps = Pick<StartQueryCommandInput, "queryString" | "logGroupNames">;
-export interface EventBridgeQueryEvent
-  extends Pick<EventBridgeEvent<"Scheduled Event", NonNullable<unknown>>, "detail-type" | "time"> {
+export interface EventBridgeQueryEvent extends Pick<
+  EventBridgeEvent<"Scheduled Event", NonNullable<unknown>>,
+  "detail-type" | "time"
+> {
   "metrics-data-query": MetricDataQuery[];
 }
 
 export interface MetricDataProps
-  extends Pick<MetricDataQuery, "MetricStat" | "Expression" | "Label" | "ReturnData" | "Period">,
+  extends
+    Pick<MetricDataQuery, "MetricStat" | "Expression" | "Label" | "ReturnData" | "Period">,
     Partial<Pick<MetricDataQuery, "Id">> {
   identifier?: string;
   region?: string;
@@ -42,6 +45,7 @@ export interface SQSEventBody {
   queryIds: string[];
   endTime: number;
   retry?: number;
+  crossRegionQueryIds?: { [region: string]: string[] };
 }
 
 export interface MetricData {

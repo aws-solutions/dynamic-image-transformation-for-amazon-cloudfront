@@ -9,10 +9,11 @@ import { getOptions } from "../../../solution-utils/get-options";
 export class ClientHelper {
   private sqsClient: SQSClient;
   private cwClients: { [key: string]: CloudWatchClient };
-  private cwLogsClient: CloudWatchLogsClient;
+  private cwLogsClients: { [key: string]: CloudWatchLogsClient };
 
   constructor() {
     this.cwClients = {};
+    this.cwLogsClients = {};
   }
 
   getSqsClient(): SQSClient {
@@ -27,15 +28,19 @@ export class ClientHelper {
       region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "default";
     }
     if (!(region in this.cwClients)) {
-      this.cwClients[region] = region === "default" ? new CloudWatchClient(getOptions()) : new CloudWatchClient(getOptions({ region }));
+      this.cwClients[region] =
+        region === "default" ? new CloudWatchClient(getOptions()) : new CloudWatchClient(getOptions({ region }));
     }
     return this.cwClients[region];
   }
 
-  getCwLogsClient(): CloudWatchLogsClient {
-    if (!this.cwLogsClient) {
-      this.cwLogsClient = new CloudWatchLogsClient(getOptions());
+  getCwLogsClient(region?: string): CloudWatchLogsClient {
+    const key = region ?? "default";
+    if (!(key in this.cwLogsClients)) {
+      this.cwLogsClients[key] = region
+        ? new CloudWatchLogsClient(getOptions({ region }))
+        : new CloudWatchLogsClient(getOptions());
     }
-    return this.cwLogsClient;
+    return this.cwLogsClients[key];
   }
 }

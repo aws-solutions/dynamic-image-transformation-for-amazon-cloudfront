@@ -27,7 +27,7 @@ describe("contentModeration", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = { contentModeration: { minConfidence: 70 } };
 
@@ -65,7 +65,7 @@ describe("contentModeration", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = {
       contentModeration: { minConfidence: 75, blur: 100 },
@@ -104,7 +104,7 @@ describe("contentModeration", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = {
       contentModeration: { moderationLabels: ["Smoking"] },
@@ -143,7 +143,7 @@ describe("contentModeration", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = {
       contentModeration: {
@@ -181,7 +181,7 @@ describe("contentModeration", () => {
   it("Should pass and blur image when no parameters passed", async () => {
     // Arrange
     const originalImage = fs.readFileSync("./test/image/aws_logo.png");
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = { contentModeration: true };
 
@@ -201,7 +201,7 @@ describe("contentModeration", () => {
     // Act
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     const result = await (await imageHandler.applyEdits(image, edits, false)).toBuffer();
-    const expected = await sharp(originalImage, { failOnError: false }).withMetadata().blur(50).toBuffer();
+    const expected = await sharp(originalImage, { failOn: "none" }).withMetadata().blur(50).toBuffer();
 
     // Assert
     expect(mockRekognitionCommands.detectModerationLabels).toHaveBeenCalledWith({
@@ -217,7 +217,7 @@ describe("contentModeration", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const buffer = await image.toBuffer();
     const edits: ImageEdits = {
       contentModeration: { minConfidence: 90, blur: 100 },
@@ -259,7 +259,7 @@ describe("blurImage", () => {
   it("should blur to specified value if the specified labels match the found rekognition moderation labels", () => {
     // Arrange
     const currentImage = Buffer.from("TestImageData");
-    const image = sharp(currentImage, { failOnError: false }).withMetadata();
+    const image = sharp(currentImage, { failOn: "none" }).withMetadata();
     const rekognitionResponse = {
       ModerationLabels: [
         {
@@ -288,7 +288,7 @@ describe("blurImage", () => {
   it("should blur if no labels were provided but moderation content was found", () => {
     // Arrange
     const currentImage = Buffer.from("TestImageData");
-    const image = sharp(currentImage, { failOnError: false }).withMetadata();
+    const image = sharp(currentImage, { failOn: "none" }).withMetadata();
     const rekognitionResponse = {
       ModerationLabels: [
         {
@@ -317,7 +317,7 @@ describe("blurImage", () => {
   it("should not blur if labels were provided but do not match found rekognition content", () => {
     // Arrange
     const currentImage = Buffer.from("TestImageData");
-    const image = sharp(currentImage, { failOnError: false }).withMetadata();
+    const image = sharp(currentImage, { failOn: "none" }).withMetadata();
     const rekognitionResponse = {
       ModerationLabels: [
         {

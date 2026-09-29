@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import CreateMapping from '../../pages/CreateMapping';
 import { MappingProvider } from '../../contexts/MappingContext';
@@ -8,14 +8,13 @@ import { OriginProvider } from '../../contexts/OriginContext';
 import { TransformationPolicyProvider } from '../../contexts/TransformationPolicyContext';
 
 // Mock services
-vi.mock('../../services/authService');
 vi.mock('../../services/mappingService');
 vi.mock('../../services/transformationPolicyService');
 
-// Mock react-router-dom hooks
+// Mock react-router hooks
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -125,7 +124,7 @@ describe('CreateMapping', () => {
     
     expect(screen.getByRole('heading', { name: 'Create mapping' })).toBeInTheDocument();
     // Check that Mappings text appears somewhere (could be breadcrumb or nav) - use getAllByText to handle multiple instances
-    expect(screen.getAllByText('Mappings')).toHaveLength(2); // One in breadcrumb, one in navigation
+    expect(screen.getAllByText('Mappings')).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
   });
 
   it('should render form actions', () => {

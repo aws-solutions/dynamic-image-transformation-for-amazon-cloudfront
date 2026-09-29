@@ -26,7 +26,7 @@ describe("overlay", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       overlayWith: { bucket: "bucket", key: "key" },
     };
@@ -57,7 +57,7 @@ describe("overlay", () => {
       "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAAEAAQDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACv/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AfwD/2Q==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       overlayWith: {
         bucket: "bucket",
@@ -92,7 +92,7 @@ describe("overlay", () => {
       "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAAEAAQDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACv/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AfwD/2Q==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       overlayWith: {
         bucket: "bucket",
@@ -127,7 +127,7 @@ describe("overlay", () => {
       "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAAEAAQDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACv/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AfwD/2Q==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       overlayWith: {
         bucket: "bucket",
@@ -160,7 +160,7 @@ describe("overlay", () => {
     // Arrange
     const originalImage = fs.readFileSync("./test/image/25x15.png");
     const overlayImage = fs.readFileSync("./test/image/1x1.jpg");
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       overlayWith: {
         bucket: "bucket",
@@ -192,7 +192,7 @@ describe("overlay", () => {
       "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAAEAAQDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACv/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AfwD/2Q==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       overlayWith: {
         bucket: "bucket",
@@ -245,12 +245,20 @@ describe("overlay", () => {
       Bucket: "validBucket",
       Key: "validKey",
     });
-    expect(result).toEqual(
+    // Compare decoded pixel content rather than exact encoded bytes: the libvips
+    // PNG encoder can emit different byte streams across versions for a
+    // pixel-identical image, so assert on the raw pixels + dimensions instead.
+    const actual = await sharp(result).raw().toBuffer({ resolveWithObject: true });
+    const expected = await sharp(
       Buffer.from(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAsTAAALEwEAmpwYAAAADUlEQVR4nGP4z8CQCgAEZgFltQhIfQAAAABJRU5ErkJggg==",
         "base64"
       )
-    );
+    ).raw().toBuffer({ resolveWithObject: true });
+    expect(actual.info.width).toEqual(expected.info.width);
+    expect(actual.info.height).toEqual(expected.info.height);
+    expect(actual.info.channels).toEqual(expected.info.channels);
+    expect(actual.data).toEqual(expected.data);
   });
 
   it("Should pass and do not throw an exception that the overlay image dimensions are not integer numbers", async () => {

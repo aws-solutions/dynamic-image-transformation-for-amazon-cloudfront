@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useNavigate, generatePath } from 'react-router-dom';
+import { useNavigate, generatePath } from 'react-router';
 import { ROUTES } from '../constants/routes';
 
 export const useTypedNavigate = () => {
@@ -21,6 +21,7 @@ export const useTypedNavigate = () => {
     toPolicies: () => navigate(ROUTES.TRANSFORMATION_POLICIES),
     toPolicyCreate: () => navigate(ROUTES.TRANSFORMATION_POLICY_CREATE),
     toPolicyDetails: (id: string) => navigate(generatePath(ROUTES.TRANSFORMATION_POLICY_DETAILS, { id })),
-    toPolicyEdit: (id: string) => navigate(generatePath(ROUTES.TRANSFORMATION_POLICY_EDIT, { id }))
+    toPolicyEdit: (id: string) => navigate(generatePath(ROUTES.TRANSFORMATION_POLICY_EDIT, { id })),
+    toPlayground: () => navigate(ROUTES.PLAYGROUND),
   };
 };

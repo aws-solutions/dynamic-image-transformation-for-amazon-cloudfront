@@ -8,6 +8,7 @@ import {
   mockOrigin,
   mockOriginCreateRequest,
   mockOriginDDB,
+  mockOriginRedacted,
   mockOriginUpdateRequest,
   mockUUIDV4,
 } from "../mocks";
@@ -30,7 +31,7 @@ describe("OriginService", () => {
 
       const result = await originService.list();
 
-      expect(result).toEqual({ items: [mockOrigin] });
+      expect(result).toEqual({ items: [mockOriginRedacted] });
     });
 
     it("should return empty array when no origins exist", async () => {
@@ -48,7 +49,7 @@ describe("OriginService", () => {
 
       const result = await originService.get(mockUUIDV4);
 
-      expect(result).toEqual(mockOrigin);
+      expect(result).toEqual(mockOriginRedacted);
     });
 
     it("should throw BadRequestError for invalid id", async () => {
@@ -85,6 +86,7 @@ describe("OriginService", () => {
       });
       expect(result).toMatchObject({
         ...mockOriginCreateRequest,
+        originHeaders: { "x-api-key": "***REDACTED***" },
         originId: mockedUUID,
         createdAt: expect.stringMatching(ISO_DATETIME_REGEX),
       });
@@ -114,7 +116,7 @@ describe("OriginService", () => {
         ConditionExpression: "attribute_exists(PK)",
       });
       expect(result).toMatchObject({
-        ...mockOrigin,
+        ...mockOriginRedacted,
         ...mockOriginUpdateRequest,
         updatedAt: expect.stringMatching(ISO_DATETIME_REGEX),
       });
@@ -128,6 +130,89 @@ describe("OriginService", () => {
 
     it("should throw BadRequestError for invalid update request", async () => {
       await expect(originService.update("origin-123", INVALID_DOMAIN_REQUEST)).rejects.toThrow(BadRequestError);
+    });
+  });
+
+  // originHeaders is the designated store for upstream authentication credentials. It is write-only:
+  // accepted on create/update, never returned. These tests guard both halves — that callers never
+  // receive the values, and that withholding them from responses cannot destroy the stored value.
+  describe("originHeaders are write-only", () => {
+    const REDACTED = "***REDACTED***";
+    const STORED_HEADERS = { "x-api-key": "test-key" };
+
+    it("never returns real header values from any read or write method", async () => {
+      mockDynamoDBCommands.query.mockResolvedValue({ Items: [mockOriginDDB] });
+      mockDynamoDBCommands.get.mockResolvedValue({ Item: mockOriginDDB });
+      mockDynamoDBCommands.put.mockResolvedValue({});
+
+      const results = [
+        (await originService.list()).items[0],
+        await originService.get(mockUUIDV4),
+        await originService.create(mockOriginCreateRequest),
+        await originService.update(mockUUIDV4, mockOriginUpdateRequest),
+      ];
+
+      for (const result of results) {
+        expect(result.originHeaders).toEqual({ "x-api-key": REDACTED });
+        expect(JSON.stringify(result)).not.toContain("test-key");
+      }
+    });
+
+    // The regression that matters most: the admin UI hydrates its edit form from the API response,
+    // so if an update that omits originHeaders were to persist what the caller last saw, editing an
+    // origin's name would overwrite the real credential with the redaction placeholder.
+    it("preserves the stored credential when an update omits originHeaders", async () => {
+      mockDynamoDBCommands.get.mockResolvedValue({ Item: mockOriginDDB });
+      mockDynamoDBCommands.put.mockResolvedValue({});
+
+      await originService.update(mockUUIDV4, { originName: "renamed-origin" });
+
+      const written = mockDynamoDBCommands.put.mock.calls[0][0];
+      expect(written.Item.Data.originHeaders).toEqual(STORED_HEADERS);
+      expect(written.Item.Data.originName).toBe("renamed-origin");
+      expect(JSON.stringify(written)).not.toContain(REDACTED);
+    });
+
+    it("writes real values when an update explicitly replaces originHeaders", async () => {
+      mockDynamoDBCommands.get.mockResolvedValue({ Item: mockOriginDDB });
+      mockDynamoDBCommands.put.mockResolvedValue({});
+
+      const result = await originService.update(mockUUIDV4, { originHeaders: { "x-api-key": "rotated-key" } });
+
+      const written = mockDynamoDBCommands.put.mock.calls[0][0];
+      expect(written.Item.Data.originHeaders).toEqual({ "x-api-key": "rotated-key" });
+      // ...but the response still redacts it
+      expect(result.originHeaders).toEqual({ "x-api-key": REDACTED });
+    });
+
+    it("writes real values on create and redacts only the response", async () => {
+      mockDynamoDBCommands.put.mockResolvedValue({});
+
+      const result = await originService.create(mockOriginCreateRequest);
+
+      const written = mockDynamoDBCommands.put.mock.calls[0][0];
+      expect(written.Item.Data.originHeaders).toEqual(STORED_HEADERS);
+      expect(result.originHeaders).toEqual({ "x-api-key": REDACTED });
+    });
+
+    it("honors an explicit null to clear originHeaders", async () => {
+      mockDynamoDBCommands.get.mockResolvedValue({ Item: mockOriginDDB });
+      mockDynamoDBCommands.put.mockResolvedValue({});
+
+      const result = await originService.update(mockUUIDV4, { originHeaders: null });
+
+      const written = mockDynamoDBCommands.put.mock.calls[0][0];
+      expect(written.Item.Data.originHeaders).toBeUndefined();
+      expect(result.originHeaders).toBeUndefined();
+    });
+
+    it("leaves an origin with no headers untouched", async () => {
+      const noHeaders = { ...mockOriginDDB, Data: { ...mockOriginDDB.Data, originHeaders: undefined } };
+      mockDynamoDBCommands.get.mockResolvedValue({ Item: noHeaders });
+
+      const result = await originService.get(mockUUIDV4);
+
+      expect(result.originHeaders).toBeUndefined();
     });
   });
 

@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, QueryCommand, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import { z } from "zod";
 import { Mapping } from "../../data-models";
-import {BadRequestError, ErrorCodes, logger, NotFoundError} from "../common";
+import { ErrorCodes, logger, NotFoundError } from "../common";
 import { DBEntityType, DBMapping, validateMappingItem } from "../interfaces";
 import { BaseDAO } from "./base-dao";
 
@@ -15,52 +15,91 @@ export class MappingDAO extends BaseDAO<DBMapping, Mapping> {
 
   // overriding base class getAll to fetch both mapping types with pagination using composite token
   async getAll(nextToken?: string): Promise<{ items: DBMapping[]; nextToken?: string }> {
-    let pathNextToken: string | undefined;
-    let hostHeaderNextToken: string | undefined;
+    let pathCursor: Record<string, any> | undefined;
+    let hostHeaderCursor: Record<string, any> | undefined;
 
-    // Parse composite token if provided
+    // Validate and extract composite cursors if token provided
     if (nextToken) {
-      try {
-        const tokenData = JSON.parse(Buffer.from(nextToken, "base64").toString("utf-8"));
-        pathNextToken = tokenData.pathNextToken;
-        hostHeaderNextToken = tokenData.hostHeaderNextToken;
-      } catch (error) {
-        logger.warn("Invalid pagination token provided, starting fresh:", { error });
-        [nextToken, pathNextToken, hostHeaderNextToken] = [undefined, undefined, undefined];
+      const validation = await this.tokenService.validateToken(nextToken, this.accountId);
+
+      if (!validation.valid) {
+        logger.warn("Token validation failed, starting fresh", {
+          error: validation.error,
+          errorCode: validation.errorCode,
+        });
+        // Start fresh - both cursors remain undefined
+        [nextToken, pathCursor, hostHeaderCursor] = [undefined, undefined, undefined];
+      } else {
+        // Extract composite cursors
+        const cursors = this.tokenService.extractCursors(validation.payload!) as Record<string, Record<string, any>>;
+        pathCursor = cursors["pathMapping"];
+        hostHeaderCursor = cursors["hostHeaderMapping"];
       }
     }
 
-    let pathMappings: { items: DBMapping[]; nextToken?: string } = { items: [] };
-    let hostHeaderMappings: { items: DBMapping[]; nextToken?: string } = { items: [] };
+    let pathMappings: { items: DBMapping[]; nextToken?: Record<string, any> } = { items: [] };
+    let hostHeaderMappings: { items: DBMapping[]; nextToken?: Record<string, any> } = { items: [] };
 
-    // If no nextToken provided, get both (first page)
-    // If pathNextToken provided, only get path mappings
-    // If hostHeaderNextToken provided, only get host header mappings
-    if (!nextToken || pathNextToken) {
-      this.entityType = DBEntityType.PATH_MAPPING;
-      pathMappings = await super.getAll(pathNextToken);
+    // Query path mappings if no token or if pathCursor exists
+    if (!nextToken || pathCursor) {
+      pathMappings = await this.queryWithCursor(pathCursor, DBEntityType.PATH_MAPPING);
     }
 
-    if (!nextToken || hostHeaderNextToken) {
-      this.entityType = DBEntityType.HOST_HEADER_MAPPING;
-      hostHeaderMappings = await super.getAll(hostHeaderNextToken);
+    // Query host header mappings if no token or if hostHeaderCursor exists
+    if (!nextToken || hostHeaderCursor) {
+      hostHeaderMappings = await this.queryWithCursor(hostHeaderCursor, DBEntityType.HOST_HEADER_MAPPING);
     }
 
     const allItems = [...pathMappings.items, ...hostHeaderMappings.items];
 
-    // Create composite token if either query has more results
+    // Generate composite token if either query has more results
     let compositeToken: string | undefined;
     if (pathMappings.nextToken || hostHeaderMappings.nextToken) {
-      const tokenData = {
-        pathNextToken: pathMappings.nextToken,
-        hostHeaderNextToken: hostHeaderMappings.nextToken,
-      };
-      compositeToken = Buffer.from(JSON.stringify(tokenData), "utf-8").toString("base64");
-    }
+      const compositeCursors: Record<string, Record<string, any>> = {};
+      if (pathMappings.nextToken) compositeCursors["pathMapping"] = pathMappings.nextToken;
+      if (hostHeaderMappings.nextToken) compositeCursors["hostHeaderMapping"] = hostHeaderMappings.nextToken;
 
+      compositeToken = await this.tokenService.generateToken({
+        accountId: this.accountId,
+        compositeCursors,
+      });
+    }
     return {
       items: allItems,
       nextToken: compositeToken,
+    };
+  }
+
+  // Helper method to execute query with optional cursor
+  private async queryWithCursor(
+    cursor?: Record<string, any>,
+    entityType?: DBEntityType
+  ): Promise<{ items: DBMapping[]; nextToken?: Record<string, any> }> {
+    const queryParams: QueryCommandInput = {
+      TableName: this.tableName,
+      IndexName: "GSI1",
+      KeyConditionExpression: "GSI1PK = :gsi1pk",
+      ExpressionAttributeValues: {
+        ":gsi1pk": entityType,
+      },
+    };
+
+    if (cursor) {
+      queryParams.ExclusiveStartKey = cursor;
+    }
+
+    const data = await this.ddbDocClient.send(new QueryCommand(queryParams));
+
+    const items: DBMapping[] = [];
+    data.Items?.forEach((item) => {
+      const validatedItem = this.validateItem(item);
+      if (validatedItem.success) items.push(validatedItem.data);
+      else logger.warn("Item validation failed during getAll", { error: JSON.parse(validatedItem.error.message) });
+    });
+
+    return {
+      items,
+      nextToken: data.LastEvaluatedKey,
     };
   }
 
@@ -89,11 +128,6 @@ export class MappingDAO extends BaseDAO<DBMapping, Mapping> {
   }
 
   convertToDB(mapping: Mapping): DBMapping {
-    // Prevent changing mapping type - if both patterns exist, it's an invalid update
-    if (mapping.pathPattern && mapping.hostHeaderPattern) {
-      throw new BadRequestError("Cannot change mapping type from path to host header or vice versa");
-    }
-
     return {
       PK: mapping.mappingId,
       Data: {
@@ -107,7 +141,7 @@ export class MappingDAO extends BaseDAO<DBMapping, Mapping> {
       GSI1PK: mapping.pathPattern ? DBEntityType.PATH_MAPPING : DBEntityType.HOST_HEADER_MAPPING,
       GSI1SK: (mapping.pathPattern || mapping.hostHeaderPattern) as string,
       GSI2PK: `${DBEntityType.ORIGIN}#${mapping.originId}`,
-      GSI3PK: `${DBEntityType.POLICY}#${mapping.policyId}`,
+      ...(mapping.policyId !== undefined && { GSI3PK: `${DBEntityType.POLICY}#${mapping.policyId}` }),
     };
   }
 

@@ -12,7 +12,7 @@ export interface TransformationPolicyTestData {
 export class TransformationPolicyFactory {
   static createBasicPolicy(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
     return {
-      name: 'Test Policy',
+      name: `Test Policy ${Date.now()}`,
       description: 'Basic transformation policy for testing',
       transformations: [
         { type: 'quality', config: { quality: 80 } }
@@ -23,7 +23,7 @@ export class TransformationPolicyFactory {
 
   static createPolicyWithOutputsOnly(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
     return {
-      name: 'Output Only Policy',
+      name: `Output Only Policy ${Date.now()}`,
       description: 'Policy with output optimizations but no transformations',
       outputs: [
         { type: 'webp', config: { quality: 85 } },
@@ -82,7 +82,7 @@ export class TransformationPolicyFactory {
 
   static createWatermarkPolicy(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
     return {
-      name: 'Watermark Policy',
+      name: `Watermark Policy ${Date.now()}`,
       description: 'Policy with watermark transformation',
       transformations: [
         { 
@@ -103,7 +103,7 @@ export class TransformationPolicyFactory {
 
   static createWatermarkPolicyWithoutOpacityWidthRatio(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
     return {
-      name: 'Watermark Policy No Opacity And Width',
+      name: `Watermark Policy No Opacity And Width ${Date.now()}`,
       description: 'Policy with watermark transformation',
       transformations: [
         { 
@@ -122,7 +122,7 @@ export class TransformationPolicyFactory {
 
   static createWatermarkWithResizePolicy(overrides: Partial<TransformationPolicyTestData> = {}): TransformationPolicyTestData {
     return {
-      name: 'Watermark Resize Policy',
+      name: `Watermark Resize Policy ${Date.now()}`,
       description: 'Policy with watermark and resize transformations',
       transformations: [
         { type: 'resize', config: { width: 1200, height: 800 } },

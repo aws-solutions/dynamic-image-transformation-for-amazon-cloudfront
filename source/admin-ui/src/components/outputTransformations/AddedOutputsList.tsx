@@ -65,7 +65,8 @@ export const AddedOutputsList: React.FC<AddedOutputsListProps> = ({
   const renderConfigDetails = (output: Output) => {
     const details = {
       type: output.type,
-      value: output.value
+      value: output.value,
+      ...(output.fallback && { fallback: output.fallback }),
     };
     
     return (

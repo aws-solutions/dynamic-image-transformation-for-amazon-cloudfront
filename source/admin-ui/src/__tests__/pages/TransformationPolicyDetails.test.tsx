@@ -11,20 +11,14 @@ const mockToPolicies = vi.fn();
 let mockUseTransformationPolicy = vi.fn();
 let mockUseTypedNavigate = vi.fn();
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useParams: () => ({ id: 'test-policy-id' }),
     useNavigate: () => mockNavigate
   };
 });
-
-vi.mock('../../services/authService', () => ({
-  AuthService: {
-    signOut: vi.fn().mockResolvedValue(undefined)
-  }
-}));
 
 vi.mock('../../hooks/useTransformationPolicy', () => ({
   useTransformationPolicy: (...args: any[]) => mockUseTransformationPolicy(...args)
@@ -68,8 +62,8 @@ describe('TransformationPolicyDetails', () => {
   it('should render breadcrumbs', () => {
     render(<TransformationPolicyDetails />);
     
-    expect(screen.getByText('Home')).toBeInTheDocument();
-    expect(screen.getByText('Transformation Policies')).toBeInTheDocument();
+    expect(screen.getAllByText('Home')).toHaveLength(2); // BreadcrumbGroup renders link + ARIA
+    expect(screen.getAllByText('Transformation Policies')).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
   });
 
   it('should render error state when policy not found', () => {
@@ -106,7 +100,7 @@ describe('TransformationPolicyDetails', () => {
 
     render(<TransformationPolicyDetails />);
     
-    expect(screen.getAllByText('Test Policy')).toHaveLength(3); // breadcrumb, header, metadata
+    expect(screen.getAllByText('Test Policy')).toHaveLength(4); // breadcrumb (x2) + header + metadata
     expect(screen.getByText('Test description')).toBeInTheDocument();
   });
 

@@ -44,8 +44,12 @@ const MappingSchema = z
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime().optional(),
   })
-  .refine((data) => (data.hostHeaderPattern && !data.pathPattern) || (!data.hostHeaderPattern && data.pathPattern), {
-    message: "Exactly one of hostHeaderPattern or pathPattern must be provided",
+  .refine((data) => data.hostHeaderPattern || data.pathPattern, {
+    message: "Mapping must have at least one of hostHeaderPattern or pathPattern",
+    path: ["hostHeaderPattern", "pathPattern"],
+  })
+  .refine((data) => !(data.hostHeaderPattern && data.pathPattern), {
+    message: "Mapping cannot have both hostHeaderPattern and pathPattern",
     path: ["hostHeaderPattern", "pathPattern"],
   });
 
@@ -62,8 +66,12 @@ const MappingCreateSchema = z
     originId: originIdSchema,
     policyId: policyIdSchema.optional(),
   })
-  .refine((data) => (data.hostHeaderPattern && !data.pathPattern) || (!data.hostHeaderPattern && data.pathPattern), {
-    message: "Exactly one of hostHeaderPattern or pathPattern must be provided",
+  .refine((data) => data.hostHeaderPattern || data.pathPattern, {
+    message: "Mapping must have at least one of hostHeaderPattern or pathPattern",
+    path: ["hostHeaderPattern", "pathPattern"],
+  })
+  .refine((data) => !(data.hostHeaderPattern && data.pathPattern), {
+    message: "Mapping cannot have both hostHeaderPattern and pathPattern",
     path: ["hostHeaderPattern", "pathPattern"],
   });
 
@@ -74,11 +82,11 @@ const MappingCreateSchema = z
 const MappingUpdateSchema = z
   .strictObject({
     mappingName: mappingNameSchema.optional(),
-    description: descriptionSchema.optional(),
-    hostHeaderPattern: hostHeaderPatternSchema.optional(),
-    pathPattern: pathPatternSchema.optional(),
+    description: descriptionSchema.nullable().optional(),
+    hostHeaderPattern: hostHeaderPatternSchema.nullable().optional(),
+    pathPattern: pathPatternSchema.nullable().optional(),
     originId: originIdSchema.optional(),
-    policyId: policyIdSchema.optional(),
+    policyId: policyIdSchema.nullable().optional(),
   })
   .refine(
     (data) => {
@@ -93,11 +101,20 @@ const MappingUpdateSchema = z
       const hasAnyField = hasName || hasDescription || hasHost || hasPath || hasOrigin || hasPolicy;
       if (!hasAnyField) return false;
 
-      // Cannot have both host and path patterns
-      return !(hasHost && hasPath);
+      // Cannot set both patterns simultaneously (null counts as "touching" the field but not "setting" it)
+      const settingHost = data.hostHeaderPattern !== undefined && data.hostHeaderPattern !== null;
+      const settingPath = data.pathPattern !== undefined && data.pathPattern !== null;
+      if (settingHost && settingPath) return false;
+
+      // Cannot remove both patterns simultaneously
+      const removingHost = data.hostHeaderPattern === null;
+      const removingPath = data.pathPattern === null;
+      if (removingHost && removingPath) return false;
+
+      return true;
     },
     {
-      message: "At least one field must be provided for update, and cannot have both hostHeaderPattern and pathPattern",
+      message: "At least one field must be provided for update, cannot set both patterns, and cannot remove both patterns simultaneously",
       path: ["hostHeaderPattern", "pathPattern"],
     }
   );

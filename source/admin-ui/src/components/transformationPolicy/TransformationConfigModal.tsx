@@ -5,11 +5,14 @@ import {
   SpaceBetween,
   Button,
   Container,
-  Badge,
   FormField,
   Input,
   Select,
-  Checkbox
+  Checkbox,
+  ColumnLayout,
+  RadioGroup,
+  Toggle,
+  SegmentedControl
 } from '@cloudscape-design/components';
 import { TransformationOption } from '../../types/interfaces';
 import { Transformation } from '@data-models';
@@ -98,11 +101,53 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
             heightRatio
           });
           break;
+        case 'smartCrop':
+          if (value === true) {
+            setConfig({ smartCropSimple: true });
+          } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && 'index' in value) {
+            setConfig({
+              faces: true,
+              faceIndex: value.index,
+              padding: value.padding?.toString() || '',
+            });
+          } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            const presetGravities = ['top-left','top-center','top-right','center-left','center','center-right','bottom-left','bottom-center','bottom-right'];
+            const isCustomGravity = value.gravity && !presetGravities.includes(value.gravity);
+            setConfig({
+              faces: value.faces || false,
+              faceIndex: value.faceIndex,
+              labelsInput: value.labels ? value.labels.join(', ') : '',
+              customModelArn: value.customModelArn || '',
+              retainText: value.retainText || false,
+              retainLogo: value.retainLogo || false,
+              aspectRatio: value.aspectRatio || '',
+              padding: value.padding?.toString() || '',
+              gravity: value.gravity || '',
+              gravityType: isCustomGravity ? 'custom' : (value.gravity || ''),
+              priorities: value.priorities || [],
+              priorityChoice: value.priorities?.[0] === 'padding' ? 'padding' : 'aspectRatio',
+              fallback: value.fallback || '',
+              minConfidence: value.minConfidence,
+            });
+          }
+          break;
+        case 'contentModeration':
+          if (value === true) {
+            setConfig({ contentModerationSimple: true });
+          } else if (typeof value === 'object' && value !== null) {
+            setConfig({
+              contentModerationSimple: false,
+              minConfidence: value.minConfidence,
+              blur: value.blur,
+              moderationLabelsInput: value.moderationLabels ? value.moderationLabels.join(', ') : '',
+            });
+          }
+          break;
         default:
           setConfig({});
       }
     } else if (!editingTransformation) {
-      setConfig({});
+      setConfig(transformation?.id === 'smartCrop' ? { smartCropSimple: true } : transformation?.id === 'contentModeration' ? { contentModerationSimple: true } : {});
       setCondition(null);
     }
     
@@ -186,6 +231,15 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
     if (transformation.id === 'watermark' && !validateWatermarkConfig()) {
       return;
     }
+
+    // Content moderation advanced mode requires at least one field
+    if (transformation.id === 'contentModeration' && !(config.contentModerationSimple ?? true)) {
+      const hasLabels = config.moderationLabelsInput?.split(',').map((s: string) => s.trim()).filter(Boolean).length > 0;
+      if (config.minConfidence === undefined && config.blur === undefined && !hasLabels) {
+        setErrors({ general: 'At least one field (min confidence, blur, or labels) is required in advanced mode' });
+        return;
+      }
+    }
     
     const finalValue = getConfigValue();
     const result = validateTransformationValue(transformation.id, finalValue);
@@ -260,8 +314,41 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
       case 'normalize':
       case 'animated':
         return true;
-      case 'smartCrop':
-        return config.smartCrop || true;
+      case 'smartCrop': {
+        if (config.smartCropSimple) return true;
+        const labels = config.labelsInput
+          ? config.labelsInput.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : undefined;
+        const padding = config.padding
+          ? ((/^\d+$/.test(config.padding)) ? parseInt(config.padding) : config.padding)
+          : undefined;
+        return {
+          ...(config.faces && { faces: true }),
+          ...(config.faceIndex !== undefined && { faceIndex: config.faceIndex }),
+          ...(labels && labels.length > 0 && { labels }),
+          ...(config.customModelArn && { customModelArn: config.customModelArn }),
+          ...(config.retainText && { retainText: true }),
+          ...(config.retainLogo && { retainLogo: true }),
+          ...(config.aspectRatio && { aspectRatio: config.aspectRatio }),
+          ...(padding !== undefined && { padding }),
+          ...(config.gravity && { gravity: config.gravity }),
+          ...(config.priorities && config.priorities.length > 0 && { priorities: config.priorities }),
+          ...(config.fallback && { fallback: config.fallback }),
+          ...(config.minConfidence !== undefined && { minConfidence: config.minConfidence }),
+        };
+      }
+      case 'contentModeration': {
+        if (config.contentModerationSimple ?? true) return true;
+        const moderationLabels = config.moderationLabelsInput
+          ? config.moderationLabelsInput.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : undefined;
+        const obj = {
+          ...(config.minConfidence !== undefined && { minConfidence: config.minConfidence }),
+          ...(config.blur !== undefined && { blur: config.blur }),
+          ...(moderationLabels && moderationLabels.length > 0 && { moderationLabels }),
+        };
+        return Object.keys(obj).length > 0 ? obj : true;
+      }
       case 'sharpen':
         return config.sharpen || true;
       default:
@@ -539,14 +626,232 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
         );
 
       case 'smartCrop':
+        if (config.smartCropSimple) {
+          return (
+            <SpaceBetween size="m">
+              <RadioGroup
+                value="simple"
+                onChange={({ detail }) => setConfig({ ...config, smartCropSimple: detail.value === 'simple', smartCropStep: 1, priorities: config.priorities?.length ? config.priorities : ['aspectRatio', 'padding'], priorityChoice: config.priorityChoice || 'aspectRatio' })}
+                items={[
+                  { value: 'simple', label: 'Simple', description: 'Face detection with defaults' },
+                  { value: 'advanced', label: 'Advanced', description: 'Custom detection and crop settings' },
+                ]}
+              />
+              <Box variant="p" color="text-body-secondary">
+                Detects the most prominent face and crops to it using default settings (center gravity, 3% padding, cover fallback, 80% confidence).
+              </Box>
+            </SpaceBetween>
+          );
+        }
+        const step = config.smartCropStep || 1;
         return (
-          <Box>
-            <Box variant="strong">{transformation.title}</Box>
-            <Box variant="p" color="text-body-secondary">
-              AI-powered face detection cropping is enabled
-            </Box>
-          </Box>
+          <SpaceBetween size="m">
+            <RadioGroup
+              value="advanced"
+              onChange={({ detail }) => setConfig({ ...config, smartCropSimple: detail.value === 'simple', smartCropStep: 1, priorities: config.priorities?.length ? config.priorities : ['aspectRatio', 'padding'], priorityChoice: config.priorityChoice || 'aspectRatio' })}
+              items={[
+                { value: 'simple', label: 'Simple', description: 'Face detection with defaults' },
+                { value: 'advanced', label: 'Advanced', description: 'Custom detection and crop settings' },
+              ]}
+            />
+
+            <hr style={{ border: 'none', borderTop: '1px solid #d1d5db', margin: '4px 0' }} />
+
+            <SpaceBetween size="xs" direction="horizontal" alignItems="center">
+              <Button variant={step === 1 ? 'primary' : 'normal'} onClick={() => setConfig({ ...config, smartCropStep: 1 })}>1. Detection</Button>
+              <Box color="text-body-secondary">→</Box>
+              <Button variant={step === 2 ? 'primary' : 'normal'} onClick={() => setConfig({ ...config, smartCropStep: 2 })}>2. Crop Settings</Button>
+              <Box color="text-body-secondary">→</Box>
+              <Button variant={step === 3 ? 'primary' : 'normal'} onClick={() => setConfig({ ...config, smartCropStep: 3 })}>3. Condition</Button>
+            </SpaceBetween>
+
+            {step === 1 && (
+              <SpaceBetween size="s">
+                <Box variant="p" color="text-body-secondary">
+                  At least one detection method is required: enable a checkbox, provide labels, or a custom model ARN.
+                </Box>
+                <Checkbox
+                  checked={config.retainText || false}
+                  onChange={({ detail }) => setConfig({ ...config, retainText: detail.checked })}
+                >
+                  Retain text
+                </Checkbox>
+                <Checkbox
+                  checked={config.retainLogo || false}
+                  onChange={({ detail }) => setConfig({ ...config, retainLogo: detail.checked })}
+                >
+                  Retain logo
+                </Checkbox>
+                <SpaceBetween size="xs" direction="horizontal" alignItems="center">
+                  <Checkbox
+                    checked={config.faces || false}
+                    onChange={({ detail }) => setConfig({ ...config, faces: detail.checked, faceIndex: detail.checked ? config.faceIndex : undefined })}
+                  >
+                    Face detection
+                  </Checkbox>
+                  <Input
+                    type="number"
+                    value={config.faceIndex?.toString() || ''}
+                    disabled={!config.faces}
+                    invalid={!!errors.faceIndex}
+                    onChange={({ detail }) => {
+                      const value = detail.value === '' ? undefined : parseInt(detail.value);
+                      setConfig({ ...config, faceIndex: value });
+                      if (errors.faceIndex) setErrors(prev => { const e = { ...prev }; delete e.faceIndex; return e; });
+                    }}
+                    onBlur={() => {
+                      if (config.faceIndex !== undefined && (config.faceIndex < 0 || config.faceIndex > 15)) {
+                        setErrors(prev => ({ ...prev, faceIndex: 'Face index must be between 0 and 15' }));
+                      }
+                    }}
+                    placeholder="Face index (0-15)"
+                  />
+                </SpaceBetween>
+                {errors.faceIndex && <Box color="text-status-error" fontSize="body-s">{errors.faceIndex}</Box>}
+                <FormField label="Labels" description="Comma-separated object labels to detect" errorText={errors.labels}>
+                  <Input value={config.labelsInput || ''} onChange={({ detail }) => setConfig({ ...config, labelsInput: detail.value })} placeholder="Labels (e.g. car, dog, person)" />
+                </FormField>
+                <FormField label="Custom Model ARN" description="ARN of a custom Rekognition model" errorText={errors.customModelArn}>
+                  <Input value={config.customModelArn || ''} onChange={({ detail }) => setConfig({ ...config, customModelArn: detail.value })} placeholder="Custom Model ARN" />
+                </FormField>
+              </SpaceBetween>
+            )}
+
+            {step === 2 && (
+              <SpaceBetween size="s">
+                <Box variant="p" color="text-body-secondary">
+                  Configure how the crop is applied after detection. All fields are optional.
+                </Box>
+                <ColumnLayout columns={2}>
+                  <FormField label="Aspect Ratio" errorText={errors.aspectRatio} stretch>
+                    <Input value={config.aspectRatio || ''} invalid={!!errors.aspectRatio} onChange={({ detail }) => { setConfig({ ...config, aspectRatio: detail.value }); if (errors.aspectRatio) setErrors(prev => { const e = { ...prev }; delete e.aspectRatio; return e; }); }} onBlur={() => { if (config.aspectRatio) { const m = config.aspectRatio.match(/^(\d{1,3}):(\d{1,3})$/); if (!m) setErrors(prev => ({ ...prev, aspectRatio: 'Must be w:h format' })); else { const [w, h] = [Number(m[1]), Number(m[2])]; if (w < 1 || w > 100 || h < 1 || h > 100) setErrors(prev => ({ ...prev, aspectRatio: 'Dimensions must be 1-100' })); } } }} placeholder="16:9" />
+                  </FormField>
+                  <FormField label="Padding" errorText={errors.padding} stretch>
+                    <Input value={config.padding?.toString() || ''} invalid={!!errors.padding} onChange={({ detail }) => { setConfig({ ...config, padding: detail.value }); if (errors.padding) setErrors(prev => { const e = { ...prev }; delete e.padding; return e; }); }} onBlur={() => { if (config.padding && !/^\d+$/.test(config.padding) && !/^\d{1,4}(%|px)$/.test(config.padding)) setErrors(prev => ({ ...prev, padding: 'Must be number, percentage, or pixels' })); }} placeholder="3%" />
+                  </FormField>
+                </ColumnLayout>
+                <ColumnLayout columns={2}>
+                  <FormField label="Gravity" stretch>
+                    <SpaceBetween size="xs">
+                      <Select
+                        selectedOption={config.gravityType === 'custom' ? { label: 'Custom', value: 'custom' } : config.gravity ? { label: config.gravity, value: config.gravity } : null}
+                        onChange={({ detail }) => { if (detail.selectedOption.value === 'none') { setConfig({ ...config, gravityType: '', gravity: '' }); } else if (detail.selectedOption.value === 'custom') { setConfig({ ...config, gravityType: 'custom', gravity: '' }); } else { setConfig({ ...config, gravityType: detail.selectedOption.value, gravity: detail.selectedOption.value }); } }}
+                        placeholder="center"
+                        options={[
+                          { label: '— None (use default)', value: 'none' },
+                          { label: 'top-left', value: 'top-left' }, { label: 'top-center', value: 'top-center' }, { label: 'top-right', value: 'top-right' },
+                          { label: 'center-left', value: 'center-left' }, { label: 'center', value: 'center' }, { label: 'center-right', value: 'center-right' },
+                          { label: 'bottom-left', value: 'bottom-left' }, { label: 'bottom-center', value: 'bottom-center' }, { label: 'bottom-right', value: 'bottom-right' },
+                          { label: 'Custom', value: 'custom' },
+                        ]}
+                      />
+                      {config.gravityType === 'custom' && <Input value={config.gravity || ''} onChange={({ detail }) => setConfig({ ...config, gravity: detail.value })} placeholder="Custom gravity value" />}
+                    </SpaceBetween>
+                  </FormField>
+                  <FormField label="Fallback" stretch>
+                    <Select
+                      selectedOption={config.fallback ? { label: config.fallback, value: config.fallback } : null}
+                      onChange={({ detail }) => setConfig({ ...config, fallback: detail.selectedOption.value === 'none' ? '' : detail.selectedOption.value })}
+                      placeholder="cover"
+                      options={[
+                        { label: '— None (use default)', value: 'none' },
+                        { label: 'cover', value: 'cover' }, { label: 'contain', value: 'contain' }, { label: 'fill', value: 'fill' },
+                        { label: 'inside', value: 'inside' }, { label: 'outside', value: 'outside' }, { label: 'no-crop', value: 'no-crop' },
+                      ]}
+                    />
+                  </FormField>
+                </ColumnLayout>
+                <ColumnLayout columns={2}>
+                  <FormField label="Min Confidence" errorText={errors.minConfidence}>
+                    <Input type="number" value={config.minConfidence?.toString() || ''} invalid={!!errors.minConfidence} onChange={({ detail }) => { const v = detail.value === '' ? undefined : parseFloat(detail.value); setConfig({ ...config, minConfidence: v }); if (errors.minConfidence) setErrors(prev => { const e = { ...prev }; delete e.minConfidence; return e; }); }} onBlur={() => { if (config.minConfidence !== undefined && (config.minConfidence < 0 || config.minConfidence > 100)) setErrors(prev => ({ ...prev, minConfidence: 'Must be between 0 and 100' })); }} placeholder="80" />
+                  </FormField>
+                  <FormField label="Priority">
+                    <SegmentedControl
+                      selectedId={config.priorityChoice || 'aspectRatio'}
+                      onChange={({ detail }) => { const v = detail.selectedId; setConfig({ ...config, priorityChoice: v, priorities: v === 'aspectRatio' ? ['aspectRatio', 'padding'] : ['padding', 'aspectRatio'] }); }}
+                      options={[{ id: 'aspectRatio', text: 'Aspect Ratio' }, { id: 'padding', text: 'Padding' }]}
+                    />
+                  </FormField>
+                </ColumnLayout>
+              </SpaceBetween>
+            )}
+
+            {step === 3 && (
+              <SpaceBetween size="s">
+                <Box variant="p" color="text-body-secondary">
+                  Optionally specify request headers and values. The transformation will only be applied if the request contains these headers with matching values.
+                </Box>
+                <ColumnLayout columns={2}>
+                  <FormField label="Field" description="Request parameter">
+                    <Input value={condition?.field || ''} onChange={({ detail }) => setCondition(prev => ({ field: detail.value, value: prev?.value || '' }))} placeholder="" />
+                  </FormField>
+                  <FormField label="Value" description="Expected value">
+                    <Input value={Array.isArray(condition?.value) ? condition.value.join(', ') : condition?.value?.toString() || ''} onChange={({ detail }) => { const value = detail.value; let parsed: string | number | (string | number)[]; if (value.includes(',')) { parsed = value.split(',').map(v => { const t = v.trim(); const n = Number(t); return !isNaN(n) && t !== '' ? n : t; }); } else { const n = Number(value); parsed = !isNaN(n) && value !== '' ? n : value; } setCondition(prev => ({ field: prev?.field || '', value: parsed })); }} placeholder="" />
+                  </FormField>
+                </ColumnLayout>
+              </SpaceBetween>
+            )}
+
+
+          </SpaceBetween>
         );
+
+      case 'contentModeration': {
+        const contentModerationItems = [
+          { value: 'simple', label: 'Simple', description: 'Blur all inappropriate content with defaults' },
+          { value: 'advanced', label: 'Advanced', description: 'Custom confidence, blur amount, and label filtering' },
+        ];
+        if (config.contentModerationSimple ?? true) {
+          return (
+            <SpaceBetween size="m">
+              <RadioGroup
+                value="simple"
+                onChange={({ detail }) => setConfig({ ...config, contentModerationSimple: detail.value === 'simple' })}
+                items={contentModerationItems}
+              />
+              <Box variant="p" color="text-body-secondary">
+                Detects inappropriate content using AWS Rekognition and applies a blur (sigma 50) to the entire image.
+              </Box>
+            </SpaceBetween>
+          );
+        }
+        return (
+          <SpaceBetween size="m">
+            <RadioGroup
+              value="advanced"
+              onChange={({ detail }) => setConfig({ ...config, contentModerationSimple: detail.value === 'simple' })}
+              items={contentModerationItems}
+            />
+            <FormField label="Min Confidence" description="Minimum detection confidence (0-100)" errorText={errors.minConfidence}>
+              <Input type="number" value={config.minConfidence?.toString() || ''} invalid={!!errors.minConfidence} onChange={({ detail }) => {
+                const v = detail.value === '' ? undefined : parseFloat(detail.value);
+                setConfig({ ...config, minConfidence: v });
+                if (errors.minConfidence) setErrors((prev) => { const e = { ...prev }; delete e.minConfidence; return e; });
+              }} onBlur={() => {
+                if (config.minConfidence !== undefined) {
+                  const result = validateTransformationValue('contentModeration', { minConfidence: config.minConfidence });
+                  if (!result.success) setErrors((prev) => ({ ...prev, minConfidence: result.error.issues[0]?.message || 'Invalid value' }));
+                }
+              }} placeholder="75" />
+            </FormField>
+            <FormField label="Blur Amount" description="Blur sigma when inappropriate content detected (0.3-1000)" errorText={errors.blur}>
+              <Input type="number" value={config.blur?.toString() || ''} invalid={!!errors.blur} onChange={({ detail }) => {
+                const v = detail.value === '' ? undefined : parseFloat(detail.value);
+                setConfig({ ...config, blur: v });
+                if (errors.blur) setErrors((prev) => { const e = { ...prev }; delete e.blur; return e; });
+              }} onBlur={() => {
+                if (config.blur !== undefined) {
+                  const result = validateTransformationValue('contentModeration', { blur: config.blur });
+                  if (!result.success) setErrors((prev) => ({ ...prev, blur: result.error.issues[0]?.message || 'Invalid value' }));
+                }
+              }} placeholder="50" />
+            </FormField>
+            <FormField label="Moderation Labels" description="Comma-separated labels to filter (e.g. label1,label2). Leave empty for all." errorText={errors.moderationLabels}>
+              <Input value={config.moderationLabelsInput || ''} onChange={({ detail }) => setConfig({ ...config, moderationLabelsInput: detail.value })} placeholder="Label1, Label2" />
+            </FormField>
+          </SpaceBetween>
+        );
+      }
 
       case 'flip':
         return (
@@ -823,8 +1128,8 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
 
             <div style={{ maxWidth: '50%' }}>
               <FormField 
-                label="Opacity or Transparency (Optional)" 
-                description="0-1, where 1 is fully opaque"
+                label="Transparency (Optional)" 
+                description="0 = fully visible, 1 = fully transparent"
                 errorText={errors.alpha}
               >
                 <Input
@@ -856,7 +1161,7 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
                       }
                     }
                   }}
-                  placeholder="0.8"
+                  placeholder="0.2"
                   step="0.1"
                   invalid={!!errors.alpha}
                 />
@@ -885,12 +1190,11 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
       <Modal
       visible={visible}
       onDismiss={onDismiss}
-      header="Add Transformation - Step 2 of 2"
+      header={`Configure ${transformation?.title || 'Transformation'}`}
       footer={
         <Box float="right">
           <SpaceBetween direction="horizontal" size="xs">
             <Button onClick={onDismiss}>Cancel</Button>
-            <Button onClick={onBack}>Back</Button>
             <Button data-testid="watermark-add-button" variant="primary" onClick={handleAdd}>
               Add to Policy
             </Button>
@@ -900,16 +1204,6 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
       size="medium"
     >
       <SpaceBetween size="l">
-        <Box>
-          <SpaceBetween size="xs" direction="horizontal" alignItems="center">
-            <Badge>1</Badge>
-            <Box color="text-body-secondary">Select Transformation</Box>
-            <Box color="text-body-secondary">→</Box>
-            <Badge>2</Badge>
-            <Box variant="strong">Configure & Add</Box>
-          </SpaceBetween>
-        </Box>
-
         <Container>
           <SpaceBetween size="l">
             <div>
@@ -923,6 +1217,7 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
 
             {renderConfiguration()}
 
+            {transformation.id !== 'smartCrop' && (
             <SpaceBetween size="s">
               <SpaceBetween size="xs">
                 <Box variant="strong" fontSize="body-m">Condition (Optional)</Box>
@@ -979,6 +1274,7 @@ export const TransformationConfigModal: React.FC<TransformationConfigModalProps>
                 </FormField>
               </SpaceBetween>
             </SpaceBetween>
+            )}
           </SpaceBetween>
         </Container>
 

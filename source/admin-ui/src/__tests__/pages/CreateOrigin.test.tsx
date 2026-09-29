@@ -11,8 +11,8 @@ vi.mock('../../../utils/user', () => ({
 }));
 
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -76,7 +76,7 @@ describe('CreateOrigin Page', () => {
   });
 
   it('should submit form with valid data', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<CreateOrigin />);
     
     await user.type(screen.getByPlaceholderText('Enter origin name'), 'Test Origin');

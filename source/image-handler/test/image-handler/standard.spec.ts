@@ -21,7 +21,7 @@ describe("standard", () => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       "base64"
     );
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = { grayscale: true, flip: true };
 
     // Act
@@ -65,7 +65,7 @@ describe("instantiateSharpImage", () => {
   it("Should keep metadata by default", async () => {
     // Arrange
     const edits = {};
-    const options = { failOnError: false };
+    const options = { failOn: "none" };
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
 
     // Act
@@ -79,7 +79,7 @@ describe("instantiateSharpImage", () => {
     // Arrange
     const originalImage = fs.readFileSync("./test/image/1x1.jpg");
     const edits = { stripExif: true };
-    const options = { failOnError: false };
+    const options = { failOn: "none" };
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
 
     // Act
@@ -97,7 +97,7 @@ describe("instantiateSharpImage", () => {
     // Arrange
     const originalImage = fs.readFileSync("./test/image/1x1.jpg");
     const edits = { stripIcc: true };
-    const options = { failOnError: false };
+    const options = { failOn: "none" };
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
 
     // Act

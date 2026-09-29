@@ -33,9 +33,8 @@ describe('TransformationConfigModal', () => {
     );
     
     // Test modal structure
-    expect(screen.getByText('Add Transformation - Step 2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Configure Quality')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add to Policy' })).toBeInTheDocument();
     
     // Test form elements

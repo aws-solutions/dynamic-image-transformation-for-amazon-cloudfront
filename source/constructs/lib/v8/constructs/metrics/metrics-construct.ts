@@ -24,6 +24,8 @@ export class MetricsConstruct extends Construct {
     const customResourceLambda = new DITNodejsFunction(this, "CustomResourceLambda", {
       handler: "handler",
       entry: path.join(__dirname, "../../../../../v8-custom-resource/index.ts"),
+      projectRoot: path.join(__dirname, "../../../../../v8-custom-resource"),
+      depsLockFilePath: path.join(__dirname, "../../../../../v8-custom-resource/package-lock.json"),
       environment: {
         SOLUTION_ID: props.solutionId,
         SOLUTION_VERSION: props.solutionVersion,

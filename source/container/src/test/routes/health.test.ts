@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Narrow-scoped unit test: Only validates status-to-HTTP-code mapping (HEALTHY→200, UNHEALTHY/INITIALIZING→503)
+// Narrow-scoped unit test: validates status-to-HTTP-code mapping (HEALTHY→200, UNHEALTHY/INITIALIZING→503)
+// and that the response body never carries cache contents.
 import { Request, Response } from 'express';
 
 jest.mock('../../services/initialization', () => ({
@@ -12,25 +13,6 @@ jest.mock('../../services/initialization', () => ({
     error: undefined,
     startTime: new Date(),
     completionTime: undefined
-  }
-}));
-
-jest.mock('../../services/cache/cache-registry', () => ({
-  CacheRegistry: {
-    getInstance: jest.fn().mockReturnValue({
-      getPolicyCache: jest.fn().mockReturnValue({
-        getContents: jest.fn().mockResolvedValue({})
-      }),
-      getOriginCache: jest.fn().mockReturnValue({
-        getContents: jest.fn().mockResolvedValue({})
-      }),
-      getPathMappingCache: jest.fn().mockReturnValue({
-        getContents: jest.fn().mockResolvedValue({})
-      }),
-      getHeaderMappingCache: jest.fn().mockReturnValue({
-        getContents: jest.fn().mockResolvedValue({})
-      })
-    })
   }
 }));
 
@@ -78,5 +60,48 @@ describe('Health Endpoint Status Codes', () => {
     await getHandler()(mockReq, mockRes);
 
     expect(mockStatus).toHaveBeenCalledWith(503);
+  });
+
+  // The origin cache holds originHeaders, which carry upstream authentication credentials, and this
+  // route is reachable through the CloudFront default behavior with no enforced authentication.
+  // SHOW_CACHE_CONTENTS previously dumped the whole cache here; it must stay removed.
+  describe('cache contents are never exposed', () => {
+    const originalFlag = process.env.SHOW_CACHE_CONTENTS;
+
+    afterEach(() => {
+      if (originalFlag === undefined) {
+        delete process.env.SHOW_CACHE_CONTENTS;
+      } else {
+        process.env.SHOW_CACHE_CONTENTS = originalFlag;
+      }
+    });
+
+    it.each(['true', 'false', undefined])(
+      'omits cache contents from the HEALTHY body when SHOW_CACHE_CONTENTS is %s',
+      async (flag) => {
+        if (flag === undefined) {
+          delete process.env.SHOW_CACHE_CONTENTS;
+        } else {
+          process.env.SHOW_CACHE_CONTENTS = flag;
+        }
+        (initializationState as any).status = 'HEALTHY';
+        (initializationState as any).completionTime = new Date();
+
+        await getHandler()(mockReq, mockRes);
+
+        expect(mockStatus).toHaveBeenCalledWith(200);
+        const body = mockJson.mock.calls[0][0];
+        expect(body).not.toHaveProperty('origins');
+        expect(body).not.toHaveProperty('policies');
+        expect(body).not.toHaveProperty('pathMappings');
+        expect(body).not.toHaveProperty('headerMappings');
+        expect(Object.keys(body).sort()).toEqual([
+          'completedCaches',
+          'initializationDuration',
+          'status',
+          'timestamp',
+        ]);
+      }
+    );
   });
 });

@@ -75,13 +75,6 @@ rm -rf "$ecr_build_dir/container/test"
 rm -f "$ecr_build_dir/container/Dockerfile.dynamodb-local"
 rm -f "$ecr_build_dir/container/docker-compose.test.yml"
 
-# Create ECR image tag file for stable version
-cat > "$deployment_dir/ecr_image_tags.json" << EOF
-{
-  "dynamic-image-transformation-for-amazon-cloudfront": "v8.0-stable"
-}
-EOF
-
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Launch Wizard Assets"
 echo "------------------------------------------------------------------------------"

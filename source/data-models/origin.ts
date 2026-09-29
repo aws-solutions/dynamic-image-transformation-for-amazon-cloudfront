@@ -73,8 +73,8 @@ const OriginUpdateSchema = z
   .strictObject({
     originName: originNameSchema.optional(),
     originDomain: originDomainSchema.optional(),
-    originPath: originPathSchema.optional(),
-    originHeaders: originHeadersSchema.optional(),
+    originPath: originPathSchema.nullable().optional(),
+    originHeaders: originHeadersSchema.nullable().optional(),
   })
   .refine(
     (data) => {

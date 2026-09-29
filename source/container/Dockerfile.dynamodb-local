@@ -1,16 +1,22 @@
 # DynamoDB Local on Amazon Linux 2023 Minimal + Corretto 17
 # Built from tar.gz instead of official Docker image to:
 #   - Eliminate Python/pip/setuptools CVEs (not present in AL2023 minimal)
-#   - Patch vulnerable Java dependency JARs shipped with DDBLocal 3.3.0
 #
-# JAR patching strategy:
-#   The DynamoDBLocal.jar MANIFEST.MF Class-Path references dependency JARs by filename.
-#   Netty JARs use version-stripped names (e.g., netty-codec-http-4.1.jar) — replace in-place.
-#   Non-Netty JARs embed the full version in the filename (e.g., jackson-core-2.20.1.jar) —
-#   download the fixed version and rename to match the manifest entry. Java resolves by
-#   classpath entry, not filename, so the new JAR contents are loaded correctly.
-#   Trivy/cdxgen detect versions from the JAR's internal MANIFEST.MF metadata, so the
-#   scanner will see the patched version even though the filename hasn't changed.
+# Java dependency CVE posture:
+#   DDBLocal 3.3.0 shipped several outdated dependency JARs that we hand-patched.
+#   3.3.1 bundles equal-or-newer fixed versions for all of them, so no in-image
+#   JAR patching is required. For reference, the CVEs previously patched and the
+#   version now bundled by 3.3.1:
+#     - jackson-core   GHSA-72hv-8253-57qq (async parser DoS)   -> 2.21.5 bundled
+#     - jetty-server   CVE-2026-1605 (JDK Inflater DoS)         -> 12.1.11 bundled
+#     - kotlin-stdlib  CVE-2022-24329 (dependency lock bypass)  -> 1.9.21 bundled
+#     - netty          (transitive fixes)                       -> 4.1.135.Final bundled
+#   If a future CVE requires patching again, note that DynamoDBLocal.jar's
+#   MANIFEST.MF Class-Path references dependency JARs by filename: Netty uses
+#   version-stripped names (netty-*-4.1.x.jar), non-Netty JARs embed the full
+#   version. Java resolves by classpath entry, so replacing the file contents at
+#   the manifest's filename loads the new JAR; Trivy/cdxgen read the JAR's internal
+#   MANIFEST.MF, so they see the patched version regardless of filename.
 
 FROM public.ecr.aws/amazonlinux/amazonlinux:minimal
 
@@ -19,22 +25,16 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:minimal
 RUN dnf install -y java-17-amazon-corretto-headless tar gzip && \
     dnf clean all && rm -rf /var/cache/dnf
 
-# Patched dependency versions
-ARG NETTY_VERSION=4.1.132.Final
-ARG JACKSON_CORE_VERSION=2.21.1
-ARG JETTY_SERVER_VERSION=12.0.32
-ARG KOTLIN_STDLIB_VERSION=1.6.0
-
-# DynamoDB Local 3.3.0 — pinned via SHA256 checksum
-# If DDBLocal releases a new version, this build will fail loudly rather than
-# silently breaking the JAR patching below (which depends on specific filenames).
-# To update: download the new tar.gz, verify the new JAR filenames in the manifest,
-# update the patches below, then update this checksum.
-ARG DDBLOCAL_VERSION=3.3.0
-ARG DDBLOCAL_SHA256=c05dc320f4f9a6f90c6597bc4dc7239ab8200a6df0f280d9cbe4d5775943f898
+# DynamoDB Local 3.3.1 — pinned via SHA256 checksum.
+# The URL is the floating "latest" alias, so this checksum is what pins the version.
+# If DDBLocal releases a new version, this build fails loudly at the sha256sum check
+# rather than silently pulling an unreviewed release.
+# To update: download the new tar.gz, re-scan its bundled JARs for CVEs (re-adding
+# patches only if upstream regressed a dependency), then update the version + checksum.
+ARG DDBLOCAL_VERSION=3.3.1
+ARG DDBLOCAL_SHA256=f80bcec477f85f57e2c77f8d54aa6b672a8403fceff0c450560aee1cf6c21163
 
 ARG DDBLOCAL_URL=https://d1ni2b6xgvw0s0.cloudfront.net/v2.x/dynamodb_local_latest.tar.gz
-ARG MAVEN=https://repo1.maven.org/maven2
 
 WORKDIR /home/dynamodblocal
 
@@ -43,27 +43,6 @@ RUN curl -fSL -o dynamodb_local_latest.tar.gz "${DDBLOCAL_URL}" && \
     echo "${DDBLOCAL_SHA256}  dynamodb_local_latest.tar.gz" | sha256sum -c - && \
     tar xzf dynamodb_local_latest.tar.gz && \
     rm -f dynamodb_local_latest.tar.gz
-
-# Patch Netty JARs (version-stripped filenames in manifest — direct replacement)
-RUN curl -fSL -o DynamoDBLocal_lib/netty-codec-http-4.1.jar \
-      "${MAVEN}/io/netty/netty-codec-http/${NETTY_VERSION}/netty-codec-http-${NETTY_VERSION}.jar" && \
-    curl -fSL -o DynamoDBLocal_lib/netty-codec-http2-4.1.jar \
-      "${MAVEN}/io/netty/netty-codec-http2/${NETTY_VERSION}/netty-codec-http2-${NETTY_VERSION}.jar" && \
-    curl -fSL -o DynamoDBLocal_lib/netty-codec-smtp-4.1.jar \
-      "${MAVEN}/io/netty/netty-codec-smtp/${NETTY_VERSION}/netty-codec-smtp-${NETTY_VERSION}.jar"
-
-# Patch non-Netty JARs (full version in filename — download new, rename to old filename)
-# jackson-core 2.20.1 -> 2.21.1 (GHSA-72hv-8253-57qq: DoS via async parser)
-RUN curl -fSL -o DynamoDBLocal_lib/jackson-core-2.20.1.jar \
-      "${MAVEN}/com/fasterxml/jackson/core/jackson-core/${JACKSON_CORE_VERSION}/jackson-core-${JACKSON_CORE_VERSION}.jar"
-
-# jetty-server 12.0.31 -> 12.0.32 (CVE-2026-1605: DoS via unreleased JDK Inflater)
-RUN curl -fSL -o DynamoDBLocal_lib/jetty-server-12.0.31.jar \
-      "${MAVEN}/org/eclipse/jetty/jetty-server/${JETTY_SERVER_VERSION}/jetty-server-${JETTY_SERVER_VERSION}.jar"
-
-# kotlin-stdlib 1.5.32 -> 1.6.0 (CVE-2022-24329: dependency lock bypass)
-RUN curl -fSL -o DynamoDBLocal_lib/kotlin-stdlib-1.5.32.jar \
-      "${MAVEN}/org/jetbrains/kotlin/kotlin-stdlib/${KOTLIN_STDLIB_VERSION}/kotlin-stdlib-${KOTLIN_STDLIB_VERSION}.jar"
 
 EXPOSE 8000
 

@@ -9,6 +9,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    testTimeout: 15000,
     setupFiles: ['./src/setupTests.ts'],
     reporters: [['default', { summary: false }]],
     coverage: {
@@ -36,7 +37,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': '/src',
-      '@data-models': new URL('../data-models/index.ts', import.meta.url).pathname
+      '@data-models': new URL('../data-models/index.ts', import.meta.url).pathname,
+      // vitest 4 uses Vite's Module Runner (vite-node removed), which no longer resolves
+      // the out-of-root ../data-models sibling's bare imports through admin-ui's node_modules.
+      // Pin zod to admin-ui's installed copy so the shared models resolve.
+      zod: new URL('./node_modules/zod/index.js', import.meta.url).pathname
     }
   }
 })

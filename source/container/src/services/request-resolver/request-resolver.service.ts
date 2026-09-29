@@ -71,9 +71,7 @@ export class RequestResolverService {
       }
 
       // Step 4: Build final URL
-      let finalUrl = UrlBuilder.buildOriginUrl(req, originResult);
-      // TODO: Remove - Local testing http->https rewrite
-      finalUrl = finalUrl.replace(/^http:/, 'https:');
+      const finalUrl = UrlBuilder.buildOriginUrl(req, originResult);
 
       // Step 5: Always validate TLS for the final domain
       await this.connectionManager.validateOriginUrl(finalUrl, imageRequest);

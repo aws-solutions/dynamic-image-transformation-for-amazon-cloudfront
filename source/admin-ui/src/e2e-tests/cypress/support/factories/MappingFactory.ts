@@ -13,41 +13,36 @@ export interface MappingTestData {
 export class MappingFactory {
   static createBasicMapping(overrides: Partial<MappingTestData> = {}): MappingTestData {
     return {
-      name: 'Test Mapping',
+      name: `Test Mapping ${Date.now()}`,
       description: 'Basic mapping for testing',
       hostHeaderPattern: 'example.com',
-      origin: 'Test Origin',
       ...overrides
     };
   }
 
   static createHostHeaderPatternMapping(overrides: Partial<MappingTestData> = {}): MappingTestData {
     return {
-      name: 'Host Header Pattern Mapping',
+      name: `Host Header Pattern Mapping ${Date.now()}`,
       description: 'Mapping with host header pattern only',
       hostHeaderPattern: '*.example.com',
-      origin: 'Test Origin',
       ...overrides
     };
   }
 
   static createPathPatternMapping(overrides: Partial<MappingTestData> = {}): MappingTestData {
     return {
-      name: 'Path Pattern Mapping',
+      name: `Path Pattern Mapping ${Date.now()}`,
       description: 'Mapping with path pattern only',
       pathPattern: '/images/*',
-      origin: 'Test Origin',
       ...overrides
     };
   }
 
   static createPolicyMapping(overrides: Partial<MappingTestData> = {}): MappingTestData {
     return {
-      name: 'Policy Mapping',
+      name: `Policy Mapping ${Date.now()}`,
       description: 'Mapping with policy',
       hostHeaderPattern: 'policy.example.com',
-      origin: 'Test Origin',
-      policy: 'Test Policy',
       ...overrides
     };
   }

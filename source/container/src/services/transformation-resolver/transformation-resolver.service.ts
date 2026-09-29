@@ -40,6 +40,7 @@ export class TransformationResolverService {
       urlTransformations: urlTransformations.length,
       policyTransformations: policyTransformations.length,
       finalTransformations: finalTransformations.length,
+      b64: req.headers['x-dit-b64'] === 'true',
     }));
 
     this.logTransformationMetrics(imageRequest.requestId, finalTransformations);

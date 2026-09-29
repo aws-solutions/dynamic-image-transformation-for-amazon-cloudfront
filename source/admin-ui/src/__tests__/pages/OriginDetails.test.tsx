@@ -11,8 +11,8 @@ vi.mock('../../../utils/user', () => ({
 }));
 
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -27,7 +27,7 @@ describe('OriginDetails Page', () => {
 
   it('should render loading state initially', () => {
     render(<OriginDetails />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getAllByText('Loading...')).toHaveLength(2); // breadcrumb + content
   });
 
   it('should render origin details after loading', async () => {
@@ -74,8 +74,8 @@ describe('OriginDetails Page', () => {
   });
 
   it('should handle origin not found', async () => {
-    vi.mock('react-router-dom', async () => {
-      const actual = await vi.importActual('react-router-dom');
+    vi.mock('react-router', async () => {
+      const actual = await vi.importActual('react-router');
       return {
         ...actual,
         useNavigate: () => mockNavigate,

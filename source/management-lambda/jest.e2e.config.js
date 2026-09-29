@@ -10,4 +10,6 @@ module.exports = {
   silent: true,
   globalSetup: "<rootDir>/test/e2e/global-setup.ts",
   globalTeardown: "<rootDir>/test/e2e/global-teardown.ts",
+  testTimeout: 60000,
+  maxWorkers: 1,
 };

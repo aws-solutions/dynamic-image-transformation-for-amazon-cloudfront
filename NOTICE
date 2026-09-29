@@ -1436,6 +1436,13 @@ fast-check under the MIT license.
 @rollup/rollup-win32-x64-gnu under the MIT license.
 @nodable/entities under the MIT license.
 xml-naming under the MIT license.
+aws-jwt-verify under the Apache-2.0 license.
+anynum under the MIT license.
+@aws-sdk/checksums under the Apache-2.0 license.
+@aws-sdk/credential-providers under the Apache-2.0 license.
+@aws-sdk/credential-provider-cognito-identity under the Apache-2.0 license.
+@radix-ui/react-use-is-hydrated under the MIT license.
+cookie-es under the MIT license.
 
 
 ********************

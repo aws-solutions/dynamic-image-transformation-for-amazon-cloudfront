@@ -21,7 +21,7 @@ describe("crop", () => {
   it("Should fail if a cropping area value is out of bounds", async () => {
     // Arrange
     const originalImage = Buffer.from(imagePngWhite1x1, "base64");
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       crop: { left: 0, top: 0, width: 100, height: 100 },
     };
@@ -45,7 +45,7 @@ describe("crop", () => {
   it("Should pass with a standard crop", async () => {
     // 5x5 png
     const originalImage = Buffer.from(imagePngWhite5x5, "base64");
-    const image = sharp(originalImage, { failOnError: true });
+    const image = sharp(originalImage, { failOn: "warning" });
     const edits: ImageEdits = {
       crop: { left: 0, top: 0, width: 1, height: 1 },
     };
@@ -54,7 +54,15 @@ describe("crop", () => {
     const imageHandler = new ImageHandler(s3Client, rekognitionClient);
     const result = await imageHandler.applyEdits(image, edits, false);
     const resultBuffer = await result.toBuffer();
-    expect(resultBuffer).toEqual(Buffer.from(imagePngWhite1x1, "base64"));
+    // Compare decoded pixel content rather than exact encoded bytes: the libvips
+    // PNG encoder can emit different byte streams across versions for a
+    // pixel-identical image, so assert on the raw pixels + dimensions instead.
+    const actual = await sharp(resultBuffer).raw().toBuffer({ resolveWithObject: true });
+    const expected = await sharp(Buffer.from(imagePngWhite1x1, "base64")).raw().toBuffer({ resolveWithObject: true });
+    expect(actual.info.width).toEqual(expected.info.width);
+    expect(actual.info.height).toEqual(expected.info.height);
+    expect(actual.info.channels).toEqual(expected.info.channels);
+    expect(actual.data).toEqual(expected.data);
   });
 
   // confirm that an invalid attribute sharp crop request containing *right* rather than *top* returns as a cropping error,
@@ -63,7 +71,7 @@ describe("crop", () => {
   it("Should fail with an invalid crop request", async () => {
     // 5x5 png
     const originalImage = Buffer.from(imagePngWhite5x5, "base64");
-    const image = sharp(originalImage, { failOnError: false }).withMetadata();
+    const image = sharp(originalImage, { failOn: "none" }).withMetadata();
     const edits: ImageEdits = {
       crop: { left: 0, right: 0, width: 1, height: 1 },
     };

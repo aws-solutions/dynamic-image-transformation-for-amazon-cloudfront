@@ -13,16 +13,5 @@ Cypress.on('uncaught:exception', (err) => {
   return true;
 });
 
-before(() => {
-  cy.setupTestUser();
-});
-
-after(() => {
-  cy.cleanupTestUser();
-});
-
-beforeEach(() => {
-});
-
-afterEach(() => {
-});
+// Test user setup and cleanup are handled once for the entire run via
+// before:run and after:run hooks in cypress/plugins/index.ts.

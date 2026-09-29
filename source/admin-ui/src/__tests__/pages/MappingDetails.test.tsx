@@ -1,7 +1,7 @@
 import { TEST_USER, TEST_ORIGIN, TEST_MAPPING, TEST_POLICY, MOCK_ORIGINS, MOCK_MAPPINGS, MOCK_POLICIES } from '../fixtures';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import MappingDetails from '../../pages/MappingDetails';
 import { MappingProvider } from '../../contexts/MappingContext';
@@ -9,7 +9,6 @@ import { OriginProvider } from '../../contexts/OriginContext';
 import { TransformationPolicyProvider } from '../../contexts/TransformationPolicyContext';
 
 // Mock services
-vi.mock('../../services/authService');
 vi.mock('../../services/mappingService');
 
 // Mock hooks
@@ -17,10 +16,10 @@ vi.mock('../../hooks/useMapping', () => ({
   useMapping: vi.fn()
 }));
 
-// Mock react-router-dom hooks
+// Mock react-router hooks
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -141,10 +140,9 @@ describe('MappingDetails', () => {
   it('should show mapping configuration details', () => {
     renderWithProviders(<MappingDetails />);
     
-    // Use queryByText to avoid errors when elements don't exist
-    expect(screen.queryByText(/routing/i) || screen.queryByText(/configuration/i)).toBeInTheDocument();
-    expect(screen.queryByText(/host.*header.*pattern/i) || screen.queryByText(/host/i)).toBeInTheDocument();
-    expect(screen.queryByText(/path.*pattern/i) || screen.queryByText(/path/i)).toBeInTheDocument();
+    expect(screen.getByText('Routing Rules')).toBeInTheDocument();
+    expect(screen.getByText('Host Header Pattern')).toBeInTheDocument();
+    expect(screen.getByText('Path Pattern')).toBeInTheDocument();
   });
 
   it('should display origin and policy information', () => {
@@ -180,7 +178,7 @@ describe('MappingDetails', () => {
     renderWithProviders(<MappingDetails />);
     
     const mappingsElements = screen.getAllByText('Mappings');
-    expect(mappingsElements.length).toBe(2); // breadcrumb and navigation
+    expect(mappingsElements).toHaveLength(4); // breadcrumb (x2) + navigation (x2)
     const testMappingElements = screen.getAllByText('Test Mapping');
     expect(testMappingElements.length).toBeGreaterThan(0);
   });

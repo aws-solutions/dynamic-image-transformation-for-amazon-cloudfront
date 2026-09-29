@@ -25,6 +25,8 @@ export class Utility extends Construct {
     const { SOLUTION_ID, VERSION } = process.env;
     this.utilityFunction = new DITNodejsFunction(this, "UtilityFunction", {
       entry: path.join(__dirname, "../../../../../utility-lambda/index.ts"),
+      projectRoot: path.join(__dirname, "../../../../../utility-lambda"),
+      depsLockFilePath: path.join(__dirname, "../../../../../utility-lambda/package-lock.json"),
       environment: {
         ECS_CLUSTER_NAME: props.cluster.clusterName,
         ECS_SERVICE_NAME: props.ecsService.serviceName,
