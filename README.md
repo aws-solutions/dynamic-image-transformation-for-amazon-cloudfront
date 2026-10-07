@@ -61,10 +61,12 @@ In addition to the AWS Solutions Constructs, the solution uses AWS CDK directly 
 
 # Customizing the Solution
 
+Each package under `source/` has its own README; start with [source/README.md](./source/README.md) for the package guide and local development.
+
 ## Prerequisites for Customization
 
 - [AWS Command Line Interface](https://aws.amazon.com/cli/)
-- Node.js 20.x or later
+- Node.js 24.x or later
 
 ### 1. Clone the repository
 
@@ -140,6 +142,10 @@ This solution sends operational metrics to AWS (the “Data”) about the use of
 - [@nicolasbuch](https://github.com/nicolasbuch) for [#569](https://github.com/aws-solutions/serverless-image-handler/pull/569)
 - [@mrnonz](https://github.com/mrnonz) for [#567](https://github.com/aws-solutions/serverless-image-handler/pull/567)
 - [@ilich](https://github.com/ilich) for [#574](https://github.com/aws-solutions/serverless-image-handler/pull/574)
+- [@chojs23](https://github.com/chojs23) for [#605](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/pull/605)
+- [@endast](https://github.com/endast) for [#608](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/pull/608)
+- [@fabidick22](https://github.com/fabidick22) for [#625](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/pull/625)
+- [@ButterflyJuicer0](https://github.com/ButterflyJuicer0) for [#647](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/pull/647)
 
 # License
 

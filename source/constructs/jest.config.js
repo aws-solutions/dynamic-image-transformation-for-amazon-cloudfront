@@ -21,6 +21,14 @@ const unitConfig = {
   ...baseConfig,
   displayName: "Unit Tests",
   roots: ["<rootDir>/test", "<rootDir>/lib/v8/test/snapshot", "<rootDir>/lib/v8/test/unit"],
+  collectCoverageFrom: [
+    "**/*.ts",
+    "!**/*.test.ts",
+    "!**/*.spec.ts",
+    "!**/*.d.ts",
+    "!**/test/**",
+    "!**/node_modules/**",
+  ],
 };
 
 // Configuration for e2e tests

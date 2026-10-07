@@ -192,6 +192,55 @@ describe('TransformationResolverService', () => {
     });
   });
 
+  describe('negotiated auto-format marker', () => {
+    const autoFormatPolicy = (outputFormat: string): TransformationPolicy => ({
+      policyId: 'auto-format-policy',
+      policyName: 'Auto Format Policy',
+      transformations: [],
+      outputs: [{ type: 'format', value: outputFormat }],
+      isDefault: false
+    });
+
+    beforeEach(() => {
+      const headers: Record<string, string> = { 'dit-accept': 'image/jpeg' };
+      mockRequest.headers = headers;
+      (mockRequest as any).header = jest.fn((name: string) => headers[name.toLowerCase()]);
+      mockImageRequest.policy = { id: 'auto-format-policy' };
+    });
+
+    it('should mark a policy auto format as negotiated', async () => {
+      mockPolicyCache.getPolicy.mockResolvedValue(autoFormatPolicy('auto'));
+
+      await service.resolve(mockRequest as TestRequest, mockImageRequest);
+
+      expect(mockImageRequest.transformations).toEqual([
+        { type: 'format', value: 'jpeg', source: 'auto', negotiated: true }
+      ]);
+    });
+
+    it('should drop the negotiated marker when a URL format overrides policy auto format', async () => {
+      mockPolicyCache.getPolicy.mockResolvedValue(autoFormatPolicy('auto'));
+      mockRequest.query = { format: 'jpeg' };
+
+      await service.resolve(mockRequest as TestRequest, mockImageRequest);
+
+      const formats = mockImageRequest.transformations!.filter(t => t.type === 'format');
+      expect(formats).toHaveLength(1);
+      expect(formats[0].source).toBe('url');
+      expect(formats[0].negotiated).toBeUndefined();
+    });
+
+    it('should not mark a static policy output format as negotiated', async () => {
+      mockPolicyCache.getPolicy.mockResolvedValue(autoFormatPolicy('jpeg'));
+
+      await service.resolve(mockRequest as TestRequest, mockImageRequest);
+
+      const formats = mockImageRequest.transformations!.filter(t => t.type === 'format');
+      expect(formats).toHaveLength(1);
+      expect(formats[0].negotiated).toBeUndefined();
+    });
+  });
+
   describe('singleton pattern', () => {
     it('should return the same instance', () => {
       // Mock CacheRegistry to avoid cache initialization issues

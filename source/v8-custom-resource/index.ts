@@ -32,6 +32,8 @@ export async function handler(event: CustomResourceRequest, context: LambdaConte
   try {
     switch (ResourceProperties.CustomAction) {
       case CustomResourceActions.CREATE_UUID: {
+        // UUID is minted only on Create; an Update returns no UUID, so the UUID resource in
+        // constructs/lib/v8/constructs/metrics/metrics-construct.ts must never be updated.
         if (RequestType === CustomResourceRequestTypes.CREATE) {
           response.Data = { UUID: randomUUID() };
         }

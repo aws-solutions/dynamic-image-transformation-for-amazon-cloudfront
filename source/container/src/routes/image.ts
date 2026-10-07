@@ -15,14 +15,6 @@ import { ImageProcessingError } from '../services/image-processing/types';
 
 const router = Router();
 
-// Headers to exclude from forwarding. x-dit-authorization is DIT's own token, never an origin's;
-// `authorization`/`cookie` are deliberately forwarded so clients can fetch images behind auth.
-const EXCLUDED_HEADERS: string[] = ['host', 'accept', 'x-dit-authorization'];
-
-// Memory protection limits
-const MAX_HEADERS = 50;
-const MAX_HEADER_VALUE_LENGTH = 1024;
-
 // Wildcard route handler for all image requests
 router.get('*', async (req: Request, res: Response) => {
   const startTime = Date.now();
@@ -34,7 +26,6 @@ router.get('*', async (req: Request, res: Response) => {
     imageRequest = {
       requestId: randomUUID(),
       timestamp: Date.now(),
-      clientHeaders: filterClientHeaders(req.headers),
       response: { headers: {} },
       timings: {}
     };
@@ -92,7 +83,6 @@ router.get('*', async (req: Request, res: Response) => {
     console.log(JSON.stringify({
       metricType: 'request_latencies',
       totalDurationMs: Date.now() - startTime,
-      preflightValidationMs: imageRequest.timings?.requestResolution?.preflightValidationMs,
       transformationResolutionMs: imageRequest.timings?.transformationResolution?.durationMs,
       originFetchMs: imageRequest.timings?.imageProcessing?.originFetchMs,
       transformationApplicationMs: imageRequest.timings?.imageProcessing?.transformationApplicationMs,
@@ -177,29 +167,6 @@ export function handleError(error: unknown, requestId: string, startTime: number
   }));
 
   return { statusCode, errorType, clientMessage };
-}
-
-/**
- * Filters and limits client headers to prevent memory exhaustion attacks
- */
-export function filterClientHeaders(headers: Record<string, string | string[]>): Record<string, string> {
-  const filtered: Record<string, string> = {};
-  let headerCount = 0;
-  
-  for (const [name, value] of Object.entries(headers)) {
-    if (headerCount >= MAX_HEADERS) break;
-    
-    const lowerName = name.toLowerCase();
-    if (EXCLUDED_HEADERS.includes(lowerName)) continue;
-    
-    const stringValue = Array.isArray(value) ? value[0] : value;
-    if (stringValue && stringValue.length <= MAX_HEADER_VALUE_LENGTH) {
-      filtered[name] = stringValue;
-      headerCount++;
-    }
-  }
-  
-  return filtered;
 }
 
 export default router;

@@ -42,6 +42,8 @@ export class ManagementStack extends Stack {
       constraintDescription: "Must be one of: small, medium, large, xlarge",
     });
 
+    // The dit- prefix is load-bearing: the dit-* strip loop in functions/dit-header-normalization.js is the only thing
+    // stopping viewers from setting this header. Dev mode has no CF function, so it is not protected there.
     const originOverrideHeader = new CfnParameter(this, "OriginOverrideHeader", {
       type: "String",
       description:

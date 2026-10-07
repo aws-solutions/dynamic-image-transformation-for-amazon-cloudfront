@@ -10,6 +10,14 @@ module.exports = {
   },
   setupFilesAfterEnv: ["./test/setupJestMocks.ts"],
   silent: true,
+  collectCoverageFrom: [
+    "**/*.ts",
+    "!**/*.test.ts",
+    "!**/*.spec.ts",
+    "!**/*.d.ts",
+    "!**/test/**",
+    "!**/node_modules/**",
+  ],
   coverageReporters: [
     'text',
     ['lcov', { 'projectRoot': '../' }]

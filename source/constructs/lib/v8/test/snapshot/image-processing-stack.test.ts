@@ -16,7 +16,7 @@ describe("ImageProcessingStack", () => {
 
   beforeEach(() => {
     process.env.SOLUTION_ID = "SO0023";
-    process.env.VERSION = "v8.1.1";
+    process.env.VERSION = "v8.1.2";
 
     app = new App();
 
@@ -43,7 +43,7 @@ describe("ImageProcessingStack", () => {
     expect(cleanedTemplate).toMatchSnapshot();
   });
 
-  test("All Lambda functions should use Node.js 22 runtime", () => {
+  test("All Lambda functions should use Node.js 24 runtime", () => {
     const lambdaFunctions = template.findResources("AWS::Lambda::Function");
     const functionNames = Object.keys(lambdaFunctions);
 
@@ -51,7 +51,7 @@ describe("ImageProcessingStack", () => {
 
     functionNames.forEach((functionName) => {
       const runtime = lambdaFunctions[functionName].Properties.Runtime;
-      expect(runtime).toBe("nodejs22.x");
+      expect(runtime).toBe("nodejs24.x");
     });
   });
 });

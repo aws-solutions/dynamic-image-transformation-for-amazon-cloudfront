@@ -9,7 +9,9 @@ import { DDBDriver } from '../../database/ddb-driver.interface';
 import { ddbDriver } from '../../database';
 
 /**
- * Origin cache manager with transparent DynamoDB fallback.
+ * Origin cache manager.
+ * Startup-only snapshot loaded by warmCache(); a miss returns null and never reads DynamoDB.
+ * Changes arrive only via DDB stream -> utility-lambda -> ECS force-new-deployment (new tasks re-warm).
  * Handles caching of origin configurations for HTTP-accessible image sources.
  */
 export class OriginCache {

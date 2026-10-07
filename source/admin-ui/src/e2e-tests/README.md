@@ -1,193 +1,47 @@
 # E2E Tests for Dynamic Image Transformation Admin UI
 
-This directory contains end-to-end (E2E) tests for the Dynamic Image Transformation Admin UI using Cypress with TypeScript.
+Cypress end-to-end tests, written in TypeScript, that drive the admin UI of a deployed v8 stack.
+
+**Run these only against a test stack.** At the end of every run they delete every item in the stack's config table (origins, mappings, and policies), not just the ones the tests created.
 
 ## Prerequisites
 
-1. The Dynamic Image Transformation stack must be deployed before running tests
-2. Node.js Version 16 or higher
-3. Local AWS credentials with permissions for DynamoDB, Cognito, and CloudFormation
-4. Environment variables `CURRENT_STACK_REGION` and `CURRENT_STACK_NAME`
+- A deployed v8 stack
+- Node.js 24.x or later
+- Local AWS credentials with permissions for DynamoDB, Cognito, CloudFormation, and S3
 
-### Required Environment Variables
+| Variable | What it is |
+|----------|------------|
+| `CURRENT_STACK_NAME` | Name of the deployed CloudFormation stack |
+| `CURRENT_STACK_REGION` | Region the stack is deployed in |
+| `USER_PASSWORD` | Password to give the Cognito test user. Required |
 
-- **CURRENT_STACK_NAME** — name of the deployed CloudFormation stack
-- **CURRENT_STACK_REGION** — AWS region where the stack is deployed
-- **USER_PASSWORD** — password for the Cognito E2E test user
+The app URL, Cognito origin and user pool ID are read from the stack outputs when the run starts.
 
-All other test configuration (`appUrl`, `cognitoOrigin`, `COGNITO_USER_POOL_ID`) is derived automatically from the CloudFormation stack outputs at test startup.
-
-
-## Installation
+## Running the tests
 
 ```bash
-# Navigate to the e2e-tests directory
 cd source/admin-ui/src/e2e-tests
-
-# Install dependencies
 npm ci
+export USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack
+
+npm run cypress:run                                          # all specs, headless
+npm run cypress:open                                         # interactive
+npx cypress run --spec "cypress/specs/origin/**/*.cy.ts"    # one folder
+npx cypress run --spec "cypress/specs/mapping/mapping-types.cy.ts"   # one spec
+npx cypress run --env TAGS="@smoke"                          # by tag
 ```
 
-## Running Tests
+Specs are grouped by page under [cypress/specs/](./cypress/specs/): `auth`, `origin`, `mapping`, `transformation-policy`, and `playground`. Tags are defined in [cypress/config/testTags.ts](./cypress/config/testTags.ts); the auth specs also use `@auth`.
 
-### Run All Tests (Headless)
-```bash
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:run
-```
+## What a run does
 
-### Run Tests with UI (Interactive)
-```bash
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run cypress:open
-```
+- **Before the run:** creates a Cognito test user with `USER_PASSWORD`, turning off the user pool's MFA for the run. If any playground spec is selected, it also creates an S3 bucket of test images and the config items that point at it.
+- **After the run:** deletes the test user and restores the MFA setting, clears the config table, and deletes the playground bucket.
 
-### Run Specific Test Suites
-
-#### Origins Tests
-```bash
-# Run all origin tests
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/origin/**/*.cy.ts"
-
-# Run specific origin test
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/origin/origin-create-delete.cy.ts"
-```
-
-#### Mapping Tests
-```bash
-# Run all mapping tests
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/**/*.cy.ts"
-
-# Run specific mapping test
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack  npx cypress run --spec "cypress/specs/mapping/mapping-types.cy.ts"
-```
-
-#### Transformation Policy Tests
-```bash
-# Run all transformation policy tests
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/**/*.cy.ts"
-
-# Run comprehensive transformation test
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --spec "cypress/specs/transformation-policy/transformation-all-options.cy.ts"
-```
-
-### Run Tests by Tags
-
-Tests are tagged for easy filtering:
-
-```bash
-# Run only smoke tests
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@smoke"
-
-# Run only CRUD tests
-USER_PASSWORD=<test-user-password> CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npx cypress run --env TAGS="@crud"
-```
-
-## Test Structure
-
-### Directory Organization
-
-```
-cypress/
-├── config/
-│   ├── env.local.ts          # Local environment configuration
-│   └── env.ci.ts             # CI environment configuration
-├── fixtures/
-│   └── seeds/
-│       └── users.json        # Test user data
-├── support/
-│   ├── commands/
-│   │   ├── auth.commands.ts  # Authentication helpers
-│   │   └── setup.commands.ts # Test setup/cleanup
-│   ├── pages/
-│   │   ├── MappingPage.ts    # Mapping page object
-│   │   ├── TransformationPolicyPage.ts  # Policy page object
-│   │   └── OriginPage.ts     # Origin page object
-│   ├── factories/
-│   │   ├── MappingFactory.ts # Mapping test data factory
-│   │   ├── TransformationPolicyFactory.ts  # Policy test data factory
-│   │   └── OriginFactory.ts  # Origin test data factory
-│   ├── selectors/
-│   │   └── common.sel.ts     # Reusable selectors
-│   ├── e2e.ts               # Global test configuration
-│   └── types.d.ts           # TypeScript type definitions
-├── specs/
-│   ├── mapping/
-│   │   ├── mapping-types.cy.ts           # Mapping creation tests
-│   │   └── mapping-create-delete.cy.ts   # Mapping CRUD tests
-│   ├── transformation-policy/
-│   │   ├── transformation-all-options.cy.ts     # Comprehensive policy tests
-│   │   ├── transformation-policy-create-delete.cy.ts  # Policy CRUD tests
-│   │   └── transformation-policy-create-edit.cy.ts    # Policy edit tests
-│   └── origins/
-│       └── origin-create-delete.cy.ts    # Origin CRUD tests
-└── cypress.config.ts        # Cypress configuration
-```
-
-### Page Object Pattern
-
-Tests use the Page Object Model for maintainability:
-
-```typescript
-// Example: MappingPage.ts
-export class MappingPage {
-  static navigateToMappings() {
-    cy.get('a[href="/mappings"]').click();
-  }
-
-  static clickCreateMapping() {
-    cy.get('button').contains('Create mapping').click();
-  }
-
-  static fillMappingForm(data: MappingTestData) {
-    // Form filling logic
-  }
-}
-```
-
-### Test Data Factories
-
-Factories generate consistent test data:
-
-```typescript
-// Example: MappingFactory.ts
-export class MappingFactory {
-  static createBasicMapping(): MappingTestData {
-    return {
-      name: 'Test Mapping',
-      description: 'Basic mapping for testing',
-      hostHeaderPattern: 'example.com',
-      origin: 'Test Origin'
-    };
-  }
-}
-```
-
-## Authentication
-
-Tests use automated authentication with test user management:
-
-- **Test User Creation**: Automatically creates test users before test runs
-- **Session Management**: Handles login/logout and session persistence
-- **MFA Handling**: Temporarily disables MFA for testing
-- **Cleanup**: Removes test users after test completion
-- **Password**: Must be supplied via `USER_PASSWORD` env var — not stored in fixtures
-
+This setup lives in [cypress/plugins/](./cypress/plugins/). Specs use page objects from `cypress/support/pages/` and test data from `cypress/support/factories/`; follow those when adding a spec.
 
 ## Troubleshooting
 
-### Common Issues
-
-#### Authentication Failures
-```bash
-# Verify environment variables are set
-echo $CURRENT_STACK_NAME
-echo $CURRENT_STACK_REGION
-
-# Check AWS credentials
-aws sts get-caller-identity
-```
-
-#### Test Timeouts
-- Increase timeout in `cypress.config.ts`
-- Check network connectivity to the app URL
-- Verify stack is fully deployed and healthy
-
+- **Sign-in fails:** check that `CURRENT_STACK_NAME` and `CURRENT_STACK_REGION` are set, and that `aws sts get-caller-identity` returns the account the stack is in.
+- **Timeouts:** check that the stack is fully deployed and the app URL loads in a browser. Timeouts are set in [cypress.config.ts](./cypress.config.ts).

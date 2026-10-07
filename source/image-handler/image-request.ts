@@ -63,7 +63,8 @@ export class ImageRequest {
   }
 
   /**
-   * Fix quality for Thumbor and Custom request type if outputFormat is different from quality type.
+   * Thumbor/Custom quality is keyed by the SOURCE extension when there is one (thumbor-mapper.ts mapQuality), so it
+   * is re-keyed to the final output format here. Only the first format key (`[0]`) is moved.
    * @param imageRequestInfo Initialized image request information
    */
   private fixQuality(imageRequestInfo: ImageRequestInfo): void {
@@ -79,7 +80,11 @@ export class ImageRequest {
         ImageFormatTypes.AVIF,
       ];
 
-      imageRequestInfo.contentType = `image/${imageRequestInfo.outputFormat}`;
+      // "tif" is an alias; image/tif is not a registered MIME type.
+      imageRequestInfo.contentType =
+        imageRequestInfo.outputFormat === ImageFormatTypes.TIF
+          ? ContentTypes.TIFF
+          : `image/${imageRequestInfo.outputFormat}`;
       if (
         requestType.includes(imageRequestInfo.requestType) &&
         acceptedValues.includes(imageRequestInfo.outputFormat)
@@ -130,14 +135,12 @@ export class ImageRequest {
         imageRequestInfo.outputFormat = ImageFormatTypes.PNG;
       }
 
-      /* Decide the output format of the image.
-       * 1) If the format is provided, the output format is the provided format.
-       * 2) If headers contain "Accept: image/webp", the output format is webp.
-       * 3) Use the default image format for the rest of cases.
+      /* Output format precedence: edits.toFormat > AutoWebP (Accept: image/webp) > Default-request outputFormat
+       * > the SVG-with-edits PNG default above > source format. AutoWebP overrides an explicit outputFormat.
        */
       if (
         imageRequestInfo.contentType !== ContentTypes.SVG ||
-        imageRequestInfo.edits.toFormat ||
+        imageRequestInfo.edits?.toFormat ||
         imageRequestInfo.outputFormat
       ) {
         this.determineOutputFormat(imageRequestInfo, event);
@@ -328,6 +331,8 @@ export class ImageRequest {
       if (requestType === RequestTypes.CUSTOM) {
         const { REWRITE_MATCH_PATTERN, REWRITE_SUBSTITUTION } = process.env;
 
+        // Expects a `/regex/flags` literal; parser duplicated in thumbor-mapper.ts parseCustomPath, keep both identical.
+        // CDK ships "" (constructs/lib/back-end/back-end-construct.ts), which keeps Custom mode off.
         if (typeof REWRITE_MATCH_PATTERN === "string") {
           const patternStrings = REWRITE_MATCH_PATTERN.split("/");
           const flags = patternStrings.pop();
@@ -340,6 +345,8 @@ export class ImageRequest {
         }
       }
 
+      // Only load-bearing order: filters:watermark(...) goes before the generic filters:[^/]+ strip, because
+      // watermark args contain "/" (bucket/key paths) that [^/]+ would truncate.
       return decodeURIComponent(
         path
           .replace(/\/\d+x\d+:\d+x\d+(?=\/)/g, "")
@@ -347,7 +354,7 @@ export class ImageRequest {
           .replace(/filters:watermark\(.*\)/u, "")
           .replace(/filters:[^/]+/g, "")
           .replace(/\/fit-in(?=\/)/g, "")
-          .replace(new RegExp("s3:" + bucket + "/"), "")
+          .replace(`s3:${bucket}/`, "")
           .replace(/^\/+/g, "")
           .replace(/^\/+/, "")
       );
@@ -369,8 +376,10 @@ export class ImageRequest {
    */
   public parseRequestType(event: ImageHandlerEvent): RequestTypes {
     const { path } = event;
+    // Whole path is base64 alphabet; DEFAULT also requires it to decode as JSON (isBase64Encoded below).
     const matchDefault = /^(\/?)([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
     const matchThumbor1 = /^(\/?)((fit-in)?|(filters:.+\(.?\))?|(unsafe)?)/i;
+    // Path has no trailing ".ext" (extensionless key).
     const matchThumbor2 = /^((.(?!(\.[^.\\/]+$)))*$)/i; // NOSONAR
     const matchThumbor3 = /.*(\.jpg$|\.jpeg$|.\.png$|\.webp$|\.tiff$|\.tif$|\.svg$|\.gif$|\.avif$)/i; // NOSONAR
     const { REWRITE_MATCH_PATTERN, REWRITE_SUBSTITUTION } = process.env;
@@ -389,6 +398,8 @@ export class ImageRequest {
       isBase64Encoded = false;
     }
 
+    // CUSTOM is chosen on REWRITE_* env presence alone, before any Thumbor regex. THUMBOR is accepted iff the path
+    // is extensionless or ends in a known image extension; anything else is a 400.
     if (matchDefault.test(path) && isBase64Encoded) {
       // use sharp
       return RequestTypes.DEFAULT;
@@ -507,9 +518,11 @@ export class ImageRequest {
   }
 
   /**
-   * Creates a query string similar to API Gateway 2.0 payload's $.rawQueryString
+   * Canonical query string for the HMAC string-to-sign; clients must reproduce it byte for byte.
+   * Already-decoded values, `signature` dropped, `expires` kept, `[key, value]` pairs ordered by default
+   * `Array.sort()` (string compare of "key,value", not a pure key sort), joined `k=v&k=v`, no URL encoding.
    * @param queryStringParameters Request's query parameters
-   * @returns URL encoded queryString
+   * @returns Canonical, not URL-encoded, query string
    */
   private recreateQueryString(queryStringParameters: ImageHandlerEvent["queryStringParameters"]): string {
     return Object.entries(queryStringParameters)
@@ -610,23 +623,37 @@ export class ImageRequest {
   }
 }
 
+// Characters permitted in S3 bucket names, including legacy us-east-1 names (uppercase, underscores, up to 255 chars)
+// https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html#general-purpose-bucket-names
+const SOURCE_BUCKET_NAME_PATTERN = /^[A-Za-z0-9._-]{1,255}$/;
+
 /**
  * Returns a formatted image source bucket allowed list as specified in the SOURCE_BUCKETS environment variable of the image handler Lambda function.
- * Provides error handling for missing/invalid values.
+ * Invalid bucket names are logged and excluded. Provides error handling for missing values.
  * @returns A formatted image source bucket.
  */
 export function getAllowedSourceBuckets(): string[] {
   const { SOURCE_BUCKETS } = process.env;
 
-  if (SOURCE_BUCKETS === undefined) {
+  const sourceBuckets = (SOURCE_BUCKETS ?? "")
+    .replace(/\s+/g, "")
+    .split(",")
+    .filter((bucket) => bucket !== "")
+    .filter((bucket) => {
+      if (SOURCE_BUCKET_NAME_PATTERN.test(bucket)) return true;
+      console.warn(`Ignoring invalid bucket name in SOURCE_BUCKETS: ${JSON.stringify(bucket)}`);
+      return false;
+    });
+
+  if (sourceBuckets.length === 0) {
     throw new ImageHandlerError(
       StatusCodes.BAD_REQUEST,
       "GetAllowedSourceBuckets::NoSourceBuckets",
       "The SOURCE_BUCKETS variable could not be read. Please check that it is not empty and contains at least one source bucket, or multiple buckets separated by commas. Spaces can be provided between commas and bucket names, these will be automatically parsed out when decoding."
     );
-  } else {
-    return SOURCE_BUCKETS.replace(/\s+/g, "").split(",");
   }
+
+  return sourceBuckets;
 }
 
 /**

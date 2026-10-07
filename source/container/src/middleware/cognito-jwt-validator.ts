@@ -15,6 +15,9 @@ const verifier = COGNITO_USER_POOL_ID
     })
   : null;
 
+// Soft auth: never rejects; a valid token only unlocks metrics (served no-store) and device simulation. Uses
+// x-dit-authorization because Authorization is forwarded to origins (routes/image.ts).
+// With COGNITO_USER_POOL_ID unset every request is unauthenticated.
 export async function cognitoJwtValidator(req: Request, res: Response, next: NextFunction): Promise<void> {
   res.locals.isAuthenticated = false;
 

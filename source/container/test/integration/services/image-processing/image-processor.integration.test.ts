@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ImageProcessorService } from '../../../../src/services/image-processing/image-processor.service';
+import { ConnectionManager } from '../../../../src/services/request-resolver/connection-manager/connection-manager';
 import { ImageProcessingRequest } from '../../../../src/types/image-processing-request';
 import { Transformation } from '../../../../src/types/transformation';
 import { CacheRegistry } from '../../../../src/services/cache/cache-registry';
@@ -19,6 +20,7 @@ const s3Mock = mockClient(S3Client);
 
 describe('ImageProcessorService Integration Tests', () => {
   let imageProcessor: ImageProcessorService;
+  let connectionManager: ConnectionManager;
   let testServer: TestHttpServer;
   let serverUrl: string;
 
@@ -34,9 +36,16 @@ describe('ImageProcessorService Integration Tests', () => {
   beforeEach(async () => {
     CacheRegistry.getInstance().clear();
     imageProcessor = ImageProcessorService.getInstance();
+    connectionManager = new ConnectionManager();
     s3Mock.reset();
     await initializeOriginCache();
   });
+
+  // Mirrors the route: request resolution fetches the origin image once, then processing runs on it.
+  const fetchAndProcess = async (request: ImageProcessingRequest): Promise<Buffer> => {
+    await connectionManager.fetchOriginImage(request.origin!.url, request, request.origin!.headers);
+    return imageProcessor.process(request);
+  };
 
   const createImageRequest = (transformations?: Transformation[], contentType = 'image/jpeg'): ImageProcessingRequest => ({
     requestId: 'test-request',
@@ -61,7 +70,7 @@ describe('ImageProcessorService Integration Tests', () => {
   describe('Pipeline Orchestration', () => {
     test('should process image without transformations', async () => {
       const request = createImageRequest();
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
 
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(result.length).toBeGreaterThan(0);
@@ -73,7 +82,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'resize', value: { width: 400 }, source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(result.length).toBeGreaterThan(0);
@@ -84,7 +93,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'format', value: 'webp', source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      await imageProcessor.process(request);
+      await fetchAndProcess(request);
 
       expect(request.response.contentType).toBe('image/webp');
     });
@@ -97,7 +106,7 @@ describe('ImageProcessorService Integration Tests', () => {
       ], 'image/gif');
       request.origin.url = `${serverUrl}/test.gif`;
       
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(request.response.contentType).toBe('image/gif');
     });
@@ -107,7 +116,7 @@ describe('ImageProcessorService Integration Tests', () => {
     test('should replace EXIF with DIT software tag when stripping', async () => {
       // First get original EXIF size
       const originalRequest = createImageRequest();
-      const originalResult = await imageProcessor.process(originalRequest);
+      const originalResult = await fetchAndProcess(originalRequest);
       const originalMetadata = await sharp(originalResult).metadata();
       const originalExifSize = originalMetadata.exif?.length || 0;
       
@@ -116,7 +125,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'stripExif', value: true, source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       
       const metadata = await sharp(result).metadata();
       expect(metadata.exif).toBeDefined();
@@ -127,7 +136,7 @@ describe('ImageProcessorService Integration Tests', () => {
 
     test('should preserve EXIF data when not stripping', async () => {
       const request = createImageRequest();
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       
       const metadata = await sharp(result).metadata();
       expect(metadata.exif).toBeDefined();
@@ -138,7 +147,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'stripIcc', value: true, source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       
       const metadata = await sharp(result).metadata();
       expect(metadata.icc).toBeDefined();
@@ -150,46 +159,42 @@ describe('ImageProcessorService Integration Tests', () => {
     test('should fetch different image formats', async () => {
       const pngRequest = createImageRequest([], 'image/png');
       pngRequest.origin.url = `${serverUrl}/test.png`;
-      const result = await imageProcessor.process(pngRequest);
+      const result = await fetchAndProcess(pngRequest);
       
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(result.length).toBeGreaterThan(0);
+      expect(pngRequest.sourceImage?.format).toBe('png');
     });
 
-
-  });
-
-  describe('Pipeline Error Handling', () => {
-    test('should handle HTTP 404 errors', async () => {
+    test('should map origin HTTP 404 to RESOURCE_NOT_FOUND', async () => {
       const request = createImageRequest();
       request.origin.url = `${serverUrl}/404`;
 
-      await expect(imageProcessor.process(request)).rejects.toThrow();
+      await expect(fetchAndProcess(request)).rejects.toMatchObject({ statusCode: 404, errorType: 'RESOURCE_NOT_FOUND' });
     });
 
-    test('should handle HTTP 500 errors', async () => {
+    test('should map origin HTTP 500 to BAD_GATEWAY', async () => {
       const request = createImageRequest();
       request.origin.url = `${serverUrl}/500`;
 
-      await expect(imageProcessor.process(request)).rejects.toThrow();
+      await expect(fetchAndProcess(request)).rejects.toMatchObject({ statusCode: 502, errorType: 'BAD_GATEWAY' });
     });
 
-    test('should handle invalid content type', async () => {
+    test('should reject a non-image content type', async () => {
       const request = createImageRequest();
       request.origin.url = `${serverUrl}/invalid-content-type`;
 
-      await expect(imageProcessor.process(request)).rejects.toThrow('Invalid content type');
+      await expect(fetchAndProcess(request)).rejects.toMatchObject({ statusCode: 400, errorType: 'INVALID_FORMAT' });
     });
+  });
 
-
-
-    test('should propagate transformation engine errors', async () => {
+  describe('Pipeline Error Handling', () => {    test('should propagate transformation engine errors', async () => {
       const transformations: Transformation[] = [
         { type: 'resize', value: { width: -100 }, source: 'url' }
       ];
       const request = createImageRequest(transformations);
 
-      await expect(imageProcessor.process(request)).rejects.toThrow();
+      await expect(fetchAndProcess(request)).rejects.toThrow();
     });
 
     test('should handle invalid format transformation', async () => {
@@ -198,7 +203,7 @@ describe('ImageProcessorService Integration Tests', () => {
       ];
       const request = createImageRequest(transformations);
 
-      await expect(imageProcessor.process(request)).rejects.toThrow();
+      await expect(fetchAndProcess(request)).rejects.toThrow();
     });
   });
 
@@ -208,7 +213,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'format', value: 'heif', source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      await imageProcessor.process(request);
+      await fetchAndProcess(request);
       
       expect(request.response.contentType).toBe('image/heif');
     });
@@ -218,7 +223,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'format', value: 'webp', source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      await imageProcessor.process(request);
+      await fetchAndProcess(request);
       
       expect(request.response.contentType).toBe('image/webp');
     });
@@ -232,7 +237,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'quality', value: 90, source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(request.response.contentType).toBe('image/png');
@@ -245,7 +250,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'format', value: 'webp', source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(request.response.contentType).toBe('image/webp');
@@ -259,7 +264,7 @@ describe('ImageProcessorService Integration Tests', () => {
         { type: 'format', value: 'png', source: 'url' }
       ];
       const request = createImageRequest(transformations);
-      const result = await imageProcessor.process(request);
+      const result = await fetchAndProcess(request);
       
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(request.response.contentType).toBe('image/png');

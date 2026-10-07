@@ -1,146 +1,67 @@
 # Dynamic Image Transformation (DIT) v8
 
-## Directory Structure
+The CDK code for the v8 architecture: an ECS Fargate image service behind CloudFront, plus the admin portal that configures it.
 
-```
-v8/
-├── constructs/                        # DIT L3 CDK constructs
-│   ├── common/                        # Common utilities
-│   │   ├── constants.ts               # Shared constants (Lambda runtime, memory, timeout)
-│   │   ├── lambda.ts                  # Lambda utility functions
-│   │   └── index.ts                   # Common exports
-│   ├── dal/                           # Data Access Layer
-│   │   ├── dal-construct.ts           # API Gateway + Lambda + DynamoDB
-│   │   ├── single-table-construct.ts  # DynamoDB single-table design
-│   │   ├── open-api-spec.yaml         # API specification
-│   │   └── index.ts                   # DAL exports
-│   ├── frontend/                      # Frontend infrastructure
-│   │   ├── auth-construct.ts          # Cognito User Pool for auth
-│   │   ├── ui-construct.ts            # CloudFront distribution with S3 bucket for frontend assets
-│   │   └── index.ts                   # Frontend exports
-│   └── processor/                     # Image processing infrastructure
-│       ├── alb-ecs-construct.ts       # Application Load Balancer + ECS Fargate service
-│       ├── container-construct.ts     # ECR repository and Docker image management
-│       ├── network-construct.ts       # VPC, subnets, and security groups
-│       └── index.ts                   # Processor exports
-├── stacks/                            # CDK stack definitions
-│   ├── image-processing-stack.ts      # Provisions ECS-based image processing infrastructure
-│   ├── management-stack.ts            # DIT portal management stack
-│   └── index.ts                       # Stack exports
-├── test/                              # Jest tests and snapshots
-│   ├── __snapshots__/                 # Jest snapshot files
-│   │   ├── image-processing-stack.test.ts.snap
-│   │   └── management-stack.test.ts.snap
-│   ├── e2e.test.ts                    # End-to-end integration tests
-│   ├── image-processing-stack.test.ts # Image processing stack unit tests
-│   └── management-stack.test.ts       # Management stack unit tests
-└── README.md                          # This documentation file
-```
+## Components
 
-## Architecture Overview
+| Folder | What it builds |
+|--------|----------------|
+| [stacks/](./stacks/) | `management-stack.ts` is the top-level `v8-Stack`. `image-processing-stack.ts` is nested inside it |
+| [constructs/frontend/](./constructs/frontend/) | Admin UI: S3 bucket and CloudFront distribution, the Cognito user pool, and a custom resource that sets the UI's Content-Security-Policy |
+| [constructs/dal/](./constructs/dal/) | Management API: API Gateway built from `open-api-spec.yaml`, the [management Lambda](../../../management-lambda/README.md), and the DynamoDB config table |
+| [constructs/processor/](./constructs/processor/) | Image service: VPC, the container image, and the ALB with the ECS Fargate service |
+| [constructs/common/](./constructs/common/) | Shared Lambda defaults and the [utility Lambda](../../../utility-lambda/README.md) that redeploys ECS when config changes |
+| [constructs/metrics/](./constructs/metrics/) | Anonymous metrics custom resource ([v8-custom-resource](../../../v8-custom-resource/README.md)) |
+| [functions/](./functions/) | CloudFront Functions source |
+| [test/](./test/) | Unit, snapshot and end-to-end tests |
 
-### Management Stack
+## Architecture
 
-Primary stack provisioning infrastructure for the v8 management portal with three main layers:
+The management stack serves the admin UI from S3 through CloudFront, signs users in with Cognito, and stores origins, mappings and policies through the management API.
 
-**Frontend Layer**
+The image processing stack runs the [container](../../../container/README.md) on ECS Fargate behind an Application Load Balancer. CloudFront terminates TLS and forwards to the ALB over HTTP. The VPC's CIDR block comes from the `vpcCidr` CDK context (see [constructs](../../README.md#configuration)). It has public and isolated subnets across three availability zones, and the ALB sits in the isolated subnets. The ALB health check is `/health`.
 
-- CloudFront distribution for global content delivery
-- S3 bucket for static web assets (TODO: frontend deployment automation)
-- Cognito User Pool for admin authentication
+## Parameters
 
-**Data Access Layer (DAL)**
+| Parameter | What it does |
+|-----------|--------------|
+| `AdminEmail` | Email address of the first admin user |
+| `DeploymentSize` | ECS sizing: `small` (default), `medium`, `large`, or `xlarge` |
+| `OriginOverrideHeader` | Request header that names an origin directly, skipping mapping lookup. Must be empty or start with `dit-` |
+| `CorsOriginParameter` | Origin allowed to request images cross-origin. Empty allows any origin |
 
-- API Gateway with OpenAPI specification
-- Microservice backed by Lambda functions
-- DynamoDB single-table design for configuration storage
+The image processing stack receives `DeploymentSize`, `OriginOverrideHeader` and `CorsOriginParameter` from the management stack.
 
-**Common Components**
+| Size | Per task | Desired tasks | Scaling range |
+|------|----------|---------------|---------------|
+| `small` | 1 vCPU, 2 GB | 2 | 1-4 |
+| `medium` | 2 vCPU, 4 GB | 3 | 2-8 |
+| `large` | 2 vCPU, 4 GB | 8 | 6-20 |
+| `xlarge` | 2 vCPU, 4 GB | 30 | 24-96 |
 
-- Shared constants and utilities
-- Baseline Lambda function (Node.js 20.x, 512MB, 30s timeout)
+The management stack outputs `WebPortalUrl` (the admin UI) and `APIEndpoint` (the management API). The image processing stack's outputs include `LoadBalancerDNS` and `ImageUri`.
 
-#### Key Outputs
-
-- `WebPortalUrl`: Admin web portal endpoint
-- `APIEndpoint`: Backend API base URL
-
-#### Parameters
-
-- `AdminEmail`: Email address for initial admin user creation
-
-### Image Processing Stack
-
-ECS-based stack for high-performance image processing with the following architecture:
-
-**Network Layer**
-
-- VPC with configurable CIDR block (/16 to /24 prefix)
-- 3 public subnets across different availability zones
-- Internet Gateway for ECS tasks to download container images
-- Security groups for ALB and ECS with appropriate ingress/egress rules
-
-**Container Layer**
-
-- ECR repository for Docker image storage
-- Docker image asset management with multi-platform support
-- IAM roles for ECS task execution and runtime permissions
-- Automatic image building and deployment
-
-**Compute Layer**
-
-- Application Load Balancer (ALB) with HTTP support (TLS termination at CloudFront)
-- ECS Fargate service with auto-scaling capabilities
-- Health check endpoint at `/health-check`
-- T-shirt sizing configurations (Small, Medium, Large, XLarge)
-
-#### Key Outputs
-
-- `VpcId`: VPC ID for the image processing infrastructure
-- `ContainerDeploymentMode`: Container deployment mode (local or production)
-- `ImageUri`: Container image URI used by ECS tasks
-- `LoadBalancerDNS`: DNS name of the Application Load Balancer
-
-#### Parameters
-
-- `AdminEmail`: Email address for the admin user
-- `DeploymentSize`: T-shirt sizing for ECS Fargate deployment (Small/Medium/Large/XLarge)
-- `OriginOverrideHeader`: HTTP header used to override the image origin (if present in request, mapping lookup is skipped)
-
-#### T-shirt Sizing Configurations
-
-- **Small**: 1 vCPU, 2GB RAM, 2 desired tasks (1-4 range)
-- **Medium**: 2 vCPU, 4GB RAM, 3 desired tasks (2-8 range)
-- **Large**: 2 vCPU, 4GB RAM, 8 desired tasks (6-20 range)
-- **XLarge**: 2 vCPU, 4GB RAM, 30 desired tasks (24-96 range)
-
-## Unit Tests
+## Unit tests
 
 ```bash
-# Test management stack
-npx jest test/management-stack.test.ts
-
-npx jest test/image-processing-stack.test.ts
+cd source/constructs
+overrideWarningsEnabled=false npx jest lib/v8/test/snapshot/management-stack.test.ts
+overrideWarningsEnabled=false npx jest lib/v8/test/snapshot/image-processing-stack.test.ts
 ```
 
 ## Deploy
 
-Docker engine needs to be installed locally to build ecr image
+Docker must be running locally to build the container image.
 
 ```bash
 cd source/constructs
-
 aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
-
-# Management stack (deployment time ~15 mins)
 overrideWarningsEnabled=false npx cdk deploy v8-Stack --parameters AdminEmail="myEmail"
 ```
 
 ## End-to-end test
 
-ℹ️ **Pre-requisite** - aws credentials configured in local environment // TODO add details on configuring local environment
-
-These tests validate local deployment, ensure to run them after deploying above stacks
+Run this after deploying, with AWS credentials for the stack's account and region available to the AWS SDK (for example through `AWS_PROFILE`).
 
 ```bash
 STACK_REGION={myRegion} STACK_NAME={myStack} TEST_TYPE=e2e npx jest e2e.test.ts

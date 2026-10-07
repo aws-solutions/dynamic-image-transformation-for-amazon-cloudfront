@@ -4,7 +4,14 @@
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
-  collectCoverageFrom: ["index.ts", "lib/**/*.ts"],
+  collectCoverageFrom: [
+    "**/*.ts",
+    "!test/**",
+    "!**/*.test.ts",
+    "!**/*.d.ts",
+    "!jest.config.js",
+    "!**/node_modules/**"
+  ],
   coverageReporters: ["text", ["lcov", { projectRoot: "../../" }]],
   testMatch: ["**/*.spec.ts"],
   setupFilesAfterEnv: ["<rootDir>/test/setupJestMocks.ts"],

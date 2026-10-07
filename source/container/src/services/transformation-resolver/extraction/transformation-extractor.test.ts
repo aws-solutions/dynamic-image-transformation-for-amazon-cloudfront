@@ -3,6 +3,7 @@
 
 import { Request } from 'express';
 import { extractUrlTransformations } from './transformation-extractor';
+import { TransformationMapper } from '../../image-processing/transformation-engine/transformation-mapper';
 
 // Custom interface for test mocks to allow parsed query parameter types
 interface TestRequest extends Omit<Request, 'query'> {
@@ -63,7 +64,7 @@ describe('extractUrlTransformations', () => {
       expect(result).toHaveLength(0);
     });
 
-    it('should reject values that fail parsing', () => {
+    it('should reject non-numeric values for numeric params', () => {
       mockRequest.query = { 'resize.width': 'invalid' };
       
       const result = extractUrlTransformations(mockRequest as Request, 'test-123');
@@ -118,6 +119,27 @@ describe('extractUrlTransformations', () => {
       result.forEach(transformation => {
         expect(transformation.source).toBe('url');
       });
+    });
+  });
+
+  // jpg is normalized to jpeg at mapping time (SharpUtils.convertImageFormatType), not at extraction.
+  describe('format aliases', () => {
+    it.each(['jpeg', 'jpg'])('should accept format=%s unchanged', (format) => {
+      mockRequest.query = { format };
+
+      const result = extractUrlTransformations(mockRequest as Request, 'test-123');
+
+      expect(result).toEqual([{ type: 'format', value: format, source: 'url' }]);
+    });
+
+    it.each(['jpeg', 'jpg'])('should map URL format=%s to jpeg output', async (format) => {
+      mockRequest.query = { format };
+
+      const edits = await TransformationMapper.mapToImageEdits(
+        extractUrlTransformations(mockRequest as Request, 'test-123')
+      );
+
+      expect(edits.toFormat).toBe('jpeg');
     });
   });
 });

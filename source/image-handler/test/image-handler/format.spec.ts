@@ -109,6 +109,29 @@ describe("modifyImageOutput", () => {
     expect(resultFormat).toEqual(ImageFormatTypes.JPEG);
   });
 
+  it("Should convert tif outputFormat to tiff", async () => {
+    // Arrange
+    const request: ImageRequestInfo = {
+      requestType: RequestTypes.DEFAULT,
+      bucket: "sample-bucket",
+      key: "sample-image-001.png",
+      edits: {},
+      outputFormat: ImageFormatTypes.TIF,
+      originalImage: image,
+    };
+    const imageHandler = new ImageHandler(s3Client, rekognitionClient);
+    const sharpImage = sharp(request.originalImage, { failOn: "none" }).withMetadata();
+    const toFormatSpy = jest.spyOn(sharp.prototype, "toFormat");
+
+    // Act
+    const result = await imageHandler["modifyImageOutput"](sharpImage, request).toBuffer();
+    const resultFormat = (await sharp(result).metadata()).format;
+
+    // Assert
+    expect(toFormatSpy).toHaveBeenCalledWith("tiff");
+    expect(resultFormat).toEqual(ImageFormatTypes.TIFF);
+  });
+
   it("Should return an image in the same format when outputFormat is not provided", async () => {
     // Arrange
     const request: ImageRequestInfo = {

@@ -21,13 +21,16 @@ export class EcsDeploymentUtility implements UtilityHandler {
 
     if (!hasChanges) return;
 
+    // Only path by which config edits reach running tasks. A new forced deployment supersedes one in progress;
+    // the 180s maxBatchingWindow in constructs/lib/v8/constructs/common/utility.ts coalesces bursts of edits to
+    // limit how often that happens.
     await this.ecsClient.send(
       new UpdateServiceCommand({
         cluster: process.env.ECS_CLUSTER_NAME,
         service: process.env.ECS_SERVICE_NAME,
         forceNewDeployment: true,
       })
-    ); // fails silently if deployment is in progress
+    );
 
     console.log("Rolling deployment triggered");
   }

@@ -55,6 +55,7 @@ export class FrontEndConstruct extends Construct {
     ]);
 
     this.domainName = cloudFrontToS3.cloudFrontWebDistribution.domainName;
+    // Safe: existingBucketObj is never passed, so CloudFrontToS3 always creates the bucket and s3Bucket is set.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.websiteHostingBucket = cloudFrontToS3.s3Bucket!;
 

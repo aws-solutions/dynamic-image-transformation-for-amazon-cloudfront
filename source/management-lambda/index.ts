@@ -96,6 +96,7 @@ export const handler = middy()
   )
   .use(httpSecurityHeaders())
   .use(conditionalJsonBodyParser())
+  // Registered after cors: middy runs onError in reverse order, so cors then adds its headers to error responses.
   .use(errorHandler())
   .use(addCacheControlHeader())
   .handler(httpRouterHandler(routes));

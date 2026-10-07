@@ -79,7 +79,8 @@ export abstract class BaseService<T extends AllowedDBEntities, K extends Allowed
       createdAt,
     };
 
-    // Identifying the request type based on fields
+    // Identifying the request type based on fields: relies on originId appearing only in MappingCreate and
+    // originName only in OriginCreate.
     if ("originId" in validatedRequest) {
       item = { ...item, mappingId: id };
     } else if ("originName" in validatedRequest) {

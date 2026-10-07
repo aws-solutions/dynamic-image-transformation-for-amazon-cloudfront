@@ -40,6 +40,7 @@ export class MappingDAO extends BaseDAO<DBMapping, Mapping> {
     let pathMappings: { items: DBMapping[]; nextToken?: Record<string, any> } = { items: [] };
     let hostHeaderMappings: { items: DBMapping[]; nextToken?: Record<string, any> } = { items: [] };
 
+    // With a token, a type whose cursor is absent is exhausted, so it is skipped rather than re-read from page 1.
     // Query path mappings if no token or if pathCursor exists
     if (!nextToken || pathCursor) {
       pathMappings = await this.queryWithCursor(pathCursor, DBEntityType.PATH_MAPPING);

@@ -66,7 +66,8 @@ export abstract class BaseDAO<T extends AllowedDBEntities, K extends AllowedData
           error: validation.error,
           errorCode: validation.errorCode,
         });
-        // Start fresh - ExclusiveStartKey remains undefined
+        // Start fresh - ExclusiveStartKey remains undefined. Fail-soft: a bad or expired token returns page 1
+        // instead of an error, so the client may see items it already has.
       } else {
         // Extract cursor and cast to DynamoDB ExclusiveStartKey format
         queryParams.ExclusiveStartKey = this.tokenService.extractCursors(validation.payload!) as Record<string, any>;

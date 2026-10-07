@@ -56,6 +56,7 @@ export class ApiGatewayArchitecture {
     });
 
     // Slice off the last line since CloudFront functions can't have module exports but we need to export the handler to unit test it.
+    // Requires module.exports to be the LAST line of the .js file with NO trailing newline, or the export ships.
     const inlineCloudFrontFunction: string[] = readFileSync(
       path.join(__dirname, "../../../image-handler/cloudfront-function-handlers/apig-request-modifier.js"),
       "utf-8"

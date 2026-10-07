@@ -6,7 +6,25 @@ import { ImageProcessingRequest } from '../../types/image-processing-request';
 import { EditApplicator } from './transformation-engine/edit-applicator';
 import { ErrorMapper } from './utils/error-mapping';
 import { ImageProcessingError } from './types';
+import { TransformationMapper } from './transformation-engine/transformation-mapper';
 import sharp from 'sharp';
+
+// process() no longer fetches: the request resolver attaches the source image before it runs.
+let stubbedSource: { buffer: Buffer; format?: string } | undefined;
+function stubSource(buffer: Buffer, format?: string): void {
+  stubbedSource = { buffer, format };
+}
+function processWithSource(request: ImageProcessingRequest): Promise<Buffer> {
+  if (stubbedSource && !request.sourceImage) {
+    request.sourceImage = {
+      buffer: stubbedSource.buffer,
+      contentType: `image/${stubbedSource.format ?? 'jpeg'}`,
+      format: stubbedSource.format,
+      fetchDurationMs: 7,
+    };
+  }
+  return ImageProcessorService.getInstance().process(request);
+}
 
 let TEST_JPEG_BUFFER: Buffer;
 let TEST_GIF_BUFFER: Buffer;
@@ -43,6 +61,7 @@ describe('ImageProcessorService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    stubbedSource = undefined;
     service = ImageProcessorService.getInstance();
   });
 
@@ -55,24 +74,55 @@ describe('ImageProcessorService', () => {
   });
 
   describe('process', () => {
-    it('should throw error for missing origin URL', async () => {
+    it('should throw when no source image was attached', async () => {
       const request: ImageProcessingRequest = {
         requestId: 'test-123',
         timestamp: Date.now(),
-        origin: { url: '' },
+        origin: { url: 'https://example.com/image.jpg' },
         transformations: [],
         response: { headers: {} }
       };
 
-      await expect(service.process(request)).rejects.toThrow();
+      await expect(processWithSource(request)).rejects.toMatchObject({ statusCode: 500, errorType: 'MissingSourceImage' });
+    });
+
+    it('should not make any origin request', async () => {
+      const fetchSpy = jest.spyOn(service['originFetcher'], 'fetchImage');
+      stubSource(TEST_JPEG_BUFFER, 'jpeg');
+
+      await processWithSource({
+        requestId: 'test-no-fetch',
+        timestamp: Date.now(),
+        origin: { url: 'https://example.com/image.jpg' },
+        transformations: [{ type: 'resize', value: { width: 50 }, source: 'url' }],
+        response: { headers: {} }
+      });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('should report the attached fetch duration as originFetchMs and exclude it from transformationApplicationMs', async () => {
+      stubSource(TEST_JPEG_BUFFER, 'jpeg');
+      const request: ImageProcessingRequest = {
+        requestId: 'test-timings',
+        timestamp: Date.now(),
+        origin: { url: 'https://example.com/image.jpg' },
+        transformations: [{ type: 'resize', value: { width: 50 }, source: 'url' }],
+        response: { headers: {} },
+        sourceImage: { buffer: TEST_JPEG_BUFFER, contentType: 'image/jpeg', format: 'jpeg', fetchDurationMs: 60000 }
+      };
+
+      await processWithSource(request);
+
+      expect(request.timings?.imageProcessing?.originFetchMs).toBe(60000);
+      expect(request.metrics?.timings.originFetchMs).toBe(60000);
+      expect(request.timings?.imageProcessing?.transformationApplicationMs).toBeGreaterThanOrEqual(0);
+      expect(request.timings?.imageProcessing?.transformationApplicationMs).toBeLessThan(60000);
     });
 
     it('should handle empty transformations array', async () => {
       const mockBuffer = Buffer.from('fake-image-data');
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: mockBuffer,
-        metadata: { size: mockBuffer.length }
-      });
+      stubSource(mockBuffer);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-123',
@@ -82,7 +132,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBe(mockBuffer);
     });
   });
@@ -117,10 +167,7 @@ describe('ImageProcessorService', () => {
   describe('process request initialization', () => {
     it('should initialize timings object if missing', async () => {
       const mockBuffer = Buffer.from('fake-image-data');
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: mockBuffer,
-        metadata: { size: mockBuffer.length }
-      });
+      stubSource(mockBuffer);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-123',
@@ -130,17 +177,14 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      await service.process(request);
+      await processWithSource(request);
       expect(request.timings).toBeDefined();
       expect(request.timings.imageProcessing).toBeDefined();
     });
 
     it('should set sourceImageContentType on response for no-transform case', async () => {
       const mockBuffer = Buffer.from('fake-image-data');
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: mockBuffer,
-        metadata: { size: mockBuffer.length }
-      });
+      stubSource(mockBuffer);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-123',
@@ -151,17 +195,14 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      await service.process(request);
+      await processWithSource(request);
       expect(request.response.contentType).toBe('image/jpeg');
     });
   });
 
   describe('full transformation pipeline', () => {
     it('should process image with transformations and set contentType from output', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_JPEG_BUFFER,
-        metadata: { size: TEST_JPEG_BUFFER.length, format: 'jpeg' }
-      });
+      stubSource(TEST_JPEG_BUFFER, 'jpeg');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-pipeline',
@@ -171,7 +212,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       
       expect(result).toBeInstanceOf(Buffer);
       expect(request.response.contentType).toMatch(/^image\//);
@@ -181,10 +222,7 @@ describe('ImageProcessorService', () => {
 
   describe('preventAutoUpscaling', () => {
     it('should filter out auto-resize transforms that would upscale', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_JPEG_BUFFER,
-        metadata: { size: TEST_JPEG_BUFFER.length }
-      });
+      stubSource(TEST_JPEG_BUFFER);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-upscale',
@@ -197,17 +235,14 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      await service.process(request);
+      await processWithSource(request);
       
       expect(request.transformations).toHaveLength(1);
       expect(request.transformations[0].type).toBe('negate');
     });
 
     it('should keep auto-resize transforms that do not upscale', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_JPEG_BUFFER,
-        metadata: { size: TEST_JPEG_BUFFER.length }
-      });
+      stubSource(TEST_JPEG_BUFFER);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-no-upscale',
@@ -219,16 +254,13 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      await service.process(request);
+      await processWithSource(request);
       
       expect(request.transformations).toHaveLength(1);
     });
 
     it('should not filter non-auto resize transforms', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_JPEG_BUFFER,
-        metadata: { size: TEST_JPEG_BUFFER.length }
-      });
+      stubSource(TEST_JPEG_BUFFER);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-url-resize',
@@ -240,7 +272,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      await service.process(request);
+      await processWithSource(request);
       
       expect(request.transformations).toHaveLength(1);
     });
@@ -248,10 +280,7 @@ describe('ImageProcessorService', () => {
 
   describe('instantiateSharpImage', () => {
     it('should apply stripExif when specified', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_JPEG_BUFFER,
-        metadata: { size: TEST_JPEG_BUFFER.length }
-      });
+      stubSource(TEST_JPEG_BUFFER);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-strip-exif',
@@ -261,15 +290,12 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
     });
 
     it('should apply stripIcc when specified', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_JPEG_BUFFER,
-        metadata: { size: TEST_JPEG_BUFFER.length }
-      });
+      stubSource(TEST_JPEG_BUFFER);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-strip-icc',
@@ -279,51 +305,48 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
     });
   });
 
   describe('error handling', () => {
     it('should wrap errors via ErrorMapper', async () => {
-      const originalError = new Error('Fetch failed');
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockRejectedValue(originalError);
+      stubSource(Buffer.from('not-an-image'));
       jest.spyOn(ErrorMapper, 'mapError');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-error',
         timestamp: Date.now(),
         origin: { url: 'https://example.com/image.jpg' },
-        transformations: [],
+        transformations: [{ type: 'resize', value: { width: 50 }, source: 'url' }],
         response: { headers: {} }
       };
 
-      await expect(service.process(request)).rejects.toThrow();
-      expect(ErrorMapper.mapError).toHaveBeenCalledWith(originalError);
+      await expect(processWithSource(request)).rejects.toThrow();
+      expect(ErrorMapper.mapError).toHaveBeenCalledWith(expect.any(Error));
     });
 
     it('should pass through ImageProcessingError unchanged', async () => {
-      const processingError = new ImageProcessingError(404, 'NotFound', 'Image not found');
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockRejectedValue(processingError);
+      const processingError = new ImageProcessingError(422, 'Unprocessable', 'Cannot apply edits');
+      stubSource(TEST_JPEG_BUFFER, 'jpeg');
+      jest.spyOn(TransformationMapper, 'mapToImageEdits').mockRejectedValueOnce(processingError);
 
       const request: ImageProcessingRequest = {
         requestId: 'test-processing-error',
         timestamp: Date.now(),
         origin: { url: 'https://example.com/image.jpg' },
-        transformations: [],
+        transformations: [{ type: 'resize', value: { width: 50 }, source: 'url' }],
         response: { headers: {} }
       };
 
-      await expect(service.process(request)).rejects.toThrow(processingError);
+      await expect(processWithSource(request)).rejects.toThrow(processingError);
     });
   });
 
   describe('transformation metrics', () => {
     it('should populate metrics after transformation', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_JPEG_BUFFER,
-        metadata: { size: TEST_JPEG_BUFFER.length, format: 'jpeg' }
-      });
+      stubSource(TEST_JPEG_BUFFER, 'jpeg');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-metrics',
@@ -333,7 +356,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      await service.process(request);
+      await processWithSource(request);
 
       expect(request.metrics).toBeDefined();
       expect(request.metrics.postOptimization.width).toBeGreaterThan(0);
@@ -348,10 +371,7 @@ describe('ImageProcessorService', () => {
     );
 
     it('should passthrough SVG unmodified when no transformations', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_SVG_BUFFER,
-        metadata: { size: TEST_SVG_BUFFER.length, format: 'svg+xml' }
-      });
+      stubSource(TEST_SVG_BUFFER, 'svg+xml');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-svg-passthrough',
@@ -362,16 +382,13 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBe(TEST_SVG_BUFFER);
       expect(request.response.contentType).toBe('image/svg+xml');
     });
 
     it('should set attachment + restrictive CSP headers on SVG passthrough with no transformations', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_SVG_BUFFER,
-        metadata: { size: TEST_SVG_BUFFER.length, format: 'svg+xml' }
-      });
+      stubSource(TEST_SVG_BUFFER, 'svg+xml');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-svg-headers-no-transform',
@@ -382,16 +399,13 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      await service.process(request);
+      await processWithSource(request);
       expect(request.response.headers['Content-Disposition']).toBe('attachment');
       expect(request.response.headers['Content-Security-Policy']).toBe("default-src 'none'; sandbox");
     });
 
     it('should set attachment + restrictive CSP headers on SVG passthrough with only a quality transform', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_SVG_BUFFER,
-        metadata: { size: TEST_SVG_BUFFER.length, format: 'svg+xml' }
-      });
+      stubSource(TEST_SVG_BUFFER, 'svg+xml');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-svg-headers-quality',
@@ -402,7 +416,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       // No format/rasterizing transform -> passthrough, so raw SVG bytes are returned.
       expect(result).toBe(TEST_SVG_BUFFER);
       expect(request.response.contentType).toBe('image/svg+xml');
@@ -411,10 +425,7 @@ describe('ImageProcessorService', () => {
     });
 
     it('should NOT set SVG safety headers when a resize rasterizes the SVG to PNG', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_SVG_BUFFER,
-        metadata: { size: TEST_SVG_BUFFER.length, format: 'svg+xml' }
-      });
+      stubSource(TEST_SVG_BUFFER, 'svg+xml');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-svg-rasterized-no-headers',
@@ -425,7 +436,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
       expect(request.response.contentType).toBe('image/png');
       expect(request.response.headers['Content-Disposition']).toBeUndefined();
@@ -433,10 +444,7 @@ describe('ImageProcessorService', () => {
     });
 
     it('should default SVG output to PNG when transformations exist but no explicit format', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_SVG_BUFFER,
-        metadata: { size: TEST_SVG_BUFFER.length, format: 'svg+xml' }
-      });
+      stubSource(TEST_SVG_BUFFER, 'svg+xml');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-svg-to-png',
@@ -447,16 +455,13 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
       expect(request.response.contentType).toBe('image/png');
     });
 
     it('should respect explicit format conversion for SVG input', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_SVG_BUFFER,
-        metadata: { size: TEST_SVG_BUFFER.length, format: 'svg+xml' }
-      });
+      stubSource(TEST_SVG_BUFFER, 'svg+xml');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-svg-to-webp',
@@ -470,16 +475,13 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
       expect(request.response.contentType).toBe('image/webp');
     });
 
     it('should not inject PNG when auto-optimization has already set a format', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_SVG_BUFFER,
-        metadata: { size: TEST_SVG_BUFFER.length, format: 'svg+xml' }
-      });
+      stubSource(TEST_SVG_BUFFER, 'svg+xml');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-svg-auto-format',
@@ -493,7 +495,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
       expect(request.response.contentType).not.toBe('image/png');
       expect(request.transformations.filter(t => t.type === 'format')).toHaveLength(1);
@@ -502,10 +504,7 @@ describe('ImageProcessorService', () => {
 
   describe('animated image handling', () => {
     it('should process a single-frame GIF as a static (non-animated) image', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_GIF_BUFFER,
-        metadata: { size: TEST_GIF_BUFFER.length, format: 'gif' }
-      });
+      stubSource(TEST_GIF_BUFFER, 'gif');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-single-frame-gif',
@@ -516,7 +515,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
 
       // A single-frame source must collapse to a static output regardless of format.
@@ -529,10 +528,7 @@ describe('ImageProcessorService', () => {
       // A multi-frame WebP converted to GIF must keep all of its frames; if Sharp were
       // instantiated with animated=false (the previous GIF-only behavior) the output
       // would collapse to a single frame.
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_ANIMATED_WEBP_BUFFER,
-        metadata: { size: TEST_ANIMATED_WEBP_BUFFER.length, format: 'webp' }
-      });
+      stubSource(TEST_ANIMATED_WEBP_BUFFER, 'webp');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-animated-webp-to-gif',
@@ -543,7 +539,7 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
 
       expect(result).toBeInstanceOf(Buffer);
       expect(request.response.contentType).toBe('image/gif');
@@ -555,10 +551,7 @@ describe('ImageProcessorService', () => {
     });
 
     it('should preserve animation for a multi-frame source when no format conversion occurs', async () => {
-      jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-        buffer: TEST_ANIMATED_WEBP_BUFFER,
-        metadata: { size: TEST_ANIMATED_WEBP_BUFFER.length, format: 'webp' }
-      });
+      stubSource(TEST_ANIMATED_WEBP_BUFFER, 'webp');
 
       const request: ImageProcessingRequest = {
         requestId: 'test-animated-webp-resize',
@@ -569,13 +562,179 @@ describe('ImageProcessorService', () => {
         response: { headers: {} }
       };
 
-      const result = await service.process(request);
+      const result = await processWithSource(request);
 
       expect(result).toBeInstanceOf(Buffer);
 
       const outputMetadata = await sharp(result).metadata();
       expect(outputMetadata.format).toBe('webp');
       expect(outputMetadata.pages).toBe(3);
+    });
+  });
+
+  describe('negotiated auto-format capability preservation', () => {
+    const TEST_SVG_BUFFER = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="40" fill="red"/></svg>'
+    );
+    let alphaPng: Buffer;
+    let opaquePng: Buffer;
+    let opaqueRgbaPng: Buffer;
+    let alphaWebp: Buffer;
+    let animatedGif: Buffer;
+    let multiPageTiff: Buffer;
+    let animatedAlphaWebp: Buffer;
+
+    beforeAll(async () => {
+      const transparent = { r: 0, g: 0, b: 255, alpha: 0.4 };
+      alphaPng = await sharp({ create: { width: 40, height: 40, channels: 4, background: transparent } }).png().toBuffer();
+      alphaWebp = await sharp({ create: { width: 40, height: 40, channels: 4, background: transparent } }).webp().toBuffer();
+      opaquePng = await sharp({ create: { width: 40, height: 40, channels: 3, background: { r: 0, g: 255, b: 0 } } })
+        .png()
+        .toBuffer();
+      opaqueRgbaPng = await sharp({ create: { width: 40, height: 40, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } })
+        .png()
+        .toBuffer();
+      animatedGif = await sharp(TEST_ANIMATED_WEBP_BUFFER, { animated: true }).gif().toBuffer();
+      const page = await sharp({ create: { width: 20, height: 20, channels: 3, background: { r: 9, g: 9, b: 9 } } })
+        .png()
+        .toBuffer();
+      multiPageTiff = await sharp([page, page], { join: { animated: true } }).tiff().toBuffer();
+      // Frames must differ, or the WebP encoder merges them into a single page.
+      const alphaFrames = await Promise.all(
+        [
+          { r: 255, g: 0, b: 0, alpha: 1 },
+          { r: 0, g: 255, b: 0, alpha: 0.4 },
+          { r: 0, g: 0, b: 255, alpha: 1 }
+        ].map(background => sharp({ create: { width: 30, height: 30, channels: 4, background } }).png().toBuffer())
+      );
+      animatedAlphaWebp = await sharp(alphaFrames, { join: { animated: true } }).webp().toBuffer();
+    });
+
+    const run = async (buffer: Buffer, contentType: string, transformations: any[]) => {
+      const request: ImageProcessingRequest = {
+        requestId: 'test-negotiated',
+        timestamp: Date.now(),
+        origin: { url: 'https://example.com/image' },
+        sourceImageContentType: contentType,
+        sourceImage: { buffer, contentType, format: contentType.split('/')[1], fetchDurationMs: 7 },
+        transformations,
+        response: { headers: {} }
+      };
+      const result = await service.process(request);
+      const outputMetadata = await sharp(result, { animated: true }).metadata();
+      return { request, outputMetadata };
+    };
+    const negotiated = (value: string) => ({ type: 'format', value, source: 'auto' as const, negotiated: true });
+
+    it('keeps the source format when negotiated jpeg would drop alpha', async () => {
+      const { request, outputMetadata } = await run(alphaPng, 'image/png', [negotiated('jpeg')]);
+      expect(request.response.contentType).toBe('image/png');
+      expect(outputMetadata.hasAlpha).toBe(true);
+    });
+
+    it('keeps the source format when negotiated gif would reduce alpha to 1-bit', async () => {
+      const { request } = await run(alphaPng, 'image/png', [negotiated('gif')]);
+      expect(request.response.contentType).toBe('image/png');
+    });
+
+    it('keeps an alpha WebP source as webp when negotiated jpeg would drop alpha', async () => {
+      const { request, outputMetadata } = await run(alphaWebp, 'image/webp', [negotiated('jpeg')]);
+      expect(request.response.contentType).toBe('image/webp');
+      expect(outputMetadata.hasAlpha).toBe(true);
+    });
+
+    it('applies a negotiated alpha-capable format to an alpha source', async () => {
+      const { request, outputMetadata } = await run(alphaPng, 'image/png', [negotiated('webp')]);
+      expect(request.response.contentType).toBe('image/webp');
+      expect(outputMetadata.hasAlpha).toBe(true);
+    });
+
+    it('still converts an opaque source to negotiated jpeg', async () => {
+      const { request } = await run(opaquePng, 'image/png', [negotiated('jpeg')]);
+      expect(request.response.contentType).toBe('image/jpeg');
+    });
+
+    it('converts an RGBA source with no transparent pixels to negotiated jpeg', async () => {
+      expect((await sharp(opaqueRgbaPng).metadata()).hasAlpha).toBe(true);
+      const { request } = await run(opaqueRgbaPng, 'image/png', [negotiated('jpeg')]);
+      expect(request.response.contentType).toBe('image/jpeg');
+    });
+
+    it('does not treat a multi-page TIFF as animated', async () => {
+      const { request } = await run(multiPageTiff, 'image/tiff', [negotiated('jpeg')]);
+      expect(request.response.contentType).toBe('image/jpeg');
+    });
+
+    it('rasterizes an SVG to png when negotiated jpeg would drop alpha', async () => {
+      const { request, outputMetadata } = await run(TEST_SVG_BUFFER, 'image/svg+xml', [negotiated('jpeg')]);
+      expect(request.response.contentType).toBe('image/png');
+      expect(outputMetadata.hasAlpha).toBe(true);
+    });
+
+    it('honors flatten: alpha is intentionally removed, so negotiated jpeg applies', async () => {
+      const { request } = await run(alphaPng, 'image/png', [
+        { type: 'flatten', value: 'white', source: 'policy' },
+        negotiated('jpeg')
+      ]);
+      expect(request.response.contentType).toBe('image/jpeg');
+    });
+
+    it('does not override an explicit (non-negotiated) format', async () => {
+      const { request } = await run(alphaPng, 'image/png', [{ type: 'format', value: 'jpeg', source: 'url' }]);
+      expect(request.response.contentType).toBe('image/jpeg');
+    });
+
+    it.each(['jpeg', 'png', 'avif'])('keeps animated WebP as webp when negotiated %s would drop frames', async (format) => {
+      const { request, outputMetadata } = await run(TEST_ANIMATED_WEBP_BUFFER, 'image/webp', [negotiated(format)]);
+      expect(request.response.contentType).toBe('image/webp');
+      expect(outputMetadata.pages).toBe(3);
+    });
+
+    // For animation, compatibility wins: gif is often the only animated format legacy clients support,
+    // so it's allowed even though it reduces alpha to 1-bit. Static alpha sources stay strict.
+    it('converts animated WebP with alpha to negotiated gif and keeps frames', async () => {
+      const { request, outputMetadata } = await run(animatedAlphaWebp, 'image/webp', [negotiated('gif')]);
+      expect(request.response.contentType).toBe('image/gif');
+      expect(outputMetadata.pages).toBe(3);
+    });
+
+    it('converts opaque animated WebP to negotiated gif and keeps frames', async () => {
+      // TEST_ANIMATED_WEBP_BUFFER frames are fully opaque, so the encoder writes no alpha channel.
+      const { request, outputMetadata } = await run(TEST_ANIMATED_WEBP_BUFFER, 'image/webp', [negotiated('gif')]);
+      expect(request.response.contentType).toBe('image/gif');
+      expect(outputMetadata.pages).toBe(3);
+    });
+
+    it('keeps animated GIF as gif when negotiated jpeg would drop frames', async () => {
+      const { request, outputMetadata } = await run(animatedGif, 'image/gif', [negotiated('jpeg')]);
+      expect(request.response.contentType).toBe('image/gif');
+      expect(outputMetadata.pages).toBe(3);
+    });
+
+    it('converts animated GIF to negotiated webp and keeps frames', async () => {
+      const { request, outputMetadata } = await run(animatedGif, 'image/gif', [negotiated('webp')]);
+      expect(request.response.contentType).toBe('image/webp');
+      expect(outputMetadata.pages).toBe(3);
+    });
+
+    it('logs the override with requestId', async () => {
+      const logSpy = jest.spyOn(console, 'log');
+      await run(alphaPng, 'image/png', [negotiated('jpeg')]);
+      const logged = logSpy.mock.calls
+        .map(args => args[0])
+        .filter(arg => typeof arg === 'string' && arg.includes('auto_format_overridden'))
+        .map(arg => JSON.parse(arg));
+      expect(logged).toEqual([
+        {
+          requestId: 'test-negotiated',
+          component: 'ImageProcessor',
+          operation: 'auto_format_overridden',
+          from: 'jpeg',
+          to: 'png',
+          reason: 'alpha'
+        }
+      ]);
+      logSpy.mockRestore();
     });
   });
 

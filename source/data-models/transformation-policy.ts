@@ -75,7 +75,7 @@ export const transformationSchemas = {
   animated: z.boolean(),
   flatten: colorSchema,
   quality: z.int().min(1).max(100),
-  format: z.enum(["jpg", "jpeg", "png", "tiff", "webp", "gif", "avif"]), // supported image formats
+  format: z.enum(["jpg", "jpeg", "png", "tif", "tiff", "webp", "gif", "avif"]), // supported image formats
   blur: z.number().min(0.3).max(1000),
   convolve: z.strictObject({
     width: z.int().positive(),

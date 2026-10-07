@@ -66,6 +66,7 @@ export class S3ObjectLambdaArchitecture {
     props.imageHandlerLambdaFunction.grantInvoke(new ServicePrincipal("cloudfront.amazonaws.com"));
 
     // Slice off the last line since CloudFront functions can't have module exports but we need to export the handler to unit test it.
+    // Requires module.exports to be the LAST line of the .js file with NO trailing newline, or the export ships.
     const inlineResponseModifierCode: string[] = readFileSync(
       path.join(__dirname, "../../../image-handler/cloudfront-function-handlers/ol-response-modifier.js"),
       "utf-8"
@@ -83,6 +84,7 @@ export class S3ObjectLambdaArchitecture {
     );
 
     // Slice off the last line since CloudFront functions can't have module exports but we need to export the handler to unit test it.
+    // Requires module.exports to be the LAST line of the .js file with NO trailing newline, or the export ships.
     const inlineRequestModifierCode: string[] = readFileSync(
       path.join(__dirname, "../../../image-handler/cloudfront-function-handlers/ol-request-modifier.js"),
       "utf-8"

@@ -37,7 +37,7 @@ export class EventSourceMappingResolver extends Construct {
       entry: path.join(__dirname, "../../../custom-resource/event-source-mapping-resolver/index.ts"),
       projectRoot: path.join(__dirname, "../../../custom-resource"),
       depsLockFilePath: path.join(__dirname, "../../../custom-resource/package-lock.json"),
-      runtime: Runtime.NODEJS_22_X,
+      runtime: Runtime.NODEJS_24_X,
       timeout: Duration.seconds(30),
       memorySize: 128,
     });

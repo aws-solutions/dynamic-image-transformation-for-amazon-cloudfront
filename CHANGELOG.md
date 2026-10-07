@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.1.2] - 2026-10-08
+
+### Added
+
+- Accept `tif` as an alias for `tiff` output format [#608](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/pull/608)
+
+### Changed
+
+- Lambda functions now run on Node.js 24 (`nodejs24.x`), and the ECS container image now runs on Node.js 24 (was Node.js 20)
+- ECS now fetches each origin image with a single GET request instead of a HEAD preflight followed by a GET
+- ECS container logs no longer include per-request debug output, and the origin override log line records only the origin host instead of the full header value
+
+### Fixed
+
+- ECS image responses now send `Cross-Origin-Resource-Policy: cross-origin`, so other sites can embed images with `<img>`. Invalidate your CloudFront distribution to apply the header to images already cached [#624](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/issues/624)
+- Lambda SVG requests with no edits no longer return a 500 error [#604](https://github.com/aws-solutions/dynamic-image-transformation-for-amazon-cloudfront/issues/604)
+- ECS `auto` format no longer drops transparency or animation. When the negotiated format cannot keep the source's alpha channel or animation frames, the source format is kept instead. Explicit policy and URL formats are unchanged
+- Lambda S3 Object Lambda error responses now send a valid `Cache-Control: max-age=10,public` header
+
+### Security
+
+- Bump `adm-zip` to 0.6.1 to mitigate [CVE-2026-76845](https://avd.aquasec.com/nvd/cve-2026-76845) and [CVE-2026-77301](https://avd.aquasec.com/nvd/cve-2026-77301)
+- Override `brace-expansion` to 1.1.21, 2.1.7, and 5.0.12 to mitigate [CVE-2026-102276](https://avd.aquasec.com/nvd/cve-2026-102276), [CVE-2026-102277](https://avd.aquasec.com/nvd/cve-2026-102277), and [CVE-2026-102278](https://avd.aquasec.com/nvd/cve-2026-102278). The copy bundled inside `aws-cdk-lib` is still 5.0.9 and will be updated when an `aws-cdk-lib` release includes the fix
+- Bump `compression` to 1.8.2 to mitigate [CVE-2026-87776](https://avd.aquasec.com/nvd/cve-2026-87776)
+- Bump `moment` to 2.31.0 to mitigate [CVE-2026-17495](https://avd.aquasec.com/nvd/cve-2026-17495)
+- Bump `morgan` to 1.12.1 to mitigate [CVE-2026-87859](https://avd.aquasec.com/nvd/cve-2026-87859). Container access logs now escape quotes in the Referer and User-Agent fields, so log metric filters that match raw quotes in those fields may need updating
+- Bump `proxy-addr` to 2.0.8 to mitigate [CVE-2026-90711](https://avd.aquasec.com/nvd/cve-2026-90711)
+- Bump `sharp` to 0.35.5 to mitigate [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w) in its bundled librsvg
+- Bump `source-map-js` to 1.2.2 to mitigate [CVE-2026-93749](https://avd.aquasec.com/nvd/cve-2026-93749)
+- Fix a potential ReDoS in the Lambda image handler where bucket names from the `SOURCE_BUCKETS` environment variable were used to build a regular expression. The `s3:` bucket tag is now matched literally, and invalid bucket names in `SOURCE_BUCKETS` are logged and ignored
+
 ## [8.1.1] - 2026-09-10
 
 ### Security
