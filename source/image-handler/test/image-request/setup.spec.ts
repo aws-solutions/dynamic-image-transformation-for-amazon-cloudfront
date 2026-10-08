@@ -606,6 +606,46 @@ describe("setup", () => {
       });
       expect(imageRequestInfo).toEqual(expectedResult);
     });
+
+    it("Should return image/tiff content type for a default request with toFormat tif", async () => {
+      // Arrange
+      const request = { bucket: "validBucket", key: "image.png", edits: { toFormat: "tif" } };
+      const event = { path: `/${Buffer.from(JSON.stringify(request)).toString("base64")}` };
+
+      // Mock
+      mockS3Commands.getObject.mockResolvedValue({ ContentType: "image/png", Body: mockImageBody });
+
+      // Act
+      const imageRequest = new ImageRequest(s3Client, secretProvider);
+      const imageRequestInfo = await imageRequest.setup(event);
+
+      // Assert
+      expect(imageRequestInfo.outputFormat).toEqual("tif");
+      expect(imageRequestInfo.contentType).toEqual("image/tiff");
+    });
+
+    it("Should return SVG image for a default request with no edits key", async () => {
+      // Arrange
+      const event = {
+        path: `/${Buffer.from(JSON.stringify({ bucket: "validBucket", key: "image.svg" })).toString("base64")}`,
+      };
+
+      // Mock
+      mockS3Commands.getObject.mockResolvedValue({
+        ContentType: "image/svg+xml",
+        Body: mockImageBody,
+      });
+
+      // Act
+      const imageRequest = new ImageRequest(s3Client, secretProvider);
+      const imageRequestInfo = await imageRequest.setup(event);
+
+      // Assert
+      expect(imageRequestInfo.requestType).toEqual("Default");
+      expect(imageRequestInfo.contentType).toEqual("image/svg+xml");
+      expect(imageRequestInfo.edits).toBeUndefined();
+      expect(imageRequestInfo.outputFormat).toBeUndefined();
+    });
   });
 
   it("Should pass and return the customer headers if custom headers are provided", async () => {

@@ -56,6 +56,7 @@ export class OriginDAO extends BaseDAO<DBOrigin, Origin> {
     return validateOriginItem(item);
   }
 
+  // The ORIGIN# prefix must match what MappingDAO.convertToDB writes to GSI2PK.
   private async mappingExists(id: string): Promise<boolean> {
     const data = await this.ddbDocClient.send(
       new QueryCommand({

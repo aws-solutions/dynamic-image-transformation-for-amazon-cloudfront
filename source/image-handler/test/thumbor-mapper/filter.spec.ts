@@ -144,6 +144,32 @@ describe("filter", () => {
     expect(edits).toEqual(expectedResult);
   });
 
+  it("Should map Thumbor:format(tif) to tiff", () => {
+    // Arrange
+    const edit = "filters:format(tif)";
+    const filetype = ImageFormatTypes.PNG;
+
+    // Act
+    const thumborMapper = new ThumborMapper();
+    const edits = thumborMapper.mapFilter(edit, filetype);
+
+    // Assert
+    expect(edits).toEqual({ toFormat: "tiff" });
+  });
+
+  it("Should map Thumbor:quality() on a tif file to tiff quality", () => {
+    // Arrange
+    const edit = "filters:quality(50)";
+    const filetype = "tif" as ImageFormatTypes;
+
+    // Act
+    const thumborMapper = new ThumborMapper();
+    const edits = thumborMapper.mapFilter(edit, filetype);
+
+    // Assert
+    expect(edits).toEqual({ tiff: { quality: 50 } });
+  });
+
   it("Should return undefined if an accepted file format is not specified", () => {
     // Arrange
     const edit = "filters:format(test)";

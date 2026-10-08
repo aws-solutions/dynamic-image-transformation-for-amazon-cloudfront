@@ -77,7 +77,7 @@
         },
         "format": {
           "type": "string",
-          "enum": ["auto", "jpg", "jpeg", "heic", "png", "raw", "tiff", "webp", "gif", "avif"]
+          "enum": ["auto", "jpg", "jpeg", "heic", "png", "raw", "tif", "tiff", "webp", "gif", "avif"]
         },
         "autosize": {
           "type": "object",

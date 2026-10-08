@@ -10,6 +10,8 @@ export class UrlBuilder {
     return originResult.originDomain + path;
   }
 
+  // originPath is spliced in before the filename and the request's directory prefix is kept
+  // (/a/img.png + /o -> /a/o/img.png). Pinned by url-builder.test.ts; changing it breaks deployed originPath users.
   private static buildFullPath(requestPath: string, originResult: OriginConfiguration): string {
     const { directory, filename } = this.splitPath(requestPath);
     const startsWithSlash = requestPath.startsWith('/');

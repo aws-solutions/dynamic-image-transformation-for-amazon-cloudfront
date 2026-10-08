@@ -19,8 +19,9 @@ const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
 // Mock S3Client
 jest.mock('@aws-sdk/client-s3');
-import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 const mockS3Send = jest.fn();
+const TEST_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 
 describe('RequestResolverService Integration Tests', () => {
   const testTableName = 'test-request-resolver-table';
@@ -51,16 +52,19 @@ describe('RequestResolverService Integration Tests', () => {
     requestResolver = RequestResolverService.getInstance();
     
     // Mock fetch responses for HTTP origins
-    mockFetch.mockResolvedValue({
+    mockFetch.mockImplementation(async () => ({
       ok: true,
       status: 200,
       headers: new Headers({ 'content-type': 'image/jpeg' }),
-    } as Response);
+      arrayBuffer: async () => new Uint8Array(TEST_JPEG).buffer,
+      body: { cancel: async () => {} },
+    } as unknown as Response));
 
     // Mock S3Client responses by default
-    mockS3Send.mockResolvedValue({
-      ContentType: 'image/jpeg'
-    });
+    mockS3Send.mockImplementation(async () => ({
+      ContentType: 'image/jpeg',
+      Body: { transformToByteArray: async () => new Uint8Array(TEST_JPEG) }
+    }));
     (S3Client as jest.MockedClass<typeof S3Client>).prototype.send = mockS3Send;
   });
 
@@ -124,7 +128,9 @@ describe('RequestResolverService Integration Tests', () => {
 
       // Should use host mapping (cdn.example.com) instead of path mapping (/images/*)
       expect(imageRequest.origin?.url).toBeDefined();
-      expect(mockS3Send).toHaveBeenCalled();
+      // One GetObject both validates the origin and returns the bytes
+      expect(mockS3Send).toHaveBeenCalledTimes(1);
+      expect(imageRequest.sourceImage?.buffer.equals(TEST_JPEG)).toBe(true);
     });
 
     test('should resolve request using path mapping when host mapping fails', async () => {

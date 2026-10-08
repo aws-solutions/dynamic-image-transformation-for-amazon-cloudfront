@@ -907,4 +907,10 @@ describe("Transformation Policy Validation", () => {
       });
     });
   });
+
+  describe("format", () => {
+    it("accepts tif as an alias for tiff", () => {
+      expect(transformationSchemas.format.safeParse("tif").success).toBe(true);
+    });
+  });
 });

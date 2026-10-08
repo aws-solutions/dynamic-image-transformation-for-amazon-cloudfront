@@ -47,10 +47,6 @@ describe('ImageProcessorService LIMIT_INPUT_PIXELS', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = ImageProcessorService.getInstance();
-    jest.spyOn(service['originFetcher'], 'fetchImage').mockResolvedValue({
-      buffer: TEST_JPEG_BUFFER,
-      metadata: { size: TEST_JPEG_BUFFER.length, format: 'jpeg' }
-    });
   });
 
   afterEach(() => {
@@ -66,7 +62,8 @@ describe('ImageProcessorService LIMIT_INPUT_PIXELS', () => {
     timestamp: Date.now(),
     origin: { url: 'https://example.com/image.jpg' },
     transformations: [{ type: 'resize', value: { width: 50 }, source: 'url' }],
-    response: { headers: {} }
+    response: { headers: {} },
+    sourceImage: { buffer: TEST_JPEG_BUFFER, contentType: 'image/jpeg', format: 'jpeg', fetchDurationMs: 1 }
   });
 
   it.each([

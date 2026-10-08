@@ -6,7 +6,7 @@ import { App } from "aws-cdk-lib";
 
 import { ServerlessImageHandlerStack } from "../lib/serverless-image-stack";
 
-const SUPPORTED_RUNTIMES = ["nodejs22.x", "python3.13"];
+const SUPPORTED_RUNTIMES = ["nodejs24.x", "python3.13"];
 
 describe("ServerlessImageHandlerStack", () => {
   let app: App;

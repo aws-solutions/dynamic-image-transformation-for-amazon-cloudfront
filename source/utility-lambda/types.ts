@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { DynamoDBStreamEvent, ScheduledEvent } from "aws-lambda";
+import { DynamoDBStreamEvent } from "aws-lambda";
 
-export type SupportedEvent = DynamoDBStreamEvent | ScheduledEvent;
+export type SupportedEvent = DynamoDBStreamEvent;
 
 export interface UtilityHandler {
   canHandle(event: SupportedEvent): boolean;

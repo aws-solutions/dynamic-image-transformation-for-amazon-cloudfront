@@ -4,7 +4,6 @@
 import { Request } from 'express';
 import { Transformation } from '../../../types/transformation';
 import { transformationSchemas } from '@dit/data-models';
-import { transformationParsers } from './transformation-parsers';
 
 export function extractUrlTransformations(req: Request, requestId: string): Transformation[] {
   try {
@@ -38,12 +37,10 @@ export function extractUrlTransformations(req: Request, requestId: string): Tran
     }
     // Process each transformation type
     for (const [transformationType, transformationParams] of Object.entries(transformationGroups)) {      
-      const parser = transformationParsers[transformationType as keyof typeof transformationParsers];
       const schema = transformationSchemas[transformationType as keyof typeof transformationSchemas];
-            
-      if (parser && schema) {
-        const parsedValue = parser(transformationParams);        
-        const validation = schema.safeParse(parsedValue);
+
+      if (schema) {
+        const validation = schema.safeParse(transformationParams);
         
         if (validation.success) {
           transformations.push({

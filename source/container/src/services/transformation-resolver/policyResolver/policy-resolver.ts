@@ -25,6 +25,8 @@ export class PolicyResolver {
 
   async resolvePolicy(req: Request, imageRequest: ImageProcessingRequest): Promise<TransformationPolicy | null> {
     // 1. URL parameter (highest precedence)
+    // A URL policyId replaces the mapping policy wholesale; the tighten-only moderation merge applies only between a
+    // policy and URL transformations, never across two policies.
     const urlPolicyId = req.query.policyId as string;
     if (urlPolicyId) {
       const policy = await this.policyCache.getPolicy(urlPolicyId);
@@ -50,6 +52,7 @@ export class PolicyResolver {
     }
 
     // 3. Default policy
+    // Only one isDefault policy is expected; if several exist, the last one loaded by PolicyCache.warmCache() wins.
     const defaultPolicy = await this.policyCache.getDefault();
     if (defaultPolicy) {
       this.logPolicyResolution(imageRequest.requestId, 'default', defaultPolicy);

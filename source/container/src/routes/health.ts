@@ -29,6 +29,8 @@ router.get('/', async (req: Request, res: Response) => {
     return res.status(200).json(healthResponse);
   }
 
+  // Every non-HEALTHY state returns 503: the ALB health check on /health is what keeps traffic off tasks whose
+  // caches are not warm yet (app.ts does not wait for initialization).
   if (status === 'INITIALIZING') {
     return res.status(503).json({
       ...baseResponse,

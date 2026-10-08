@@ -3,8 +3,8 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal AS builder
 
 WORKDIR /app
 
-# Install Node.js 20 (minimal image excludes Python, eliminating pip/setuptools CVEs from SBOM)
-RUN dnf install -y nodejs20 nodejs20-npm && \
+# Install Node.js 24 (minimal image excludes Python, eliminating pip/setuptools CVEs from SBOM)
+RUN dnf install -y nodejs24 nodejs24-npm && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -31,8 +31,8 @@ RUN npm run build --workspace=data-models && \
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal AS deps
 WORKDIR /app
 
-# Install Node.js 20 and findutils (for dependency cleanup below)
-RUN dnf install -y nodejs20 nodejs20-npm findutils && \
+# Install Node.js 24 and findutils (for dependency cleanup below)
+RUN dnf install -y nodejs24 nodejs24-npm findutils && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -61,8 +61,8 @@ RUN npm ci --workspaces --omit=dev --no-audit --no-fund && \
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023-minimal
 WORKDIR /app
 
-# Install Node.js 20 runtime and shadow-utils for user management
-RUN dnf install -y nodejs20 shadow-utils && \
+# Install Node.js 24 runtime and shadow-utils for user management
+RUN dnf install -y nodejs24 shadow-utils && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 

@@ -11,7 +11,9 @@ export class SharpUtils {
   ]; 
 
   static isAllowedTransformation(type: string): boolean {
-    if (!this.ALLOWED_TRANSFORMATIONS.includes(type)) {console.log(`The following transformation: ${type}, was blocked from being applied`)}
+    if (!this.ALLOWED_TRANSFORMATIONS.includes(type)) {
+      console.log(JSON.stringify({ component: 'SharpUtils', operation: 'transformation_blocked', transformationType: type }));
+    }
     return this.ALLOWED_TRANSFORMATIONS.includes(type);
   }
 
@@ -36,6 +38,7 @@ export class SharpUtils {
         return 'png';
       case 'webp':
         return 'webp';
+      case 'tif':
       case 'tiff':
         return 'tiff';
       case 'heif':

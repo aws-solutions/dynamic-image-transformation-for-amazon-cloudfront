@@ -6,7 +6,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-ecs": "^3.993.0",
-    "@aws-sdk/client-cloudwatch": "^3.993.0",
     "@types/aws-lambda": "^8.10.0"
   },
   "devDependencies": {
@@ -21,10 +20,18 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "roots": [
-      "<rootDir>/test"
+      "<rootDir>"
     ],
     "testMatch": [
       "**/*.test.ts"
+    ],
+    "collectCoverageFrom": [
+      "**/*.ts",
+      "!test/**",
+      "!**/*.test.ts",
+      "!**/*.d.ts",
+      "!jest.config.js",
+      "!**/node_modules/**"
     ],
     "coverageReporters": [
       "text",
@@ -38,7 +45,7 @@
   },
   "overrides": {
     "minimatch@3": "3.1.5",
-    "brace-expansion@1": "1.1.18",
+    "brace-expansion@1": "1.1.21",
     "handlebars": "4.7.9",
     "picomatch@2": "2.3.2",
     "picomatch@4": "4.0.4",

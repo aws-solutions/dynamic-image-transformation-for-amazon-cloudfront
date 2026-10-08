@@ -16,8 +16,8 @@ export class SecretProvider {
 
   /**
    * Returns the secret associated with the secret ID.
-   * Note: method caches the secret associated with `secretId` and makes a call to SecretManager
-   * in case if the `secretId` changes, i.e. when SECRETS_MANAGER environment variable values changes.
+   * Cached for the life of the execution environment with no TTL; only a changed `secretId` refetches, so a rotated
+   * secret VALUE is not seen until the Lambda execution environment is recycled.
    * @param secretId The secret ID.
    * @returns Secret associated with the secret ID.
    */

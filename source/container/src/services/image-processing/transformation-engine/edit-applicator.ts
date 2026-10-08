@@ -30,7 +30,9 @@ export class EditApplicator {
         await ContentModerationService.getInstance().execute(image, edits.contentModeration);
       }
 
-      // For efficiency we attempt resizing prior to other image transformations. Certain transforms will defer resizing (watermark, crop, etc)
+      // Resize runs first for efficiency, but is deferred to after the loop when extract or composite is present:
+      // extract coordinates and watermark offsets/ratios refer to source dimensions. Sharp keeps only the last
+      // resize(), so it is set once.
       await this.applyResize(image, edits);
 
       for (const [operation, value] of Object.entries(edits)) {
@@ -55,7 +57,6 @@ export class EditApplicator {
               break;
             default:
               if (SharpUtils.isAllowedTransformation(operation)) {
-                console.log("Apply Edit Base case for: ", operation, " with value: ", value);
                 image[operation](value);
               }
               break;
@@ -166,6 +167,8 @@ export class EditApplicator {
     const targetOrigin = url.host;
     
     const originCache = CacheRegistry.getInstance().getOriginCache();
+    // Overlay allowlist: url.host must equal a registered originDomain exactly (no subdomain or prefix match).
+    // The overlay fetch below sends no originHeaders.
     const origins = await originCache.getContents();
     const origin = origins.find(o => o.originDomain === targetOrigin);
     if (!origin) {

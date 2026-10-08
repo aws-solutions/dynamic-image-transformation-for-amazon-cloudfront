@@ -17,6 +17,7 @@ export class QueryParamMapper {
     rotate: { path: [], key: "rotate", transform: stringToNullInt },
     flip: { path: [], key: "flip", transform: stringToBoolean },
     flop: { path: [], key: "flop", transform: stringToBoolean },
+    // Sharp's method is greyscale(); grayscale is accepted as the public alias.
     grayscale: { path: [], key: "greyscale", transform: stringToBoolean },
     greyscale: { path: [], key: "greyscale", transform: stringToBoolean },
   };
@@ -24,8 +25,7 @@ export class QueryParamMapper {
   public static readonly QUERY_PARAM_KEYS = Object.keys(this.QUERY_PARAM_MAPPING);
 
   /**
-   * Initializer function for creating a new Thumbor mapping, used by the image
-   * handler to perform image modifications based on legacy URL path requests.
+   * Maps the supported query parameters (QUERY_PARAM_MAPPING) to image edits.
    * @param queryParameters The query parameter provided alongside the request.
    * @returns Image edits included due to the provided query parameter.
    */
@@ -37,6 +37,7 @@ export class QueryParamMapper {
       const result: Result = {};
 
       Object.entries(queryParameters).forEach(([param, value]) => {
+        // Params not in QUERY_PARAM_MAPPING are dropped silently, not rejected.
         if (value !== undefined && QueryParamMapper.QUERY_PARAM_MAPPING[param]) {
           const { path, key, transform } = QueryParamMapper.QUERY_PARAM_MAPPING[param];
 

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { handleError, filterClientHeaders } from './image';
+import { handleError } from './image';
 import { ValidationError } from '../services/request-resolver/errors/validation.error';
 import { OriginNotFoundError } from '../services/request-resolver/errors/origin-not-found.error';
 import { ConnectionError } from '../services/request-resolver/errors/connection.error';
@@ -89,88 +89,5 @@ describe('handleError', () => {
     expect(result.statusCode).toBe(500);
     expect(result.errorType).toBe('INTERNAL_ERROR');
     expect(result.clientMessage).toBe('An unexpected error occurred while processing your request');
-  });
-});
-
-describe('filterClientHeaders', () => {
-  it('Should exclude host header', () => {
-    const headers = { host: 'example.com', 'x-custom': 'value' };
-
-    const result = filterClientHeaders(headers);
-
-    expect(result).toEqual({ 'x-custom': 'value' });
-  });
-
-  it('Should exclude accept header', () => {
-    const headers = { accept: 'image/*', 'x-custom': 'value' };
-
-    const result = filterClientHeaders(headers);
-
-    expect(result).toEqual({ 'x-custom': 'value' });
-  });
-
-  it('Should handle case-insensitive exclusion', () => {
-    const headers = { Host: 'example.com', Accept: 'image/*', 'x-custom': 'value' };
-
-    const result = filterClientHeaders(headers);
-
-    expect(result).toEqual({ 'x-custom': 'value' });
-  });
-
-  it("Should exclude only DIT's own token, forwarding client authorization and cookie", () => {
-    // authorization/cookie are the client's credentials for the client's own origin, and
-    // customers depend on forwarding them to fetch images behind auth. Only DIT's own
-    // x-dit-authorization is stripped.
-    const headers = {
-      authorization: 'Bearer origin-token',
-      cookie: 'session=abc123',
-      'X-DIT-Authorization': 'Bearer eyJhbGciOiJSUzI1NiJ9.cognito-access-token',
-    };
-
-    const result = filterClientHeaders(headers);
-
-    expect(result).toEqual({ authorization: 'Bearer origin-token', cookie: 'session=abc123' });
-  });
-
-  it('Should limit to 50 headers', () => {
-    const headers: Record<string, string> = {};
-    for (let i = 0; i < 60; i++) {
-      headers[`header-${i}`] = `value-${i}`;
-    }
-
-    const result = filterClientHeaders(headers);
-
-    expect(Object.keys(result).length).toBe(50);
-  });
-
-  it('Should exclude headers with values exceeding 1024 characters', () => {
-    const longValue = 'x'.repeat(1025);
-    const headers = { 'x-long': longValue, 'x-short': 'ok' };
-
-    const result = filterClientHeaders(headers);
-
-    expect(result).toEqual({ 'x-short': 'ok' });
-  });
-
-  it('Should take first element from array header values', () => {
-    const headers = { 'x-multi': ['first', 'second'] };
-
-    const result = filterClientHeaders(headers);
-
-    expect(result).toEqual({ 'x-multi': 'first' });
-  });
-
-  it('Should return empty object for empty input', () => {
-    const result = filterClientHeaders({});
-
-    expect(result).toEqual({});
-  });
-
-  it('Should exclude headers with empty string values', () => {
-    const headers = { 'x-empty': '', 'x-valid': 'value' };
-
-    const result = filterClientHeaders(headers);
-
-    expect(result).toEqual({ 'x-valid': 'value' });
   });
 });

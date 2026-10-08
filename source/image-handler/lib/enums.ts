@@ -23,6 +23,7 @@ export enum ImageFormatTypes {
   PNG = "png",
   WEBP = "webp",
   TIFF = "tiff",
+  TIF = "tif",
   HEIF = "heif",
   HEIC = "heic",
   RAW = "raw",

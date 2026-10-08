@@ -1,55 +1,8 @@
 # Management Lambda
 
-A TypeScript-based AWS Lambda function that provides management API operations for the Dynamic Image Transformation solution. This lambda implements a layered architecture pattern with service and data access object layers for managing transformation policies, origins, and mappings.
+A TypeScript AWS Lambda function that serves the v8 management API. The admin UI uses it to create, read, update and delete transformation policies, origins, and mappings, which it stores in the DynamoDB config table.
 
-### Entry Point ([./index.ts](./index.ts))
-
-The Lambda handler uses the Middy middleware framework for request processing:
-
-```typescript
-export const handler = middy()
-  .use(httpHeaderNormalizer()) // Normalize HTTP headers
-  .use(cors()) // Enable CORS
-  .use(httpSecurityHeaders()) // Add security headers
-  .use(errorHandler()) // Custom error handling middleware
-  .handler(httpRouterHandler(routes));
-```
-
-**Middleware Stack**:
-
-- **Header Normalization**: Ensures consistent header casing
-- **CORS**: Enables cross-origin requests for web clients
-- **Security Headers**: Adds standard security headers (CSP, HSTS, etc.)
-- **Error Handler**: Converts exceptions to proper API Gateway responses
-- **Router**: Routes requests to appropriate handlers based on method and path
-
-### Route Definitions ([./routes.ts](./routes.ts))
-
-Defines all API endpoints with their HTTP methods, paths, and handler functions:
-
-```typescript
-export const routes: {
-  method: Method;
-  path: string;
-  handler: LambdaHandler;
-}[] = [
-  // Transformation Policies
-  { method: "GET", path: "/policies", handler: ... },
-  { method: "POST", path: "/policies", handler: ... },
-  { method: "GET", path: "/policies/{policyId}", handler: ... },
-  // ... Origins and Mappings routes
-];
-```
-
-**Service Initialization**:
-
-- Creates DynamoDB DocumentClient with optimized configuration
-- Initializes service instances (PolicyService, OriginService, MappingService)
-- Each route handler accesses pre-initialized services
-
-## Architecture
-
-The implementation follows a layered architecture pattern:
+## How a request flows
 
 ```
 ┌─────────────────┐
@@ -57,7 +10,7 @@ The implementation follows a layered architecture pattern:
 └─────────┬───────┘
           │
 ┌─────────▼───────┐
-│ Lambda Handler  │  ← Entry point and request router
+│ Lambda Handler  │  ← Middleware chain and router
 └─────────┬───────┘
           │
 ┌─────────▼───────┐
@@ -65,76 +18,48 @@ The implementation follows a layered architecture pattern:
 └─────────┬───────┘
           │
 ┌─────────▼───────┐
-│   DAO Layer     │  ← Data access & transformation
+│   DAO Layer     │  ← Data access & item validation
 └─────────┬───────┘
           │
 ┌─────────▼───────┐
-│   DynamoDB      │  ← Data persistence
+│   DynamoDB      │  ← Config table
 └─────────────────┘
 ```
 
-## APIs
+API Gateway invokes the handler in [index.ts](./index.ts). It is a [Middy](https://middy.js.org/) chain. In order, it adds the Lambda context and request ID to log lines, normalizes headers, applies CORS for `CORS_ORIGIN`, adds security headers, parses JSON bodies on POST and PUT (invalid JSON returns 415 `INVALID_JSON`), turns thrown errors into API responses, and marks responses `no-store`. The router then dispatches to the handler in [routes.ts](./routes.ts).
 
-All list endpoints support pagination via `nextToken` query parameter and return responses in the format:
+Each resource then passes through two layers:
 
-```json
-{
-  "items": [...],
-  "nextToken": "optional-token-for-next-page"
-}
+| Layer | Folder | Job |
+|-------|--------|-----|
+| Service | [services/](./services/) | Validates requests against the shared Zod schemas in [data-models](../data-models/README.md) and applies business rules |
+| DAO | [dao/](./dao/) | Reads and writes DynamoDB, validating items on both read and write. Common operations live in `base-dao.ts` |
+
+To add a resource, follow the pattern of an existing one: a DAO extending `BaseDAO`, a service extending `BaseService`, and routes in `routes.ts`.
+
+## API
+
+The full contract is the OpenAPI spec, [open-api-spec.yaml](../constructs/lib/v8/constructs/dal/open-api-spec.yaml). The routes are defined in [routes.ts](./routes.ts).
+
+| Resource | Collection | Item |
+|----------|------------|------|
+| Transformation policies | `GET`, `POST /policies` | `GET`, `PUT`, `DELETE /policies/{policyId}` |
+| Origins | `GET`, `POST /origins` | `GET`, `PUT`, `DELETE /origins/{originId}` |
+| Mappings | `GET`, `POST /mappings` | `GET`, `PUT`, `DELETE /mappings/{mappingId}` |
+
+List endpoints return `{ "items": [...], "nextToken": "..." }`. Pass `nextToken` back as a query parameter to get the next page. Tokens are encrypted with a key from Secrets Manager (`PAGINATION_TOKEN_SECRET_ARN`) and bound to the account (`ACCOUNT_ID`), so clients must treat them as opaque.
+
+Errors are classes in [common/error.ts](./common/error.ts), each mapped to a status code (400, 404, 415, 429, 500) and an error code from the same file.
+
+## Storage
+
+The config table uses a single-table design. The API request and response types come from [data-models](../data-models/README.md); the DynamoDB item schemas are in [interfaces/types.ts](./interfaces/types.ts).
+
+**Generic entity structure**
+
 ```
-
-### Transformation Policies
-
-Manage image transformation policies that define how images are processed.
-
-- `GET /policies?nextToken={token}` - List all transformation policies (paginated)
-- `POST /policies` - Create new transformation policy with JSON configuration
-- `GET /policies/{policyId}` - Get specific transformation policy details
-- `PUT /policies/{policyId}` - Update existing transformation policy
-- `DELETE /policies/{policyId}` - Delete transformation policy
-
-### Origins
-
-Manage origin configurations that define source locations for images.
-
-- `GET /origins?nextToken={token}` - List all configured origins (paginated)
-- `POST /origins` - Create new origin
-- `GET /origins/{originId}` - Get specific origin configuration
-- `PUT /origins/{originId}` - Update existing origin configuration
-- `DELETE /origins/{originId}` - Delete origin configuration
-
-### Mappings
-
-Manage path-based or host-header based routing to map requests to specific origins.
-
-- `GET /mappings?nextToken={token}` - List all mappings (paginated)
-- `POST /mappings` - Create new mapping
-- `GET /mappings/{mappingId}` - Get specific mapping details
-- `PUT /mappings/{mappingId}` - Update existing mapping
-- `DELETE /mappings/{mappingId}` - Delete mapping
-
-## Data Models
-
-Data models support the domain objects Origins, Transformation Policies, Mappings on API request/response and DynamoDB
-
-### Domain Objects
-
-Type definitions for domain objects that are used in API request/response are defined under `../data-models/`:
-
-- [TransformationPolicy](../data-models/transformation-policy.ts)
-- [Origin](../data-models/origin.ts)
-- [Mapping](../data-models/mappings.ts)
-
-### DynamoDB Schema
-
-The schema/type definitions are in [types.ts](./interfaces/types.ts). The implementation uses a single-table design with multiple entity types.
-
-**Generic Entity Structure**
-
-```bash
 {
-  PK: "{entityId}",    // Primary Key
+  PK: "{entityId}",                  // Primary key
   GSI1PK: "{ENTITY_TYPE}",           // Entity type for listing
   GSI1SK: "{sortableField}",         // Sort key (name, pattern, etc.)
   CreatedAt: "ISO_DATE_STRING",      // Creation timestamp
@@ -145,9 +70,9 @@ The schema/type definitions are in [types.ts](./interfaces/types.ts). The implem
 }
 ```
 
-**Transformation Policy**
+**Transformation policy**
 
-```bash
+```
 {
   PK: "{policyId}",
   GSI1PK: "POLICY",
@@ -164,7 +89,7 @@ The schema/type definitions are in [types.ts](./interfaces/types.ts). The implem
 
 **Origin**
 
-```bash
+```
 {
   PK: "{originId}",
   GSI1PK: "ORIGIN",
@@ -180,7 +105,7 @@ The schema/type definitions are in [types.ts](./interfaces/types.ts). The implem
 
 **Mapping**
 
-```bash
+```
 {
   PK: "{mappingId}",
   GSI1PK: "PATH_MAPPING" | "HOST_HEADER_MAPPING",
@@ -188,138 +113,40 @@ The schema/type definitions are in [types.ts](./interfaces/types.ts). The implem
   GSI2PK: "ORIGIN#{originId}",       // For querying by origin
   GSI3PK?: "POLICY#{policyId}",      // For querying by policy
   Data: {
+    mappingName: string,
+    description?: string,
     originId: string,
     policyId?: string
   }
 }
 ```
 
-## Code Patterns
-
-### Base Classes
-
-#### BaseDAO [base-dao.ts](./dao/base-dao.ts)
-
-Abstract base class providing common DynamoDB operations:
-
-- Generic CRUD operations (create, read, update, delete, list) on DynamoDB
-- Data validation using Zod schemas with **reads** and **writes**
-- Type-safe operations with generics
-
-#### BaseService [base-service.ts](./services/base-service.ts)
-
-Abstract base class providing common business logic:
-
-- Request validation using Zod schemas
-- Type-safe operations with generics
-
-### Error Handling
-
-#### Structured Error System (`common/error.ts`)
-
-- **ManagementApiError**: Base error class with API Gateway response formatting
-- **BadRequestError**: 400 errors with specific error codes
-- **NotFoundError**: 404 errors for missing resources
-- **InternalServerError**: 500 errors for system failures
-
-#### Error Codes
-
-```typescript
-const ErrorCodes = {
-  BAD_REQUEST: "BAD_REQUEST",
-  INVALID_JSON: "INVALID_JSON",
-  MISSING_REQUIRED_FIELD: "MISSING_REQUIRED_FIELD",
-  INVALID_FIELD_VALUE: "INVALID_FIELD_VALUE",
-  NOT_FOUND: "NOT_FOUND",
-  POLICY_NOT_FOUND: "POLICY_NOT_FOUND",
-  ORIGIN_NOT_FOUND: "ORIGIN_NOT_FOUND",
-  INTERNAL_SERVER_ERROR: "INTERNAL_SERVER_ERROR",
-};
-```
-
 ## Testing
 
-### Unit Tests
-
 ```bash
-# Run all unit tests
+# Unit tests
 npm test
-
-# Run specific test file
 npm test -- transformation-policy-dao.test.ts
 
-```
-
-### End-to-End Tests
-
-```bash
-# Run all E2E tests (requires AWS credentials and deployed stack)
-CURRENT_STACK_REGION={myRegion} CURRENT_STACK_NAME={myStackName} npm run test:e2e
-
-# Run specific E2E test suite
+# End-to-end tests against a deployed stack
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run test:e2e
 CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run test:e2e -- policies.test.ts
 
-# Run negative/authorization tests only
-CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run test:e2e -- negative.test.ts
+# Throttling tests (excluded from test:e2e; leaves the API's throttling in place)
+CURRENT_STACK_REGION=us-east-1 CURRENT_STACK_NAME=my-stack npm run test:e2e:throttling
 ```
 
-**E2E Test Requirements**:
+The end-to-end tests need a deployed stack and local AWS credentials with DynamoDB, Cognito and CloudFormation permissions. They live in [test/e2e/](./test/e2e/).
 
-- Deployed stack
-- Local AWS credentials with permissions for DynamoDB, Cognito, and CloudFormation
-- Environment variables: `CURRENT_STACK_REGION` and `CURRENT_STACK_NAME`
+## Configuration
 
-## Project Structure
+| Name | Read in | What it does | Set by CDK |
+|------|---------|--------------|------------|
+| `CONFIG_TABLE_NAME` | `routes.ts`, `dao/base-dao.ts` | DynamoDB config table | Yes, `constructs/lib/v8/constructs/dal/dal-construct.ts` |
+| `ACCOUNT_ID` | `dao/base-dao.ts` | AWS account ID that pagination tokens are bound to. Required | Yes, `dal-construct.ts` |
+| `CORS_ORIGIN` | `index.ts` | Allowed CORS origin | Yes, the admin UI CloudFront URL, `dal-construct.ts` |
+| `PAGINATION_TOKEN_SECRET_ARN` | `common/pagination-token-service.ts` | Secrets Manager secret used to encrypt and validate `nextToken` values | Yes, `dal-construct.ts` |
+| `POWERTOOLS_LOGGER_LOG_LEVEL` | `common/logger.ts` | Log level. Default `INFO` | Yes, `INFO`, `dal-construct.ts` |
+| `SOLUTION_ID`, `SOLUTION_VERSION` | `../solution-utils/get-options.ts` | Adds the solution to the AWS SDK user agent | Yes, `constructs/lib/v8/constructs/common/lambda.ts` |
 
-```
-management-lambda/
-├── dao/                                  # Data Access Objects
-│   ├── base-dao.ts                       # Abstract base DAO with common operations
-│   ├── transformation-policy-dao.ts      # Policy data access layer
-│   ├── origin-dao.ts                     # Origin data access layer
-│   ├── mapping-dao.ts                    # Mapping data access layer
-│   └── index.ts                          # DAO exports
-├── services/                             # Business logic layer
-│   ├── base-service.ts                   # Abstract base service with common operations
-│   ├── transformation-policy-service.ts  # Policy service
-│   ├── origin-service.ts                 # Origin service
-│   ├── mapping-service.ts                # Mapping service
-│   └── index.ts                          # Service exports
-├── interfaces/                           # Type definitions and interfaces
-│   ├── types.ts                          # DynamoDB entity types and validators
-│   ├── dao.ts                            # DAO interface definitions
-│   ├── service.ts                        # Service interface definitions
-│   └── index.ts                          # Interface exports
-├── common/                               # Shared utilities and error handling
-│   ├── error.ts                          # Custom error classes and error codes
-│   ├── utils.ts                          # Common utility functions
-│   └── index.ts                          # Common exports
-├── test/                                 # Test files
-│   ├── mocks.ts                          # Test mocks and fixtures
-│   ├── setupJestMocks.ts                 # Jest setup configuration
-│   ├── transformation-policy/            # Policy-related unit tests
-│   │   └── transformation-policy-dao.test.ts
-│   ├── origin/                           # Origin-related unit tests
-│   │   ├── origin-dao.test.ts
-│   │   └── origin-service.test.ts
-│   ├── mapping/                          # Mapping-related unit tests
-│   │   └── mapping-dao.test.ts
-│   └── e2e/                              # End-to-end integration tests
-│       ├── global-setup.ts               # E2E test setup (DynamoDB, Cognito)
-│       ├── global-teardown.ts            # E2E test cleanup
-│       ├── dynamodb-client.ts            # DynamoDB test utilities
-│       ├── cognito-client.ts             # Cognito test utilities
-│       ├── cfn-client.ts                 # CloudFormation test utilities
-│       ├── utils.ts                      # E2E test helper functions
-│       ├── negative.test.ts              # Authorization & error handling tests
-│       ├── policies.test.ts              # Policy CRUD operations tests
-│       ├── origins.test.ts               # Origin CRUD operations tests
-│       └── mappings.test.ts              # Mapping CRUD operations tests
-├── index.ts                              # Lambda entry point with middleware
-├── routes.ts                             # API route definitions and handlers
-├── package.json                          # Dependencies and scripts
-├── tsconfig.json                         # TypeScript configuration
-├── jest.unit.config.js                   # Jest unit test configuration
-├── jest.e2e.config.js                    # Jest E2E test configuration
-└── README.md                             # This file
-```
+The end-to-end tests read `CURRENT_STACK_REGION` and `CURRENT_STACK_NAME`.

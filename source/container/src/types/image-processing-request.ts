@@ -15,7 +15,6 @@ export interface SmartCropMetrics {
 export interface LatencyMetrics {
   originFetchMs: number;
   transformationApplicationMs: number;
-  requestResolutionMs: number;
   transformationResolutionMs: number;
   totalRequestMs: number;
 }
@@ -33,9 +32,14 @@ export interface ImageProcessingRequest {
   requestId: string;
   timestamp: number;
   sourceImageContentType?: string;
-  
-  // Client headers to forward to origin
-  clientHeaders?: Record<string, string>;
+
+  // Origin image, fetched once during request resolution (populated by ConnectionManager)
+  sourceImage?: {
+    buffer: Buffer;
+    contentType: string;
+    format?: string;
+    fetchDurationMs: number;
+  };
   
   // Origin information (populated by RequestResolver)
   origin?: {
@@ -61,9 +65,6 @@ export interface ImageProcessingRequest {
 
   // Timing data (populated throughout request lifecycle)
   timings?: {
-    requestResolution?: {
-      preflightValidationMs?: number;
-    };
     transformationResolution?: {
       startMs: number;
       endMs?: number;

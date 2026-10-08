@@ -599,7 +599,7 @@ Temporary Password: <strong>{####}</strong>
         "Environment": {
           "Variables": {
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.1",
+            "SOLUTION_VERSION": "v8.1.2",
           },
         },
         "Handler": "index.handler",
@@ -615,7 +615,7 @@ Temporary Password: <strong>{####}</strong>
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Timeout": 30,
       },
       "Type": "AWS::Lambda::Function",
@@ -1177,7 +1177,7 @@ Temporary Password: <strong>{####}</strong>
             "POWERTOOLS_LOGGER_LOG_EVENT": "false",
             "POWERTOOLS_LOGGER_LOG_LEVEL": "INFO",
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.1",
+            "SOLUTION_VERSION": "v8.1.2",
           },
         },
         "Handler": "index.handler",
@@ -1193,7 +1193,7 @@ Temporary Password: <strong>{####}</strong>
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Timeout": 30,
       },
       "Type": "AWS::Lambda::Function",
@@ -2244,7 +2244,7 @@ Temporary Password: <strong>{####}</strong>
         "Environment": {
           "Variables": {
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.1",
+            "SOLUTION_VERSION": "v8.1.2",
           },
         },
         "Handler": "index.handler",
@@ -2260,7 +2260,7 @@ Temporary Password: <strong>{####}</strong>
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Timeout": 30,
       },
       "Type": "AWS::Lambda::Function",

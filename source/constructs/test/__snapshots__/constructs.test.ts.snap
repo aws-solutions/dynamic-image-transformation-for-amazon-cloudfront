@@ -935,7 +935,7 @@ function processQueryParams(querystring) {
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Tags": [
           {
             "Key": "SolutionId",
@@ -2153,7 +2153,7 @@ function processQueryParams(querystring) {
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Tags": [
           {
             "Key": "SolutionId",
@@ -2868,7 +2868,7 @@ function handler(event) {
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Tags": [
           {
             "Key": "SolutionId",
@@ -3294,7 +3294,7 @@ function handler(event) {
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Tags": [
           {
             "Key": "SolutionId",

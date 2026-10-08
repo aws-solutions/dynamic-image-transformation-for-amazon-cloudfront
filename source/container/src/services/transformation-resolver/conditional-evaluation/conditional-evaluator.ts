@@ -19,7 +19,6 @@ export function evaluateConditionals(transformations: Transformation[], req: Req
 
 function evaluateCondition(conditional: TransformationConditional, req: Request): boolean {
   const targetValue = req.get(conditional.target);
-  console.log(`Evaluating: `, conditional, "AGAINST", targetValue);
   
   switch (conditional.operator) {
     case 'equals':
@@ -39,7 +38,6 @@ function evaluateEquals(targetValue: string | undefined, expectedValue: string |
     return expectedValue.some(val => val === targetValue);
   }
   
-  console.log("Conditional is: ", expectedValue === targetValue);
   return expectedValue === targetValue;
 }
 

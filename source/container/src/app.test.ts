@@ -96,3 +96,12 @@ describe('app global error handler', () => {
     expect(response.body).not.toHaveProperty('timestamp');
   });
 });
+
+describe('app security headers', () => {
+  // Browsers block cross-site <img> embeds when CORP is same-origin (GitHub #625).
+  it('Should allow cross-origin embedding via Cross-Origin-Resource-Policy', async () => {
+    const response = await request(app).get('/health');
+
+    expect(response.headers['cross-origin-resource-policy']).toBe('cross-origin');
+  });
+});

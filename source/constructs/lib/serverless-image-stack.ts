@@ -218,6 +218,7 @@ export class ServerlessImageHandlerStack extends Stack {
           DeployCloudWatchDashboard: "Yes",
           SolutionId: props.solutionId,
           Version: props.solutionVersion,
+          // "" = Sharp's default input pixel limit, "0" = unlimited; read in image-handler/image-handler.ts process().
           SharpSizeLimit: "",
         },
       },

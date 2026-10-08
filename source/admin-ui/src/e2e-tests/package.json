@@ -54,7 +54,7 @@
     "flatted": "3.4.2",
     "picomatch@2": "2.3.2",
     "picomatch@4": "4.0.4",
-    "brace-expansion@1": "1.1.18",
+    "brace-expansion@1": "1.1.21",
     "uuid": "11.1.1",
     "@babel/core": "7.29.6",
     "js-yaml@3": "3.15.2",

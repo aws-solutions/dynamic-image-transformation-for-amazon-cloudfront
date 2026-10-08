@@ -6,10 +6,10 @@ import { Template } from "aws-cdk-lib/assertions";
 import { ManagementStack } from "../../stacks";
 import { cleanTemplateForSnapshot } from "./test-utils";
 
-// nodejs24.x covers CDK-generated framework helpers (LogRetention, custom-resource
-// provider framework) whose runtime is set internally by aws-cdk-lib. Our own Lambdas
-// use nodejs22.x via DIT_LAMBDA_RUNTIME.
-const SUPPORTED_RUNTIMES = ["nodejs22.x", "nodejs24.x", "python3.13"];
+// Our own Lambdas use nodejs24.x via DIT_LAMBDA_RUNTIME. CDK-generated framework helpers
+// (LogRetention, custom-resource provider framework) have their runtime set internally by
+// aws-cdk-lib; python3.13 is one such helper.
+const SUPPORTED_RUNTIMES = ["nodejs24.x", "python3.13"];
 
 describe("ManagementStack", () => {
   let app: App;
@@ -18,7 +18,7 @@ describe("ManagementStack", () => {
 
   beforeEach(() => {
     process.env.SOLUTION_ID = "SO0023";
-    process.env.VERSION = "v8.1.1";
+    process.env.VERSION = "v8.1.2";
 
     app = new App();
     stack = new ManagementStack(app, "TestManagementStack", {
@@ -39,7 +39,7 @@ describe("ManagementStack", () => {
     expect(cleanedTemplate).toMatchSnapshot();
   });
 
-  test("All Lambda functions should use Node.js 22 runtime", () => {
+  test("All Lambda functions should use Node.js 24 runtime", () => {
     const lambdaFunctions = template.findResources("AWS::Lambda::Function");
     const functionNames = Object.keys(lambdaFunctions);
 

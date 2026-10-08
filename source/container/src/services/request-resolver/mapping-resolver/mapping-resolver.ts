@@ -18,6 +18,7 @@ export class MappingResolver implements IMappingResolver {
     const requestPath = req.path || '/';
     const hostHeader = req.get('dit-host');
 
+    // Host mappings have absolute precedence: path mappings are consulted only when no host mapping matches.
     const hostMatch = await this.headerMappingCache.findBestMatch(hostHeader).catch(() => null);
     
     let pathMatch = null;

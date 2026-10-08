@@ -1,13 +1,20 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import sharp, { Sharp, SharpOptions } from 'sharp';
+import sharp, { Metadata, Sharp, SharpOptions } from 'sharp';
 import { ImageProcessingRequest } from '../../types/image-processing-request';
 import { OriginFetcher } from './origin-fetcher';
 import { ImageProcessingError } from './types';
 import { ErrorMapper } from './utils/error-mapping';
 import { TransformationMapper } from './transformation-engine/transformation-mapper';
 import { EditApplicator } from './transformation-engine/edit-applicator';
+
+// Output capabilities measured on sharp 0.35.4 / libvips 8.18.6.
+// Full alpha survives webp/avif/heif/png; gif keeps only 1-bit alpha; jpeg and tiff drop it.
+const ALPHA_PRESERVING_FORMATS = new Set(['webp', 'avif', 'heif', 'png']);
+// Only gif and webp are decoded and encoded with multiple frames (avif/heif/png write one frame;
+// multi-page tiff is not an animation).
+const ANIMATED_SOURCE_FORMATS = new Set(['gif', 'webp']);
 
 export class ImageProcessorService {
   private static instance: ImageProcessorService;
@@ -30,13 +37,14 @@ export class ImageProcessorService {
     imageRequest.timings.imageProcessing = {};
 
     try {
-      const fetchStart = Date.now();
-      const { buffer: imageBuffer, metadata: originMetadata } = await this.originFetcher.fetchImage(
-        imageRequest.origin.url,
-        imageRequest.origin.headers,
-        imageRequest.requestId
-      );
-      imageRequest.timings.imageProcessing.originFetchMs = Date.now() - fetchStart;
+      // The request resolver already fetched the origin image; processing makes no origin call.
+      const source = imageRequest.sourceImage;
+      if (!source) {
+        throw new ImageProcessingError(500, 'MissingSourceImage', 'Source image not available', `Request ${imageRequest.requestId} reached image processing without a fetched source image.`);
+      }
+      const imageBuffer = source.buffer;
+      const originMetadata = { size: source.buffer.length, format: source.format };
+      imageRequest.timings.imageProcessing.originFetchMs = source.fetchDurationMs;
 
       if (!imageRequest.transformations?.length) {
         imageRequest.response.contentType = imageRequest.sourceImageContentType;
@@ -63,6 +71,7 @@ export class ImageProcessorService {
 
       // Extract source dimensions to validate auto-resize transformations
       const metadata = await sharp(imageBuffer).metadata();
+      await this.preserveSourceCapabilities(imageRequest, metadata, imageBuffer);
       this.preventAutoUpscaling(imageRequest, metadata.width);
       
       // We need to map Transformations to Edits before Sharp image instantiation because it influences whether or not we strip or keep metadata
@@ -94,8 +103,7 @@ export class ImageProcessorService {
       imageRequest.response.contentType = 'image/' + finalImage.info.format;
 
       const totalImageProcessingMs = Date.now() - startTime;
-      imageRequest.timings.imageProcessing.transformationApplicationMs = 
-        totalImageProcessingMs - imageRequest.timings.imageProcessing.originFetchMs;
+      imageRequest.timings.imageProcessing.transformationApplicationMs = totalImageProcessingMs;
 
       console.log(JSON.stringify({
         metricType: 'imageTransformation',
@@ -124,7 +132,6 @@ export class ImageProcessorService {
         timings: {
           originFetchMs: imageRequest.timings.imageProcessing.originFetchMs,
           transformationApplicationMs: imageRequest.timings.imageProcessing.transformationApplicationMs,
-          requestResolutionMs: imageRequest.timings.requestResolution?.preflightValidationMs ?? 0,
           transformationResolutionMs: imageRequest.timings.transformationResolution?.durationMs ?? 0,
           totalRequestMs: Date.now() - imageRequest.timestamp,
         },
@@ -136,10 +143,57 @@ export class ImageProcessorService {
     }
   }
 
+  // A negotiated (format: auto) format is chosen before the source is fetched, so it can't know
+  // whether the source has alpha or animation. If the negotiated format would drop either, keep
+  // the source format, which is known to carry it. Explicit URL/policy formats are never touched.
+  private async preserveSourceCapabilities(
+    imageRequest: ImageProcessingRequest,
+    metadata: Metadata,
+    imageBuffer: Buffer
+  ): Promise<void> {
+    const transformations = imageRequest.transformations ?? [];
+    const negotiated = transformations.find(t => t.type === 'format' && t.negotiated);
+    if (!negotiated) return;
+
+    const target = String(negotiated.value).toLowerCase();
+    const sourceFormat = metadata.format;
+    const isAnimated = (metadata.pages ?? 1) > 1 && ANIMATED_SOURCE_FORMATS.has(sourceFormat);
+    let reason: 'animation' | 'alpha';
+
+    if (isAnimated) {
+      // gif keeps frames but only 1-bit alpha. It's still allowed: for animation, compatibility wins,
+      // because gif is often the only animated format legacy clients support. Static alpha stays strict.
+      if (target === 'webp' || target === 'gif') return;
+      reason = 'animation';
+    } else if (metadata.hasAlpha && !transformations.some(t => t.type === 'flatten')) {
+      if (ALPHA_PRESERVING_FORMATS.has(target)) return;
+      // hasAlpha only means an alpha channel exists; skip the override when no pixel is transparent.
+      // stats() decodes every pixel, so it runs only when the override would otherwise fire.
+      if ((await sharp(imageBuffer).stats()).isOpaque) return;
+      reason = 'alpha';
+    } else {
+      return;
+    }
+
+    // Sharp can't write SVG, so a rasterized SVG falls back to png instead of its source format.
+    const replacement = sourceFormat === 'svg' ? 'png' : null;
+    imageRequest.transformations = replacement
+      ? transformations.map(t => (t === negotiated ? { ...t, value: replacement } : t))
+      : transformations.filter(t => t !== negotiated);
+
+    console.log(JSON.stringify({
+      requestId: imageRequest.requestId,
+      component: 'ImageProcessor',
+      operation: 'auto_format_overridden',
+      from: target,
+      to: replacement ?? sourceFormat,
+      reason
+    }));
+  }
+
   private preventAutoUpscaling(imageRequest: ImageProcessingRequest, sourceWidth: number): void {
     if (!imageRequest.transformations?.length || !sourceWidth) return;
     imageRequest.transformations = imageRequest.transformations.filter(t => {
-      console.log(t);
       if (t.type === 'resize' && t.source === 'auto' && t.value?.width > sourceWidth) {
         console.log(JSON.stringify({
           requestId: imageRequest.requestId,

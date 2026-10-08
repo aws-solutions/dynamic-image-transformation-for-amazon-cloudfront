@@ -8,7 +8,9 @@ import { DDBDriver } from '../../database/ddb-driver.interface';
 import { ddbDriver } from '../../database';
 
 /**
- * Path mapping cache manager with transparent DynamoDB fallback.
+ * Path mapping cache manager.
+ * Startup-only snapshot loaded by warmCache(); a miss returns null and never reads DynamoDB.
+ * Changes arrive only via DDB stream -> utility-lambda -> ECS force-new-deployment (new tasks re-warm).
  * Uses trie structure for efficient hierarchical path-based lookups.
  * Handles caching of path-to-policy/origin mappings for request routing.
  */

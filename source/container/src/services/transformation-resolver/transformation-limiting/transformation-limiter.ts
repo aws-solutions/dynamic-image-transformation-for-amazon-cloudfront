@@ -31,6 +31,8 @@ function mergeModerationTightenOnly(
   };
 }
 
+// Input is policy + auto-optimizations; a URL transformation of a type already present replaces that entry in place
+// (dropping the policy entry's conditional), and only new types are appended at the end.
 export function applyPrecedence(urlTransformations: Transformation[], policyTransformations: Transformation[]): Transformation[] {
   const result: Transformation[] = [];
   const typeToIndex = new Map<string, number>();
@@ -62,6 +64,7 @@ export function applyPrecedence(urlTransformations: Transformation[], policyTran
   return result;
 }
 
+// Runs after conditionals are evaluated and truncates from the end, so appended URL-only types are dropped first.
 export function enforceLimits(transformations: Transformation[]): Transformation[] {
   if (transformations.length <= MAX_TRANSFORMATIONS) {
     return transformations;

@@ -403,4 +403,38 @@ describe('OriginFetcher', () => {
       expect(result.metadata.format).toBe('jpeg');
     });
   });
+
+  describe('public checks reused by the single origin fetch', () => {
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+
+    it('assertAllowedContentType accepts allowlisted types and rejects others with 415', () => {
+      expect(() => fetcher.assertAllowedContentType('image/webp; q=1', 'https://example.com/a', 'http')).not.toThrow();
+      expect(() => fetcher.assertAllowedContentType('image/bmp', 'https://example.com/a', 'http'))
+        .toThrow(expect.objectContaining({ statusCode: 415, errorType: 'InvalidContentType' }));
+      expect(() => fetcher.assertAllowedContentType(undefined, 's3://bucket/a', 's3'))
+        .toThrow(expect.objectContaining({ verboseDescription: "S3 origin 's3://bucket/a' returned unsupported Content-Type 'missing'." }));
+    });
+
+    it('validateImage returns the normalized media type and enforces magic numbers', () => {
+      expect(fetcher.validateImage(JPEG, 'IMAGE/JPEG; charset=utf-8', 'https://example.com/a')).toBe('image/jpeg');
+      expect(() => fetcher.validateImage(JPEG, 'image/png', 'https://example.com/a'))
+        .toThrow(expect.objectContaining({ statusCode: 415, errorType: 'InvalidImage' }));
+    });
+
+    it('logImageFetched emits the image_fetched event with a sanitized URL', () => {
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      fetcher.logImageFetched({ originType: 'http', url: 'https://example.com/a.jpg?token=x', mediaType: 'image/jpeg', sizeBytes: 4, fetchDurationMs: 12 });
+      expect(JSON.parse(logSpy.mock.calls[0][0])).toEqual({
+        requestId: 'unknown',
+        component: 'OriginFetcher',
+        operation: 'image_fetched',
+        originType: 'http',
+        url: 'https://example.com/a.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 4,
+        fetchDurationMs: 12
+      });
+      logSpy.mockRestore();
+    });
+  });
 });

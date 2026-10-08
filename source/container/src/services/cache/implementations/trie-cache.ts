@@ -167,6 +167,8 @@ export class TrieCache<T> implements CacheManager<T> {
     }
 
     // Sort matches: prioritize by depth (longest), then exact matches over wildcards
+    // Depth beats exactness: a deeper wildcard match (/a/*/c) outranks a shallower exact one (/a/b). hasWildcard is
+    // sticky, so one '*' anywhere on the path marks the whole match as wildcard for the tie-break.
     matches.sort((a, b) => {
       if (a.depth !== b.depth) {
         return b.depth - a.depth; // Longer matches first

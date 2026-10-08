@@ -32,6 +32,7 @@ export class MetricsConstruct extends Construct {
       },
     });
 
+    // v8-custom-resource/index.ts returns the UUID only on Create, so this resource must never receive an Update.
     const uuidResource = new CustomResource(this, "UUID", {
       serviceToken: customResourceLambda.functionArn,
       properties: {

@@ -529,7 +529,7 @@ exports[`ImageProcessingStack Snapshot Test 1`] = `
               },
               {
                 "Name": "SOLUTION_VERSION",
-                "Value": "v8.1.1",
+                "Value": "v8.1.2",
               },
               {
                 "Name": "DDB_TABLE_NAME",
@@ -1034,6 +1034,7 @@ function logDetect(result) {
 const MAX_ACCEPT_HEADER_LENGTH = 512;
 const MAX_ACCEPT_MIME_TYPES = 20;
 
+// webp over avif: cheaper, steadier encoding (incl. animation) outweighs AVIF size. Sync container auto-optimizer.ts
 const FORMAT_PRIORITY = ['webp', 'avif', 'jpeg', 'png', 'heif', 'tiff', 'raw', 'gif'];
 
 const FORMAT_MAPPING = {
@@ -1932,7 +1933,7 @@ async function handler(event) {
               ],
             },
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.1",
+            "SOLUTION_VERSION": "v8.1.2",
           },
         },
         "Handler": "index.handler",
@@ -1948,7 +1949,7 @@ async function handler(event) {
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Timeout": 30,
       },
       "Type": "AWS::Lambda::Function",

@@ -16,19 +16,23 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html', ["lcov", { 'projectRoot': '../' }]],
       include: ['src/**/*.{ts,tsx}'],
+      // vitest 4 matches these against the absolute path (picomatch contains),
+      // so bare 'build/' also matched CodeBuild's /codebuild/ root and emptied the report.
       exclude: [
-        'node_modules/',
+        '**/node_modules/**',
         'src/setupTests.ts',
         'src/__tests__/**',
-        'src/mocks/',
+        'src/mocks/**',
         '**/*.d.ts',
         '**/*.config.*',
-        'dist/',
-        'build/',
-        'public/',
-        'plugins/',
+        '**/dist/**',
+        '**/build/**',
+        '**/public/**',
+        '**/plugins/**',
         '**/*.js',
-        'src/e2e-tests'
+        'src/e2e-tests/**',
+        'src/types/**',
+        'src/components/help/index.ts'
       ]
     },
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
