@@ -5,9 +5,9 @@ import { Request } from 'express';
 import { Transformation, TransformationPolicy } from '../../../types/transformation';
 import { ImageProcessingRequest } from '../../../types/image-processing-request';
 
+// webp ranks above avif on purpose: AVIF's size savings are traded for much cheaper encoding and more consistent
+// encoder behavior, including animation. Keep in sync with constructs/lib/v8/functions/dit-header-normalization.js.
 const FORMAT_PRIORITY = ['webp', 'avif', 'jpeg', 'png', 'heif', 'tiff', 'raw', 'gif'];
-// TODO, DISCUSS WITH TEAM FOR OPTIMAL FORMAT PRIORITIY LIST
-const ANIMATION_CAPABLE_FORMATS = new Set(['webp', 'avif', 'gif']);
 const FORMAT_MAPPING: Record<string, string> = {
   'image/webp': 'webp',
   'image/png': 'png',
@@ -65,7 +65,6 @@ function getFormatOptimizations(req: Request, formatOutput: any, imageRequest?: 
   }
   
   const accept = req.header('dit-accept') || '';
-  console.log('Accept header found as: ', req.header('dit-accept'))
   const compatibleFormats = Object.keys(FORMAT_MAPPING)
     .filter(mimeType => accept.includes(mimeType))
     .map(mimeType => FORMAT_MAPPING[mimeType]);
@@ -78,12 +77,6 @@ function getFormatOptimizations(req: Request, formatOutput: any, imageRequest?: 
     return [];
   }
 
-  // Skip format conversion if source is a GIF and selected format cannot carry animation
-  const sourceIsGif = imageRequest?.sourceImageContentType === 'image/gif';
-  if (sourceIsGif && !ANIMATION_CAPABLE_FORMATS.has(selectedFormat)) {
-    return [];
-  }
-
   // Check if source image format matches selected format to avoid unnecessary transformation
   if (imageRequest?.sourceImageContentType) {
     const sourceFormat = FORMAT_MAPPING[imageRequest.sourceImageContentType];
@@ -92,7 +85,9 @@ function getFormatOptimizations(req: Request, formatOutput: any, imageRequest?: 
     }
   }
 
-  return [createOptimizationTransformation('format', selectedFormat)];
+  // Marked as negotiated so the image processor can keep the source format if this one would drop
+  // the source's alpha channel or animation (only known after the origin is fetched).
+  return [{ ...createOptimizationTransformation('format', selectedFormat), negotiated: true }];
 }
 
 function getQualityOptimizations(req: Request, qualityOutput: any): Transformation[] {

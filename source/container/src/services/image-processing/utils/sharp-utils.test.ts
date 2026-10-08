@@ -27,6 +27,8 @@ describe('SharpUtils', () => {
       ['png', 'png'],
       ['webp', 'webp'],
       ['tiff', 'tiff'],
+      ['tif', 'tiff'],
+      ['TIF', 'tiff'],
       ['heif', 'heif'],
       ['raw', 'raw'],
       ['gif', 'gif'],

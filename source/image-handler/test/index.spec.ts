@@ -694,6 +694,27 @@ describe("index", () => {
     writeGetObjectAssertion(event, "max-age=31536000,public", { "Custom-Header": "CustomValue%0A" });
   });
 
+  it("should send a 400 with a short-lived CacheControl when writing the S3 OL response fails", async () => {
+    // Mock
+    const imageRequest = { bucket: "source-bucket", key: "test.jpg" };
+    const event = setupObjectLambdaB64EncodedTest(imageRequest);
+    mockS3Commands.writeGetObjectResponse.mockRejectedValueOnce(new Error("write failed"));
+
+    // Act
+    await handler(event, mockContext as unknown as Context);
+
+    // Assert
+    expect(mockS3Commands.writeGetObjectResponse).toHaveBeenCalledTimes(2);
+    expect(mockS3Commands.writeGetObjectResponse).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        RequestRoute: event.getObjectContext.outputRoute,
+        RequestToken: event.getObjectContext.outputToken,
+        CacheControl: "max-age=10,public",
+        Metadata: { StatusCode: JSON.stringify(StatusCodes.BAD_REQUEST) },
+      })
+    );
+  });
+
   it("should allow overwriting of CacheControl header when expires is not provided", async () => {
     // Mock
     const imageRequest = {

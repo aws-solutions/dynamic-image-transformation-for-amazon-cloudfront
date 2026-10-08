@@ -10,6 +10,7 @@ import { ConnectionManager } from './connection-manager/connection-manager';
 import { ValidationError } from './errors/validation.error';
 import { OriginNotFoundError } from './errors/origin-not-found.error';
 import { ConnectionError } from './errors/connection.error';
+import { ImageProcessingError } from '../image-processing/types';
 import { CacheRegistry } from '../cache/cache-registry';
 import { OriginConfiguration } from '../cache/domain/origin-cache';
 import { ImageProcessingRequest } from '../../types/image-processing-request';
@@ -29,8 +30,6 @@ export class RequestResolverService {
   ) {}
 
   async resolve(req: Request, imageRequest: ImageProcessingRequest): Promise<void> {
-    if (!imageRequest.timings) imageRequest.timings = {};
-    imageRequest.timings.requestResolution = {};
 
     try {
       // Step 1: Validate the incoming request
@@ -40,18 +39,29 @@ export class RequestResolverService {
       let policyId: string | null = null;
 
       // Step 1.5: Check for custom header override
+      // The override skips mappings and mapping policies entirely. It is safe only because the header is in the
+      // CloudFront cache key (constructs/lib/v8/stacks/image-processing-stack.ts) and UrlValidator enforces
+      // https and rejects private/link-local IP literals.
       const customHeaderName = process.env.CUSTOM_ORIGIN_HEADER;
       
       if (customHeaderName && req.headers[customHeaderName]) {
         const customOriginDomain = req.headers[customHeaderName] as string;
-        console.log('Custom header override detected:', customOriginDomain);
         
         // Validate header value is a proper URL
+        let customOriginUrl: URL;
         try {
-          new URL(customOriginDomain);
+          customOriginUrl = new URL(customOriginDomain);
         } catch (error) {
           throw new ValidationError(`Invalid origin override header value`, `Invalid origin override header value. ${customOriginDomain}`);
         }
+        // Host only: the header is client-supplied and may carry userinfo or query tokens.
+        console.log(JSON.stringify({
+          requestId: imageRequest.requestId,
+          component: 'RequestResolver',
+          operation: 'custom_origin_override',
+          headerName: customHeaderName,
+          originHost: customOriginUrl.host
+        }));
         
         // Create synthetic OriginConfiguration
         originResult = {
@@ -73,8 +83,8 @@ export class RequestResolverService {
       // Step 4: Build final URL
       const finalUrl = UrlBuilder.buildOriginUrl(req, originResult);
 
-      // Step 5: Always validate TLS for the final domain
-      await this.connectionManager.validateOriginUrl(finalUrl, imageRequest);
+      // Step 5: Fetch the origin image once; validates TLS, status and content type on the way
+      await this.connectionManager.fetchOriginImage(finalUrl, imageRequest, originResult?.originHeaders);
       
       // Step 6: Populate origin information in shared request object
       imageRequest.origin = {
@@ -87,7 +97,8 @@ export class RequestResolverService {
       // Re-throw known errors as-is
       if (error instanceof ValidationError || 
           error instanceof OriginNotFoundError || 
-          error instanceof ConnectionError) {
+          error instanceof ConnectionError ||
+          error instanceof ImageProcessingError) {
         throw error;
       }
       // Wrap unknown errors

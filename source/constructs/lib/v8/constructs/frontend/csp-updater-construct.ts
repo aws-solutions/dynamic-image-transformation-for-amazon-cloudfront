@@ -101,6 +101,7 @@ export class CSPUpdaterConstruct extends Construct {
       },
     ]);
 
+    // Attached out-of-band because the CSP needs the Cognito and API URLs, which depend on this distribution's domain.
     new CustomResource(this, "CSPUpdaterCustomResource", {
       serviceToken: provider.serviceToken,
       properties: {

@@ -10,6 +10,8 @@ import { DBEntityType, DBTransformationPolicy, validatePolicyItem } from "../int
 import { BaseDAO } from "./base-dao";
 
 export class TransformationPolicyDAO extends BaseDAO<DBTransformationPolicy, TransformationPolicy> {
+  // Lock item that makes the default policy unique. It must never carry GSI1PK, or it would show up in POLICY
+  // listings and container loads; runtime code reads Data.isDefault, not this item.
   private static readonly CONTROL_ITEM_PK = "GSI2PK#DEFAULT_POLICY";
 
   constructor(tableName?: string, ddbDocClient?: DynamoDBDocumentClient) {
@@ -200,6 +202,7 @@ export class TransformationPolicyDAO extends BaseDAO<DBTransformationPolicy, Tra
     await this.ddbDocClient.send(command);
   }
 
+  // The POLICY# prefix must match what MappingDAO.convertToDB writes to GSI3PK.
   private async mappingExists(id: string): Promise<boolean> {
     const data = await this.ddbDocClient.send(
       new QueryCommand({

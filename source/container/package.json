@@ -33,9 +33,9 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "helmet": "^7.1.0",
-    "morgan": "^1.12.0",
+    "morgan": "^1.12.1",
     "qs": "^6.15.2",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "zod": "^4.1.4"
   },
   "devDependencies": {
@@ -60,15 +60,8 @@
     "tsx": "^4.20.6",
     "typescript": "^5.2.2"
   },
-  "overrides": {
-    "brace-expansion": "2.1.4",
-    "brace-expansion@1": "1.1.18",
-    "brace-expansion@2": "2.1.4",
-    "picomatch@2": "2.3.2",
-    "picomatch@4": "4.0.4"
-  },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "author": "AWS Solutions",
   "license": "Apache-2.0"

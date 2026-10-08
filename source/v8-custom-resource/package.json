@@ -14,7 +14,7 @@
     "test": "jest --coverage --silent"
   },
   "dependencies": {
-    "moment": "^2.30.0"
+    "moment": "^2.31.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.130",
@@ -33,7 +33,7 @@
     "picomatch@4": "4.0.4",
     "fast-xml-parser": "5.5.7",
     "flatted": "3.4.2",
-    "brace-expansion@1": "1.1.18",
+    "brace-expansion@1": "1.1.21",
     "js-yaml@3": "3.15.2",
     "browserslist": ">=4.28.7",
     "js-yaml@4": "4.3.2"

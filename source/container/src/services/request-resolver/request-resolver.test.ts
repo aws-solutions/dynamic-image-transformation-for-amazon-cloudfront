@@ -9,6 +9,7 @@ import { OriginResolver } from './origin-resolver/origin-resolver';
 import { RequestValidator } from './validation/request-validator';
 import { ConnectionManager } from './connection-manager/connection-manager';
 import { ImageProcessingRequest } from '../../types/image-processing-request';
+import { ImageProcessingError } from '../image-processing/types';
 
 // Mock the dependencies
 jest.mock('./mapping-resolver/mapping-resolver');
@@ -41,7 +42,7 @@ describe('RequestResolverService', () => {
     } as any;
     
     mockConnectionManager = {
-      validateOriginUrl: jest.fn()
+      fetchOriginImage: jest.fn()
     } as any;
 
     // Create service instance with mocked dependencies
@@ -82,11 +83,54 @@ describe('RequestResolverService', () => {
     mockRequestValidator.validateRequest.mockReturnValue(undefined);
     mockMappingResolver.resolve.mockResolvedValue(mappingResult);
     mockOriginResolver.resolve.mockResolvedValue(origin);
-    mockConnectionManager.validateOriginUrl.mockResolvedValue(undefined);
+    mockConnectionManager.fetchOriginImage.mockResolvedValue(undefined);
 
     await service.resolve(mockReq, imageRequest);
 
     expect(imageRequest.origin?.url).toBe('https://test-bucket.s3.amazonaws.com/images/test.jpg');
+  });
+
+  describe('origin fetch boundary', () => {
+    const req = { path: '/images/test.jpg', get: jest.fn().mockReturnValue('example.com') } as any;
+    const mappingResult = {
+      pathMatch: { pathPattern: '/images/*', originId: 'origin-1' },
+      hostMatch: undefined,
+      selectedMapping: { pathPattern: '/images/*', originId: 'origin-1' },
+      resolvedBy: 'path' as const
+    };
+    const origin = {
+      originId: 'origin-1',
+      originName: 'test-origin',
+      originDomain: 'https://assets.example.com',
+      originHeaders: { 'x-origin-key': 'secret' }
+    };
+    const newRequest = (): ImageProcessingRequest => ({ requestId: 'test-123', timestamp: Date.now(), response: { headers: {} } });
+
+    beforeEach(() => {
+      mockMappingResolver.resolve.mockResolvedValue(mappingResult as any);
+      mockOriginResolver.resolve.mockResolvedValue(origin as any);
+    });
+
+    it('passes the resolved origin headers to the origin fetch', async () => {
+      mockConnectionManager.fetchOriginImage.mockResolvedValue(undefined);
+      const imageRequest = newRequest();
+
+      await service.resolve(req, imageRequest);
+
+      expect(mockConnectionManager.fetchOriginImage).toHaveBeenCalledWith(
+        'https://assets.example.com/images/test.jpg',
+        imageRequest,
+        { 'x-origin-key': 'secret' }
+      );
+      expect(imageRequest.origin?.headers).toEqual({ 'x-origin-key': 'secret' });
+    });
+
+    it('rethrows an ImageProcessingError from the origin fetch unchanged', async () => {
+      const timeout = new ImageProcessingError(504, 'RequestTimeout', 'Origin request timeout', 'body read exceeded 30000ms');
+      mockConnectionManager.fetchOriginImage.mockRejectedValue(timeout);
+
+      await expect(service.resolve(req, newRequest())).rejects.toBe(timeout);
+    });
   });
 
   it('should throw ValidationError for invalid requests', async () => {
@@ -155,7 +199,7 @@ describe('RequestResolverService', () => {
     mockRequestValidator.validateRequest.mockReturnValue(undefined);
     mockMappingResolver.resolve.mockResolvedValue(mappingResult);
     mockOriginResolver.resolve.mockResolvedValue(origin);
-    mockConnectionManager.validateOriginUrl.mockResolvedValue(undefined);
+    mockConnectionManager.fetchOriginImage.mockResolvedValue(undefined);
 
     await service.resolve(mockReq, imageRequest);
 
@@ -184,7 +228,7 @@ describe('RequestResolverService', () => {
       };
 
       mockRequestValidator.validateRequest.mockReturnValue(undefined);
-      mockConnectionManager.validateOriginUrl.mockResolvedValue(undefined);
+      mockConnectionManager.fetchOriginImage.mockResolvedValue(undefined);
 
       await service.resolve(mockReq, imageRequest);
 
@@ -245,7 +289,7 @@ describe('RequestResolverService', () => {
       mockRequestValidator.validateRequest.mockReturnValue(undefined);
       mockMappingResolver.resolve.mockResolvedValue(mappingResult);
       mockOriginResolver.resolve.mockResolvedValue(origin);
-      mockConnectionManager.validateOriginUrl.mockResolvedValue(undefined);
+      mockConnectionManager.fetchOriginImage.mockResolvedValue(undefined);
 
       await service.resolve(mockReq, imageRequest);
 

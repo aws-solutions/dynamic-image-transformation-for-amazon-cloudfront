@@ -45,7 +45,7 @@ interface ImageProcessingStackProps extends NestedStackProps {
  * - Production mode: Internal ALB + CloudFront with VPC Origins
  * - Development mode: Internet-facing ALB
  * - ECS Fargate service with configurable t-shirt sizing
- * - Health check endpoint at /health-check
+ * - Health check endpoint at /health
  */
 export class ImageProcessingStack extends NestedStack {
   public readonly distributionDomain?: string;
@@ -133,6 +133,8 @@ export class ImageProcessingStack extends NestedStack {
     const deploymentMode = this.node.tryGetContext("deploymentMode") || "prod";
     const isDevMode = deploymentMode === "dev";
 
+    // The VPC origin, CF function, cache and response-headers policies below use fixed names suffixed only by region,
+    // so only one v8 stack can be deployed per account and region.
     let vpcOrigin: origins.VpcOrigin | undefined;
     if (!isDevMode) {
       vpcOrigin = origins.VpcOrigin.withApplicationLoadBalancer(albEcsConstruct.loadBalancer, {
@@ -202,7 +204,8 @@ export class ImageProcessingStack extends NestedStack {
         enableAcceptEncodingBrotli: true,
       });
 
-      // Override the headers property with conditional logic
+      // This override is authoritative; the typed allowList above is replaced by it. The dit-* names must match the
+      // headers set in functions/dit-header-normalization.js and read by the container.
       const cfnCachePolicy = ditCachePolicy.node.defaultChild as cloudfront.CfnCachePolicy;
       cfnCachePolicy.addPropertyOverride(
         "CachePolicyConfig.ParametersInCacheKeyAndForwardedToOrigin.HeadersConfig.Headers",
@@ -285,6 +288,7 @@ export class ImageProcessingStack extends NestedStack {
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
           cachePolicy: ditCachePolicy,
+          // Required so CloudFront-Is-*-Viewer headers reach the CF function (Tier 4 device detection).
           originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_AND_CLOUDFRONT_2022,
           responseHeadersPolicy: imageResponseHeadersPolicy,
           functionAssociations: [

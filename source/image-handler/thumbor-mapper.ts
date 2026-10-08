@@ -20,9 +20,8 @@ export class ThumborMapper {
 
     let edits: ImageEdits = this.mergeEdits(this.mapCrop(path), this.mapResize(path), this.mapFitIn(path));
 
-    // parse the image path. we have to sort here to make sure that when we have a file name without extension,
-    // and `format` and `quality` filters are passed, then the `format` filter will go first to be able
-    // to apply the `quality` filter to the target image format.
+    // Sorted so filter precedence is fixed for ALL filters and URL order is ignored. E.g. `format` runs before
+    // `quality`, so quality can key on the target format when the file name has no extension.
     const filters =
       path
         .match(/filters(:[^)]*\))+/g)
@@ -55,6 +54,8 @@ export class ThumborMapper {
     } else {
       let parsedPath = "";
 
+      // Expects a `/regex/flags` literal; parser duplicated in image-request.ts parseImageKey, keep both identical.
+      // CDK ships "" (constructs/lib/back-end/back-end-construct.ts), which keeps Custom mode off.
       if (typeof REWRITE_MATCH_PATTERN === "string") {
         const patternStrings = REWRITE_MATCH_PATTERN.split("/");
         const flags = patternStrings.pop();
@@ -138,7 +139,10 @@ export class ThumborMapper {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapFormat(filterValue: string, currentEdits: Record<string, any>): void {
-    const imageFormatType = filterValue.replace(/[^0-9a-z]/gi, "").replace(/jpg/i, "jpeg") as ImageFormatTypes;
+    const imageFormatType = filterValue
+      .replace(/[^0-9a-z]/gi, "")
+      .replace(/jpg/i, "jpeg")
+      .replace(/^tif$/i, "tiff") as ImageFormatTypes;
     const acceptedValues = [
       ImageFormatTypes.HEIC,
       ImageFormatTypes.HEIF,
@@ -200,6 +204,8 @@ export class ThumborMapper {
     const toSupportedImageFormatType = (format: ImageFormatTypes): ImageFormatTypes => {
       if ([ImageFormatTypes.JPG, ImageFormatTypes.JPEG].includes(format)) {
         return ImageFormatTypes.JPEG;
+      } else if ([ImageFormatTypes.TIF, ImageFormatTypes.TIFF].includes(format)) {
+        return ImageFormatTypes.TIFF;
       } else if (
         [
           ImageFormatTypes.PNG,

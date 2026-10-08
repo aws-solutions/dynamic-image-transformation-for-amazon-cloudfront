@@ -73,6 +73,8 @@ export class AlbEcsConstruct extends Construct {
   public readonly service: ecs.FargateService;
   public readonly loadBalancer: elbv2.ApplicationLoadBalancer;
   public readonly targetGroup: elbv2.ApplicationTargetGroup;
+  // A public literal, so defense-in-depth only; isolation comes from the internal ALB and its security group.
+  // Must match the VpcOrigin customHeaders in stacks/image-processing-stack.ts.
   private readonly customHeaderName = "X-Origin-Verify";
   private readonly customHeaderValue = "CloudFrontOrigin";
 

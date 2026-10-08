@@ -42,7 +42,8 @@ describe('applyAutoOptimizations', () => {
       expect(result[0]).toEqual({
         type: 'format',
         value: 'jpeg',
-        source: 'auto'
+        source: 'auto',
+        negotiated: true
       });
     });
 
@@ -86,7 +87,7 @@ describe('applyAutoOptimizations', () => {
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ type: 'format', value: 'jpeg', source: 'auto' });
+      expect(result[0]).toEqual({ type: 'format', value: 'jpeg', source: 'auto', negotiated: true });
     });
 
     it('should not use fallback when dit-accept header is absent and no fallback defined', () => {
@@ -106,16 +107,19 @@ describe('applyAutoOptimizations', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({ type: 'format', value: 'png', source: 'auto' });
+      expect(result[0].negotiated).toBeUndefined();
     });
 
-    it('should skip format conversion when source is GIF and selected format is not animation-capable', () => {
+    // Animation/alpha preservation is decided by the image processor from decoded metadata, so the
+    // resolver no longer skips negotiation based on the source content type.
+    it('should emit a negotiated format for a GIF source even when the format cannot animate', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
       mockRequest.headers = { 'dit-accept': 'image/jpeg' };
       const imageRequest = { sourceImageContentType: 'image/gif' } as ImageProcessingRequest;
 
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
 
-      expect(result).toHaveLength(0);
+      expect(result).toEqual([{ type: 'format', value: 'jpeg', source: 'auto', negotiated: true }]);
     });
 
     it('should allow format conversion when source is GIF and selected format is webp', () => {
@@ -126,10 +130,10 @@ describe('applyAutoOptimizations', () => {
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ type: 'format', value: 'webp', source: 'auto' });
+      expect(result[0]).toEqual({ type: 'format', value: 'webp', source: 'auto', negotiated: true });
     });
 
-    it('should allow format conversion when source is GIF and selected format is avif', () => {
+    it('should emit a negotiated avif for a GIF source', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
       mockRequest.headers = { 'dit-accept': 'image/avif' };
       const imageRequest = { sourceImageContentType: 'image/gif' } as ImageProcessingRequest;
@@ -137,10 +141,10 @@ describe('applyAutoOptimizations', () => {
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ type: 'format', value: 'avif', source: 'auto' });
+      expect(result[0]).toEqual({ type: 'format', value: 'avif', source: 'auto', negotiated: true });
     });
 
-    it('should not restrict format selection for non-GIF sources', () => {
+    it('should mark the negotiated format for non-GIF sources', () => {
       mockPolicy.outputs = [{ type: 'format', value: 'auto' }];
       mockRequest.headers = { 'dit-accept': 'image/jpeg' };
       const imageRequest = { sourceImageContentType: 'image/png' } as ImageProcessingRequest;
@@ -148,10 +152,17 @@ describe('applyAutoOptimizations', () => {
       const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy, imageRequest);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ type: 'format', value: 'jpeg', source: 'auto' });
+      expect(result[0]).toEqual({ type: 'format', value: 'jpeg', source: 'auto', negotiated: true });
     });
 
+    it('should not mark a static policy format as negotiated', () => {
+      mockPolicy.outputs = [{ type: 'format', value: 'jpeg' }];
+      mockRequest.headers = { 'dit-accept': 'image/webp' };
 
+      const result = applyAutoOptimizations(baseTransformations, mockRequest as Request, mockPolicy);
+
+      expect(result[0].negotiated).toBeUndefined();
+    });
   });
 
   describe('quality optimizations', () => {

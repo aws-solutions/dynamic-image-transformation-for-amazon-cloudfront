@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Credit to xpepermint: https://github.com/xpepermint/query-types
+// Caps arrays built by parseNestedArray; independent of the qs arrayLimit (10) set inside queryTypesMiddleware.
 const MAX_ARRAY_LENGTH = 25;
 
 function isObject(val) {
@@ -114,6 +115,8 @@ function queryTypesMiddleware() {
     const qs = require('qs');
     const queryString = req.url.split('?')[1] || '';
 
+    // qs arrayLimit only, independent of the module-level 25. This middleware must run before b64DecoderMiddleware
+    // (app.ts): running after it would re-parse the rewritten req.url and overwrite the decoded req.query.
     const MAX_ARRAY_LENGTH = 10;
 
     const parsedQuery = qs.parse(queryString, {

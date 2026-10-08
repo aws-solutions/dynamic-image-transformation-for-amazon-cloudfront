@@ -46,7 +46,7 @@ describe('CreateMapping Form Validation', () => {
     expect(pathPatternInput).toBeInTheDocument();
   });
 
-  it.skip('should validate pattern mutual exclusion', async () => {
+  it('should validate pattern mutual exclusion', async () => {
     const user = userEvent.setup();
     render(<CreateMapping />);
     

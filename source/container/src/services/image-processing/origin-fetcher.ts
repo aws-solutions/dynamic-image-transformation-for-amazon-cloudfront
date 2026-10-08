@@ -36,39 +36,65 @@ export class OriginFetcher {
       throw new ImageProcessingError(400, 'InvalidUrl', 'Unsupported URL protocol', `URL '${url}' uses an unsupported protocol. Only http://, https://, and s3:// are supported.`);
     }
 
-    // Normalize once so a parameter (e.g. '; charset=...') can't dodge the downstream exact-key
-    // lookups and skip magic-number validation, reopening the SSRF raw-body read (finding a3ede07f).
-    const mediaType = result.contentType ? this.normalizeMediaType(result.contentType) : undefined;
-
-    this.validateImageMagicNumbers(result.buffer, mediaType, url);
-    const fetchDurationMs = Date.now() - startTime;
-
-    console.log(JSON.stringify({
-      requestId: requestId || 'unknown',
-      component: 'OriginFetcher',
-      operation: 'image_fetched',
+    const mediaType = this.validateImage(result.buffer, result.contentType, url);
+    this.logImageFetched({
+      requestId,
       originType: S3UrlHelper.isS3Url(url) ? 's3' : 'http',
-      url: this.sanitizeUrl(url),
-      contentType: mediaType,
+      url,
+      mediaType,
       sizeBytes: result.buffer.length,
-      fetchDurationMs
-    }));
+      fetchDurationMs: Date.now() - startTime
+    });
 
-    const format = mediaType?.replace('image/', '');
     return {
       buffer: result.buffer,
       metadata: {
         size: result.buffer.length,
-        format
+        format: mediaType?.replace('image/', '')
       }
     };
+  }
+
+  /** Fails closed on a missing or non-allowlisted Content-Type; call before reading the body (finding a3ede07f). */
+  public assertAllowedContentType(contentType: string | undefined | null, url: string, originType: 's3' | 'http'): void {
+    if (contentType && this.isValidImageContentType(contentType)) return;
+    const origin = originType === 's3' ? 'S3 origin' : 'Origin';
+    throw new ImageProcessingError(
+      415,
+      'InvalidContentType',
+      `Invalid content type: ${contentType ?? 'missing'}`,
+      `${origin} '${url}' returned unsupported Content-Type '${contentType ?? 'missing'}'.`
+    );
+  }
+
+  /** Validates the fetched bytes against their declared type and returns the normalized media type. */
+  public validateImage(buffer: Buffer, contentType: string | undefined, url: string): string | undefined {
+    // Normalize once so a parameter (e.g. '; charset=...') can't dodge the downstream exact-key
+    // lookups and skip magic-number validation, reopening the SSRF raw-body read (finding a3ede07f).
+    const mediaType = contentType ? this.normalizeMediaType(contentType) : undefined;
+    this.validateImageMagicNumbers(buffer, mediaType, url);
+    return mediaType;
+  }
+
+  /** Emits the `image_fetched` event that the ECS origin-type solution metric counts. */
+  public logImageFetched(event: { requestId?: string; originType: 's3' | 'http'; url: string; mediaType?: string; sizeBytes: number; fetchDurationMs: number }): void {
+    console.log(JSON.stringify({
+      requestId: event.requestId || 'unknown',
+      component: 'OriginFetcher',
+      operation: 'image_fetched',
+      originType: event.originType,
+      url: this.sanitizeUrl(event.url),
+      contentType: event.mediaType,
+      sizeBytes: event.sizeBytes,
+      fetchDurationMs: event.fetchDurationMs
+    }));
   }
 
   private async fetchFromS3(url: string, headers?: Record<string, string>): Promise<{ buffer: Buffer; contentType?: string }> {
     // S3 enforces its own deadline via the SDK client timeout (getOptions()), not this AbortController.
     try {
       const { bucket, key } = S3UrlHelper.parseS3Url(url);
-      console.log(`Attempting to fetch from bucket: ${bucket} and key: ${key}`)      
+      console.log(JSON.stringify({ component: 'OriginFetcher', operation: 's3_fetch_attempt', bucket, key }));
       const commandInput: any = { Bucket: bucket, Key: key };
       
       if (headers) {
@@ -93,14 +119,7 @@ export class OriginFetcher {
 
       // Fail closed on missing/non-image Content-Type, mirroring fetchFromHttp (Guardian Post 4a).
       const contentType = response.ContentType;
-      if (!contentType || !this.isValidImageContentType(contentType)) {
-        throw new ImageProcessingError(
-          415,
-          'InvalidContentType',
-          `Invalid content type: ${contentType ?? 'missing'}`,
-          `S3 origin '${url}' returned unsupported Content-Type '${contentType ?? 'missing'}'.`
-        );
-      }
+      this.assertAllowedContentType(contentType, url, 's3');
 
       return { buffer, contentType };
     } catch (error) {
@@ -144,14 +163,7 @@ export class OriginFetcher {
       // Fail closed on a missing or non-image Content-Type: without this, a zero-transformation
       // request returns an internal response body unmodified, i.e. an SSRF read (finding a3ede07f).
       const contentType = response.headers.get('content-type');
-      if (!contentType || !this.isValidImageContentType(contentType)) {
-        throw new ImageProcessingError(
-          415,
-          'InvalidContentType',
-          `Invalid content type: ${contentType ?? 'missing'}`,
-          `Origin '${url}' returned unsupported Content-Type '${contentType ?? 'missing'}'.`
-        );
-      }
+      this.assertAllowedContentType(contentType, url, 'http');
 
       // Still under the abort timer: an abort here rejects → mapped to 504 below.
       const arrayBuffer = await response.arrayBuffer();

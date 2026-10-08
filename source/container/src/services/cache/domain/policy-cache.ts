@@ -11,7 +11,9 @@ import { TransformationPolicy } from '../../../types/transformation';
 import { TransformationPolicyRecord } from '../../database/types';
 
 /**
- * Transformation policy cache manager with transparent DynamoDB fallback.
+ * Transformation policy cache manager.
+ * Startup-only snapshot loaded by warmCache(); a miss returns null and never reads DynamoDB.
+ * Changes arrive only via DDB stream -> utility-lambda -> ECS force-new-deployment (new tasks re-warm).
  * Handles caching of image transformation policies from DynamoDB.
  */
 export class PolicyCache {

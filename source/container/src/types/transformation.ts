@@ -6,6 +6,9 @@ export interface Transformation {
   value: any;
   source: 'url' | 'policy' | 'auto';
   conditional?: TransformationConditional;
+  // True only for a format chosen by `format: auto` negotiation (dit-accept or auto fallback).
+  // The image processor may drop it when it would lose the source's alpha channel or animation.
+  negotiated?: boolean;
 }
 
 export interface TransformationConditional {

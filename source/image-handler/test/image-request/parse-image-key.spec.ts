@@ -112,6 +112,66 @@ describe("parseImageKey", () => {
     expect(result).toEqual(expectedResult);
   });
 
+  it("Should match the s3:bucket tag literally when the overridden bucket contains periods", () => {
+    // Arrange
+    const event = {
+      path: "/filters:grayscale()/s3:myXbucket/thumbor-image.jpg",
+    };
+
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const result = imageRequest.parseImageKey(event, RequestTypes.THUMBOR, "my.bucket");
+
+    // Assert
+    expect(result).toEqual("s3:myXbucket/thumbor-image.jpg");
+  });
+
+  it("Should remove the s3:bucket tag when the overridden bucket contains periods and matches exactly", () => {
+    // Arrange
+    const event = {
+      path: "/filters:grayscale()/s3:my.bucket/thumbor-image.jpg",
+    };
+
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const result = imageRequest.parseImageKey(event, RequestTypes.THUMBOR, "my.bucket");
+
+    // Assert
+    expect(result).toEqual("thumbor-image.jpg");
+  });
+
+  it("Should treat regular expression syntax in the overridden bucket as a literal string", () => {
+    // Arrange
+    const maliciousBucket = "(a|a?)+$";
+    const event = {
+      path: `/s3:${"a".repeat(50)}!/thumbor-image.jpg`,
+    };
+
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const start = Date.now();
+    const result = imageRequest.parseImageKey(event, RequestTypes.THUMBOR, maliciousBucket);
+    const elapsed = Date.now() - start;
+
+    // Assert
+    expect(result).toEqual(`s3:${"a".repeat(50)}!/thumbor-image.jpg`);
+    expect(elapsed).toBeLessThan(1000);
+  });
+
+  it("Should remove the s3:bucket tag when the overridden bucket contains regular expression syntax and matches exactly", () => {
+    // Arrange
+    const event = {
+      path: "/s3:bucket(1)/thumbor-image.jpg",
+    };
+
+    // Act
+    const imageRequest = new ImageRequest(s3Client, secretProvider);
+    const result = imageRequest.parseImageKey(event, RequestTypes.THUMBOR, "bucket(1)");
+
+    // Assert
+    expect(result).toEqual("thumbor-image.jpg");
+  });
+
   it("Should pass if an image key value is provided in the thumbor request format having open parentheses", () => {
     // Arrange
     const event = {

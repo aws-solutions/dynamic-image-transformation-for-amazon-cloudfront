@@ -20,7 +20,8 @@ import {
  */
 
 /**
- * Entity type enum
+ * Entity type enum. Values are a wire contract: they are the GSI1PK literals queried by
+ * container/src/services/database/ddb-driver.ts, so renaming one silently hides those items from the container.
  */
 export enum DBEntityType {
   ORIGIN = "ORIGIN",
@@ -35,7 +36,7 @@ export enum DBEntityType {
 const GenericDBSchema = z.strictObject({
   /**
    * Unique identifier for the entity. Also, the primary key
-   * eg. originId, policyId, path or host-header pattern
+   * eg. originId, policyId or mappingId (path and host-header patterns are stored in GSI1SK)
    * Support access patterns to get item by ids
    */
   PK: z.string(),
@@ -116,8 +117,8 @@ const TransformationPolicyDBSchema = GenericDBSchema.extend({
   }),
   /**
    * GSI-2 partition key
-   * "DEFAULT_POLICY" only when this is the default policy
-   * Supports access pattern for getItem() on "DEFAULT_POLICY"
+   * "DEFAULT_POLICY" only when this is the default policy; nothing queries it. Default-policy uniqueness is
+   * enforced by TransformationPolicyDAO.CONTROL_ITEM_PK, and the container reads Data.isDefault
    */
   GSI2PK: z.string().optional(),
 });

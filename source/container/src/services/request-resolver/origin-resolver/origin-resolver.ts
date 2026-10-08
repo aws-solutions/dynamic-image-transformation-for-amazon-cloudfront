@@ -26,6 +26,8 @@ export class OriginResolver {
   }
 
   private normalizeOriginDomain(origin: OriginConfiguration): void {
+    // Stored originDomain is a bare hostname, so https is supplied here for UrlValidator. The origin-override path in
+    // request-resolver.service.ts bypasses this resolver, so its header value must already carry a scheme.
     // Matches valid protocol at start of string (e.g., http://, https://, s3://, ftp://)
     const hasProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(origin.originDomain);
     

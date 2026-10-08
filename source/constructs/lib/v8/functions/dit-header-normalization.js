@@ -85,6 +85,7 @@ function logDetect(result) {
 const MAX_ACCEPT_HEADER_LENGTH = 512;
 const MAX_ACCEPT_MIME_TYPES = 20;
 
+// webp over avif: cheaper, steadier encoding (incl. animation) outweighs AVIF size. Sync container auto-optimizer.ts
 const FORMAT_PRIORITY = ['webp', 'avif', 'jpeg', 'png', 'heif', 'tiff', 'raw', 'gif'];
 
 const FORMAT_MAPPING = {

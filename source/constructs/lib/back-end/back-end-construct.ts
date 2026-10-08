@@ -100,7 +100,9 @@ export class BackEnd extends Construct {
     const imageHandlerLambdaFunction = new NodejsFunction(this, "ImageHandlerLambdaFunction", {
       description: `${props.solutionName} (${props.solutionVersion}): Performs image edits and manipulations`,
       memorySize: 1024,
-      runtime: Runtime.NODEJS_22_X,
+      runtime: Runtime.NODEJS_24_X,
+      // 29s matches the API Gateway REST default integration timeout (raisable only by quota request); this same
+      // function also serves the S3 Object Lambda path.
       timeout: Duration.seconds(29),
       role: imageHandlerLambdaFunctionRole,
       entry: path.join(__dirname, "../../../image-handler/index.ts"),
@@ -181,6 +183,8 @@ export class BackEnd extends Construct {
       queryStringBehavior: CacheQueryStringBehavior.all(),
     });
 
+    // This override supersedes the typed allowList above: accept is in the cache key only when AutoWebP is on.
+    // Keep in sync with Accept normalization in image-handler/cloudfront-function-handlers/apig-request-modifier.js.
     const cachePolicyResource = this.node.findChild("CachePolicy").node.defaultChild as CfnResource;
     cachePolicyResource.addOverride(
       "Properties.CachePolicyConfig.ParametersInCacheKeyAndForwardedToOrigin.HeadersConfig.Headers",
@@ -256,6 +260,8 @@ export class BackEnd extends Construct {
       logGroups: [imageHandlerLogGroup],
       queryDefinitionName: "BilledDurationMemorySizeQuery",
     });
+    // These patterns parse log text from image-handler/index.ts (console.info(imageRequestInfo)) and
+    // image-handler/image-request.ts ("Query param edits:"); changing either log line breaks this query.
     solutionsMetrics.addQueryDefinition({
       logGroups: [imageHandlerLogGroup],
       queryString: new QueryString({

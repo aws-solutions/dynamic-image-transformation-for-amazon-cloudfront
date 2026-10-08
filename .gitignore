@@ -34,6 +34,7 @@ bom.json
 
 # System Files
 **/.DS_Store
+**/.metadata_never_index
 **/.vscode
 **/.idea
 build
@@ -46,10 +47,14 @@ git-info
 # kiro - personal/ephemeral files
 .kiro/settings/mcp.json
 .kiro/docs/
+.kiro/specs/
 .kiro/steering/*
 !.kiro/steering/metrics.md
+.kiro/plans/*
+!.kiro/plans/README.md
 # Generic Docs Directory (non-kiro)
 .docs
+docs/
 .kiro/handoff
 
 # Claude

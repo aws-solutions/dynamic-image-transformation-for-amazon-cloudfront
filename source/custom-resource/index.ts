@@ -200,8 +200,8 @@ async function performRequest(
 }
 
 /**
- * Suspends for the specified amount of seconds.
- * @param timeOut The number of seconds for which the call is suspended.
+ * Suspends for the specified number of milliseconds.
+ * @param timeOut The number of milliseconds for which the call is suspended.
  * @returns Sleep promise.
  */
 async function sleep(timeOut: number): Promise<void> {
@@ -209,9 +209,9 @@ async function sleep(timeOut: number): Promise<void> {
 }
 
 /**
- * Gets retry timeout based on the current retry attempt in seconds.
+ * Gets the retry timeout in milliseconds for the current retry attempt (RETRY_SECONDS is in seconds).
  * @param attempt Retry attempt.
- * @returns Timeout in seconds.
+ * @returns Timeout in milliseconds.
  */
 function getRetryTimeout(attempt: number): number {
   const retrySeconds = Number(RETRY_SECONDS);
@@ -258,6 +258,7 @@ async function sendCloudFormationResponse(
   const responseBody = JSON.stringify({
     Status: response.Status,
     Reason: `See the details in CloudWatch Log Stream: ${logStreamName}`,
+    // Constant across updates, so CloudFormation never sees a replacement and never sends a Delete for the old one.
     PhysicalResourceId: event.LogicalResourceId,
     StackId: event.StackId,
     RequestId: event.RequestId,
@@ -268,6 +269,7 @@ async function sendCloudFormationResponse(
   return fetch(event.ResponseURL, {
     method: "PUT",
     headers: {
+      // CloudFormation's pre-signed ResponseURL rejects a Content-Type; match the cfn-response module and send an empty one.
       "Content-Type": "",
       "Content-Length": String(responseBody.length),
     },
@@ -363,7 +365,7 @@ async function putConfigFile(
 
   const content = `'use strict';\n\nconst appVariables = {\n${configFieldValues}\n};`;
 
-  // In case getting object fails due to asynchronous IAM permission creation, it retries.
+  // In case putting object fails due to asynchronous IAM permission creation, it retries.
   const params: PutObjectCommandInput = {
     Bucket: DestS3Bucket,
     Body: content,
@@ -461,7 +463,9 @@ async function checkFirstBucketRegion(
     console.info("Detected non-S3 Object Lambda deployment. Returning first bucket.");
     return { BucketName: bucket, BucketHash: "" };
   }
-  // Generate unique bucket hash to support unique Access Point names
+  // Generate unique bucket hash to support unique Access Point names.
+  // 6 chars because "sih-ap-" + 36-char UUID + "-" + 6 = 50, the Access Point name maximum
+  // (constructs/lib/back-end/s3-object-lambda-architecture.ts).
   const generateBucketHash = (bucketName: string): string => {
     // Simple hashing algorithm
     let hash = 0;
@@ -476,6 +480,7 @@ async function checkFirstBucketRegion(
 
   try {
     const bucketLocationResponse = await s3Client.send(new GetBucketLocationCommand({ Bucket: bucket }));
+    // GetBucketLocation returns a null LocationConstraint for us-east-1.
     const bucketRegion = bucketLocationResponse.LocationConstraint || "us-east-1";
     if (bucketRegion === AWS_REGION) {
       console.info(`Bucket '${bucket}' is in the same region (${bucketRegion}) as the S3 client.`);
