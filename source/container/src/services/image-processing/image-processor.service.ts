@@ -94,9 +94,9 @@ export class ImageProcessorService {
       }
 
       // Instantiate Sharp image with rotation-aware logic
-      const image = this.instantiateSharpImage(imageBuffer, imageEdits, sharpOptions);
+      const image = this.instantiateSharpImage(imageBuffer, imageEdits, sharpOptions, metadata.orientation);
 
-      await EditApplicator.applyEdits(image, imageEdits, this.originFetcher);
+      await EditApplicator.applyEdits(image, imageEdits, this.originFetcher, imageBuffer.length);
       
       // We need to resolve final image format from the outputted image. Obtaining this formating from image metadata prior to being outputted is unreliable.
       const finalImage = await image.toBuffer({resolveWithObject: true});
@@ -169,7 +169,7 @@ export class ImageProcessorService {
       if (ALPHA_PRESERVING_FORMATS.has(target)) return;
       // hasAlpha only means an alpha channel exists; skip the override when no pixel is transparent.
       // stats() decodes every pixel, so it runs only when the override would otherwise fire.
-      if ((await sharp(imageBuffer).stats()).isOpaque) return;
+      if ((await sharp(imageBuffer, { limitInputPixels: this.limitInputPixels() }).stats()).isOpaque) return;
       reason = 'alpha';
     } else {
       return;
@@ -218,29 +218,28 @@ export class ImageProcessorService {
     imageRequest.response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox";
   }
 
-  private instantiateSharpImage(imageBuffer: Buffer, imageEdits: any, options?: any): Sharp {
-    // LIMIT_INPUT_PIXELS is set per deployment size by the CDK (50 MP on the 2 GB tier, 100 MP on
-    // the 4 GB tiers) as a decode-memory guard. The fallback matches the smallest tier so an
-    // unset/invalid value fails safe rather than reverting to an effectively unlimited ceiling.
+  // The CDK sets LIMIT_INPUT_PIXELS per deployment size (50 MP on 2 GB, 100 MP on 4 GB) as a decode-memory
+  // guard. An unset or non-numeric value falls back to the smallest tier's cap, not Sharp's ~268 MP default.
+  private limitInputPixels(): number {
     const parsedLimit = parseInt(process.env.LIMIT_INPUT_PIXELS || '', 10);
-    const limitInputPixels = Number.isNaN(parsedLimit) ? 50000000 : parsedLimit;
-    const sharpOptions: SharpOptions = { limitInputPixels, ...options };
-    // Default behavior of DIT is to keep all Metadata. Sharp by default converts the ICC to sRGB. Must chain keepIcc and keepMetadata to prevent this.
-    let returnInstance = sharp(imageBuffer, sharpOptions).keepIccProfile().keepMetadata();
+    return Number.isNaN(parsedLimit) ? 50000000 : parsedLimit;
+  }
+
+  private instantiateSharpImage(imageBuffer: Buffer, imageEdits: any, options?: any, sourceOrientation?: number): Sharp {
+    const sharpOptions: SharpOptions = { limitInputPixels: this.limitInputPixels(), ...options };
+    // Sharp by default converts the ICC to sRGB, so keep it on every path.
+    const returnInstance = sharp(imageBuffer, sharpOptions).keepIccProfile();
     try {
       if(imageEdits.stripExif === true){
-        // Removes all EXIF, by inserting the Software EXIF tag. Atleast 1 field is required to use Sharp.withExif(). Leaves ICC untouched.
-        returnInstance.keepIccProfile().withExif({
-          IFD0: {
-            Software: 'Dynamic Image Transformation for Amazon CloudFront'
-          }
-        });
-      } 
+        // Keep only ICC and the orientation tag: keepMetadata() bits cannot be cleared, and pixels are not rotated.
+        if (sourceOrientation) returnInstance.withExif({ IFD0: { Orientation: String(sourceOrientation) } });
+      } else {
+        // Default behavior of DIT is to keep all metadata.
+        returnInstance.keepMetadata();
+      }
       if (imageEdits.stripIcc === true) {
-      // Strips ICC by defaulting to sRGB color space, while keeping EXIF untouched. Allows strip_exif and strip_icc to be used in combination with eachother.
-        returnInstance
-          .keepExif() // Keep EXIF
-          .withIccProfile('srgb'); // Force standard sRGB instead of original ICC
+        // Replaces the ICC with sRGB. EXIF is left to the branch above: keepExif() here would copy back the source EXIF.
+        returnInstance.withIccProfile('srgb');
       }
       return returnInstance;
     } catch (error) {

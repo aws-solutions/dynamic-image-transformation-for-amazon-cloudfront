@@ -8,6 +8,9 @@ import { mockClient } from 'aws-sdk-client-mock';
 
 const s3Mock = mockClient(S3Client);
 
+const JPEG_BYTES = [0xff, 0xd8, 0xff, 0xe0];
+const streamOf = (bytes: number[] | Buffer) => new Response(new Uint8Array(bytes)).body;
+
 describe('OriginFetcher', () => {
   let fetcher: OriginFetcher;
 
@@ -57,6 +60,7 @@ describe('OriginFetcher', () => {
       status: 200,
       headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? contentType : null) },
       arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer,
+      body: streamOf(JPEG_BYTES),
     });
 
     it('should reject a response with no Content-Type header', async () => {
@@ -105,6 +109,7 @@ describe('OriginFetcher', () => {
         arrayBuffer: async () => {
           throw abortError;
         },
+        body: new ReadableStream({ pull: controller => controller.error(abortError) }),
       }) as unknown as typeof fetch;
 
       await expect(fetcher['fetchFromHttp']('https://example.com/image.jpg')).rejects.toMatchObject({
@@ -120,6 +125,7 @@ describe('OriginFetcher', () => {
         status: 200,
         headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'image/jpeg' : null) },
         arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer,
+        body: streamOf(JPEG_BYTES),
       }) as unknown as typeof fetch;
 
       const result = await fetcher['fetchFromHttp']('https://example.com/image.jpg');
@@ -139,6 +145,7 @@ describe('OriginFetcher', () => {
         arrayBuffer: async () => {
           throw abortError;
         },
+        body: new ReadableStream({ pull: controller => controller.error(abortError) }),
       }) as unknown as typeof fetch;
 
       await expect(fetcher['fetchFromHttp']('https://example.com/image.jpg')).rejects.toBeDefined();
@@ -151,6 +158,8 @@ describe('OriginFetcher', () => {
     // A GetObject Body is a stream-like object exposing transformToByteArray(); mirror that here.
     const s3Body = (bytes: number[]) => ({
       transformToByteArray: async () => new Uint8Array(bytes),
+      destroy: jest.fn(),
+      async *[Symbol.asyncIterator]() { yield new Uint8Array(bytes); },
     });
     const validPng = [0x89, 0x50, 0x4e, 0x47];
     const s3Url = (key: string) => `https://source-bucket.s3.us-west-2.amazonaws.com/${key}`;
@@ -219,6 +228,7 @@ describe('OriginFetcher', () => {
         status: 200,
         headers: { get: () => 'image/jpeg' },
         arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer,
+        body: streamOf(JPEG_BYTES),
       });
       global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -333,7 +343,7 @@ describe('OriginFetcher', () => {
       
       await fetcher.fetchImage('https://bucket.s3.amazonaws.com/key');
       
-      expect(spy).toHaveBeenCalledWith('https://bucket.s3.amazonaws.com/key', undefined);
+      expect(spy).toHaveBeenCalledWith('https://bucket.s3.amazonaws.com/key', undefined, expect.any(Number));
     });
 
     it('should route regional S3 URLs to S3 fetcher', async () => {
@@ -341,7 +351,7 @@ describe('OriginFetcher', () => {
       
       await fetcher.fetchImage('https://bucket.s3.us-west-2.amazonaws.com/key');
       
-      expect(spy).toHaveBeenCalledWith('https://bucket.s3.us-west-2.amazonaws.com/key', undefined);
+      expect(spy).toHaveBeenCalledWith('https://bucket.s3.us-west-2.amazonaws.com/key', undefined, expect.any(Number));
     });
 
     it('should route dash-style S3 URLs to S3 fetcher', async () => {
@@ -349,7 +359,7 @@ describe('OriginFetcher', () => {
       
       await fetcher.fetchImage('https://bucket.s3-eu-central-1.amazonaws.com/key');
       
-      expect(spy).toHaveBeenCalledWith('https://bucket.s3-eu-central-1.amazonaws.com/key', undefined);
+      expect(spy).toHaveBeenCalledWith('https://bucket.s3-eu-central-1.amazonaws.com/key', undefined, expect.any(Number));
     });
 
 
@@ -359,7 +369,7 @@ describe('OriginFetcher', () => {
       
       await fetcher.fetchImage('https://s3.us-west-2.amazonaws.com/bucket/key');
       
-      expect(spy).toHaveBeenCalledWith('https://s3.us-west-2.amazonaws.com/bucket/key', undefined);
+      expect(spy).toHaveBeenCalledWith('https://s3.us-west-2.amazonaws.com/bucket/key', undefined, expect.any(Number));
     });
 
     it('should route HTTP URLs to HTTP fetcher', async () => {
@@ -367,7 +377,7 @@ describe('OriginFetcher', () => {
       
       await fetcher.fetchImage('https://example.com/image.jpg');
       
-      expect(spy).toHaveBeenCalledWith('https://example.com/image.jpg', undefined);
+      expect(spy).toHaveBeenCalledWith('https://example.com/image.jpg', undefined, expect.any(Number));
     });
 
     it('should reject unsupported protocols', async () => {
@@ -435,6 +445,193 @@ describe('OriginFetcher', () => {
         fetchDurationMs: 12
       });
       logSpy.mockRestore();
+    });
+  });
+  describe('origin body size limit (watermark overlay fetch)', () => {
+    const LIMIT = 10;
+    const TOO_LARGE = { statusCode: 502, errorType: 'OriginImageTooLarge' };
+    const HTTP = 'https://example.com/overlay.jpg';
+    const S3 = 'https://source-bucket.s3.us-west-2.amazonaws.com/overlay.jpg';
+    const realFetch = global.fetch;
+    let limited: OriginFetcher;
+
+    const jpegOfLength = (length: number) => {
+      const buf = Buffer.alloc(length);
+      Buffer.from(JPEG_BYTES).copy(buf, 0, 0, Math.min(JPEG_BYTES.length, length));
+      return buf;
+    };
+
+    // Chunked delivery lets tests cross the limit mid-read; the cancel spies show the stream was released.
+    const spiedBody = (bytes: Buffer, chunkSize = bytes.length || 1, cancelRejects = false) => {
+      let offset = 0;
+      const reader = {
+        read: jest.fn(async () => {
+          if (offset >= bytes.length) return { done: true, value: undefined };
+          const value = new Uint8Array(bytes.subarray(offset, offset + chunkSize));
+          offset += chunkSize;
+          return { done: false, value };
+        }),
+        cancel: jest.fn().mockResolvedValue(undefined),
+        releaseLock: jest.fn(),
+      };
+      return {
+        reader,
+        getReader: jest.fn(() => reader),
+        cancel: cancelRejects ? jest.fn().mockRejectedValue(new Error('cancel failed')) : jest.fn().mockResolvedValue(undefined),
+      };
+    };
+
+    const httpResponse = (body: unknown, { status = 200, contentType = 'image/jpeg', contentLength }: { status?: number; contentType?: string; contentLength?: string } = {}) => ({
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: 'status',
+      headers: new Headers({ 'content-type': contentType, ...(contentLength ? { 'content-length': contentLength } : {}) }),
+      body,
+    });
+
+    // Chunked delivery lets tests cross the limit mid-read; the destroy spy shows a rejected S3 stream was released.
+    const s3Body = (bytes: Buffer, chunkSize = bytes.length || 1) => ({
+      destroy: jest.fn(),
+      transformToByteArray: jest.fn(async () => new Uint8Array(bytes)),
+      [Symbol.asyncIterator]: jest.fn(async function* () {
+        for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+          yield new Uint8Array(bytes.subarray(offset, offset + chunkSize));
+        }
+      }),
+    });
+
+    beforeEach(() => {
+      limited = new OriginFetcher(LIMIT);
+    });
+
+    afterEach(() => {
+      global.fetch = realFetch;
+    });
+
+    describe('HTTP', () => {
+      it('rejects a declared length over the limit before reading and cancels the body', async () => {
+        const body = spiedBody(jpegOfLength(4));
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(body, { contentLength: '20' })) as unknown as typeof fetch;
+
+        await expect(limited.fetchImage(HTTP)).rejects.toMatchObject(TOO_LARGE);
+        expect(body.getReader).not.toHaveBeenCalled();
+        expect(body.cancel).toHaveBeenCalled();
+      });
+
+      it('returns a body whose declared and actual length equal the limit', async () => {
+        const bytes = jpegOfLength(LIMIT);
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(spiedBody(bytes), { contentLength: String(LIMIT) })) as unknown as typeof fetch;
+
+        const result = await limited.fetchImage(HTTP);
+        expect(result.buffer.equals(bytes)).toBe(true);
+      });
+
+      it.each([
+        ['understated', '5'],
+        ['absent', undefined],
+      ])('cancels the read once the body passes the limit when the declared length is %s', async (_label, contentLength) => {
+        const body = spiedBody(jpegOfLength(LIMIT + 5), 4);
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(body, { contentLength })) as unknown as typeof fetch;
+
+        await expect(limited.fetchImage(HTTP)).rejects.toMatchObject(TOO_LARGE);
+        expect(body.reader.cancel).toHaveBeenCalled();
+      });
+
+      it('uses a per-call limit over the constructor default', async () => {
+        const body = spiedBody(jpegOfLength(8));
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(body)) as unknown as typeof fetch;
+
+        await expect(limited.fetchImage(HTTP, undefined, undefined, 6)).rejects.toMatchObject(TOO_LARGE);
+      });
+
+      it('treats a missing body as empty, which the short-body check rejects with 415', async () => {
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(null)) as unknown as typeof fetch;
+
+        await expect(limited.fetchImage(HTTP)).rejects.toMatchObject({ statusCode: 415, errorType: 'InvalidImage' });
+      });
+
+      it('releases the body when the origin returns a non-ok status', async () => {
+        const body = spiedBody(jpegOfLength(4));
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(body, { status: 404 })) as unknown as typeof fetch;
+
+        await expect(limited.fetchImage(HTTP)).rejects.toMatchObject({ statusCode: 404, errorType: 'HttpFetchError' });
+        expect(body.cancel).toHaveBeenCalled();
+      });
+
+      it('releases the body when the Content-Type is rejected', async () => {
+        const body = spiedBody(jpegOfLength(4));
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(body, { contentType: 'text/html' })) as unknown as typeof fetch;
+
+        await expect(limited.fetchImage(HTTP)).rejects.toMatchObject({ statusCode: 415, errorType: 'InvalidContentType' });
+        expect(body.getReader).not.toHaveBeenCalled();
+        expect(body.cancel).toHaveBeenCalled();
+      });
+
+      it('still throws the original error when releasing the body fails', async () => {
+        const body = spiedBody(jpegOfLength(4), 4, true);
+        global.fetch = jest.fn().mockResolvedValue(httpResponse(body, { contentLength: '20' })) as unknown as typeof fetch;
+
+        await expect(limited.fetchImage(HTTP)).rejects.toMatchObject(TOO_LARGE);
+        expect(body.cancel).toHaveBeenCalled();
+      });
+    });
+
+    describe('S3', () => {
+      it('rejects a declared ContentLength over the limit and releases the unread body', async () => {
+        const body = s3Body(jpegOfLength(4));
+        s3Mock.on(GetObjectCommand).resolves({ Body: body as any, ContentType: 'image/jpeg', ContentLength: 20 });
+
+        await expect(limited.fetchImage(S3)).rejects.toMatchObject(TOO_LARGE);
+        expect(body[Symbol.asyncIterator]).not.toHaveBeenCalled();
+        expect(body.destroy).toHaveBeenCalled();
+      });
+
+      it('checks the Content-Type before reading and releases the unread body', async () => {
+        const body = s3Body(jpegOfLength(4));
+        s3Mock.on(GetObjectCommand).resolves({ Body: body as any, ContentType: 'text/html' });
+
+        await expect(limited.fetchImage(S3)).rejects.toMatchObject({ statusCode: 415, errorType: 'InvalidContentType' });
+        expect(body[Symbol.asyncIterator]).not.toHaveBeenCalled();
+        expect(body.transformToByteArray).not.toHaveBeenCalled();
+        expect(body.destroy).toHaveBeenCalled();
+      });
+
+      it('returns a body whose ContentLength and actual length equal the limit', async () => {
+        const bytes = jpegOfLength(LIMIT);
+        s3Mock.on(GetObjectCommand).resolves({ Body: s3Body(bytes, 3) as any, ContentType: 'image/jpeg', ContentLength: LIMIT });
+
+        const result = await limited.fetchImage(S3);
+        expect(result.buffer.equals(bytes)).toBe(true);
+      });
+
+      it('rejects a Buffer body over the limit and returns one at the limit', async () => {
+        const bytes = jpegOfLength(LIMIT);
+        s3Mock
+          .on(GetObjectCommand)
+          .resolvesOnce({ Body: jpegOfLength(LIMIT + 1) as any, ContentType: 'image/jpeg' })
+          .resolvesOnce({ Body: bytes as any, ContentType: 'image/jpeg' });
+
+        await expect(limited.fetchImage(S3)).rejects.toMatchObject(TOO_LARGE);
+        const result = await limited.fetchImage(S3);
+        expect(result.buffer.equals(bytes)).toBe(true);
+      });
+
+      it('rejects any non-empty overlay when no budget is left', async () => {
+        s3Mock.on(GetObjectCommand).resolves({ Body: s3Body(jpegOfLength(4)) as any, ContentType: 'image/jpeg' });
+
+        await expect(limited.fetchImage(S3, undefined, undefined, 0)).rejects.toMatchObject(TOO_LARGE);
+      });
+
+      it.each([
+        ['understated', 5],
+        ['absent', undefined],
+      ])('destroys the stream once the body passes the limit when ContentLength is %s', async (_label, contentLength) => {
+        const body = s3Body(jpegOfLength(LIMIT + 5), 4);
+        s3Mock.on(GetObjectCommand).resolves({ Body: body as any, ContentType: 'image/jpeg', ContentLength: contentLength });
+
+        await expect(limited.fetchImage(S3)).rejects.toMatchObject(TOO_LARGE);
+        expect(body.destroy).toHaveBeenCalled();
+      });
     });
   });
 });

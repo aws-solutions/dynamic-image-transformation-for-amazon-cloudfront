@@ -265,3 +265,46 @@ export const mockHostHeaderMappingUpdateRequest: MappingUpdate = {
   originId: mockUUIDV4_2,
   policyId: mockUUIDV4_2,
 };
+
+/**
+ * Stubs GSI1 queries with the given items per GSI1PK, so the uniqueness check sees an existing table.
+ * Partitions not listed return no items. GetItem on a listed item's PK returns that item (the clash
+ * confirmation read); any other GetItem falls through to the get mock already set.
+ */
+export const mockGSI1Partitions = (partitions: Partial<Record<DBEntityType, any[]>>) => {
+  mockDynamoDBCommands.query.mockImplementation(async (input: any) => ({
+    Items: partitions[input.ExpressionAttributeValues?.[":gsi1pk"] as DBEntityType] ?? [],
+  }));
+  const fallback = mockDynamoDBCommands.get.getMockImplementation();
+  const byPK = new Map(Object.values(partitions).flatMap((items) => (items ?? []).map((item) => [item.PK, item])));
+  mockDynamoDBCommands.get.mockImplementation(async (input: any) =>
+    byPK.has(input.Key.PK) ? { Item: byPK.get(input.Key.PK) } : fallback ? fallback(input) : { Item: undefined }
+  );
+};
+
+export const mockOtherOriginDDB = (originName: string, pk = mockUUIDV4_2): DBOrigin => ({
+  ...mockOriginDDB,
+  PK: pk,
+  GSI1SK: originName,
+  Data: { ...mockOriginDDB.Data, originName },
+});
+
+export const mockOtherPolicyDDB = (policyName: string, pk = mockUUIDV4_2): DBTransformationPolicy => ({
+  ...mockTransformationPolicyDDB,
+  PK: pk,
+  GSI1SK: policyName,
+  Data: { ...mockTransformationPolicyDDB.Data, policyName },
+});
+
+export const mockOtherMappingDDB = (
+  type: DBEntityType.PATH_MAPPING | DBEntityType.HOST_HEADER_MAPPING,
+  pattern: string,
+  mappingName: string,
+  pk = mockUUIDV4_2
+): DBMapping => ({
+  ...mockPathMappingDDB,
+  PK: pk,
+  GSI1PK: type,
+  GSI1SK: pattern,
+  Data: { ...mockPathMappingDDB.Data, mappingName },
+});

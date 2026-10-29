@@ -22,14 +22,53 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length) as ArrayBuffer;
 }
 
-function httpResponse(contentType: string | null, bytes: Buffer = JPEG, status = 200) {
+// Chunked delivery lets tests cross the limit mid-read; the cancel spies show a rejected response was released.
+function webBody(bytes: Buffer, chunkSize = bytes.length || 1) {
+  return {
+    getReader: jest.fn(() => {
+      let offset = 0;
+      return {
+        read: jest.fn(async () => {
+          if (offset >= bytes.length) return { done: true, value: undefined };
+          const value = new Uint8Array(bytes.subarray(offset, offset + chunkSize));
+          offset += chunkSize;
+          return { done: false, value };
+        }),
+        cancel: jest.fn().mockResolvedValue(undefined),
+        releaseLock: jest.fn(),
+      };
+    }),
+    cancel: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function httpResponse(contentType: string | null, bytes: Buffer = JPEG, status = 200, extraHeaders: Record<string, string> = {}) {
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: new Headers(contentType ? { 'content-type': contentType } : {}),
+    headers: new Headers({ ...(contentType ? { 'content-type': contentType } : {}), ...extraHeaders }),
     arrayBuffer: jest.fn().mockResolvedValue(toArrayBuffer(bytes)),
-    body: { cancel: jest.fn().mockResolvedValue(undefined) },
+    body: webBody(bytes),
   };
+}
+
+// Chunked delivery lets tests cross the limit mid-read; the destroy spy shows a rejected S3 stream was released.
+function s3Body(bytes: Buffer, chunkSize = bytes.length || 1) {
+  return {
+    transformToByteArray: jest.fn().mockResolvedValue(new Uint8Array(bytes)),
+    destroy: jest.fn(),
+    [Symbol.asyncIterator]: jest.fn(async function* () {
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        yield new Uint8Array(bytes.subarray(offset, offset + chunkSize));
+      }
+    }),
+  };
+}
+
+function jpegOfLength(length: number): Buffer {
+  const buf = Buffer.alloc(length);
+  JPEG.copy(buf, 0, 0, Math.min(JPEG.length, length));
+  return buf;
 }
 
 function abortError(): Error {
@@ -146,6 +185,7 @@ describe('ConnectionManager', () => {
 
       await expect(connectionManager.fetchOriginImage(HTTP_URL, imageRequest)).rejects.toMatchObject({ errorType, statusCode });
       expect(response.arrayBuffer).not.toHaveBeenCalled();
+      expect(response.body.getReader).not.toHaveBeenCalled();
       expect(response.body.cancel).toHaveBeenCalled();
     });
 
@@ -211,9 +251,13 @@ describe('ConnectionManager', () => {
     it('lets the body read run past 5s and maps a body not done by 30s to RequestTimeout (504)', async () => {
       let signal: AbortSignal | undefined;
       const response = httpResponse('image/jpeg');
-      response.arrayBuffer.mockImplementation(() => new Promise((_resolve, reject) => {
-        signal!.addEventListener('abort', () => reject(abortError()));
-      }));
+      response.body.getReader.mockImplementation(() => ({
+        read: jest.fn(() => new Promise((_resolve, reject) => {
+          signal!.addEventListener('abort', () => reject(abortError()));
+        })),
+        cancel: jest.fn().mockResolvedValue(undefined),
+        releaseLock: jest.fn(),
+      }) as any);
       mockFetch.mockImplementation(async (_url, init) => { signal = init.signal; return response; });
 
       const pending = connectionManager.fetchOriginImage(HTTP_URL, imageRequest);
@@ -235,15 +279,29 @@ describe('ConnectionManager', () => {
 
   describe('content checks', () => {
     it.each([
-      ['text/html'],
-      [null],
-    ])('rejects non-image content type %p with INVALID_FORMAT (400)', async (contentType) => {
+      ['text/html', 'text/html'],
+      [null, 'undefined'],
+    ])('rejects non-image content type %p with INVALID_FORMAT (400)', async (contentType, loggedType) => {
       const response = httpResponse(contentType);
       mockFetch.mockResolvedValue(response);
 
-      await expect(connectionManager.fetchOriginImage(HTTP_URL, imageRequest))
-        .rejects.toMatchObject({ title: 'Invalid content type', errorType: 'INVALID_FORMAT', statusCode: 400 });
+      await expect(connectionManager.fetchOriginImage(HTTP_URL, imageRequest)).rejects.toMatchObject({
+        title: 'Invalid content type',
+        errorType: 'INVALID_FORMAT',
+        statusCode: 400,
+        verboseDescription: `Origin '${HTTP_URL}' does not serve image content. Content-Type: ${loggedType}`
+      });
       expect(response.arrayBuffer).not.toHaveBeenCalled();
+      expect(response.body.getReader).not.toHaveBeenCalled();
+    });
+
+    it('puts the origin URL without userinfo or query string in the error description', async () => {
+      mockFetch.mockResolvedValue(httpResponse('text/html'));
+
+      await expect(connectionManager.fetchOriginImage('https://user:pw@example.com/image.jpg?token=abc', imageRequest))
+        .rejects.toMatchObject({
+          verboseDescription: "Origin 'https://example.com/image.jpg' does not serve image content. Content-Type: text/html"
+        });
     });
 
     it('rejects an image/* type outside the allowlist with InvalidContentType (415) without reading the body', async () => {
@@ -253,7 +311,19 @@ describe('ConnectionManager', () => {
       await expect(connectionManager.fetchOriginImage(HTTP_URL, imageRequest))
         .rejects.toMatchObject({ errorType: 'InvalidContentType', statusCode: 415 });
       expect(response.arrayBuffer).not.toHaveBeenCalled();
+      expect(response.body.getReader).not.toHaveBeenCalled();
       expect(response.body.cancel).toHaveBeenCalled();
+    });
+
+    it('puts the origin URL without userinfo or query string in the unsupported image type error', async () => {
+      mockFetch.mockResolvedValue(httpResponse('image/bmp'));
+
+      await expect(connectionManager.fetchOriginImage('https://user:pw@example.com/image.jpg?token=abc', imageRequest))
+        .rejects.toMatchObject({
+          errorType: 'InvalidContentType',
+          statusCode: 415,
+          verboseDescription: "Origin 'https://example.com/image.jpg' returned unsupported Content-Type 'image/bmp'."
+        });
     });
 
     it('rejects bytes that do not match the declared type with InvalidImage (415)', async () => {
@@ -273,7 +343,7 @@ describe('ConnectionManager', () => {
 
     const s3Object = (contentType: string | undefined, bytes: Buffer = JPEG) => ({
       ContentType: contentType,
-      Body: { transformToByteArray: jest.fn().mockResolvedValue(new Uint8Array(bytes)), destroy: jest.fn() },
+      Body: s3Body(bytes),
     });
 
     it('makes exactly one GetObject and attaches the image', async () => {
@@ -329,9 +399,14 @@ describe('ConnectionManager', () => {
       const object = s3Object(contentType);
       mockS3Send.mockResolvedValue(object);
 
-      await expect(connectionManager.fetchOriginImage(S3_URL, imageRequest))
-        .rejects.toMatchObject({ errorType: 'INVALID_FORMAT', statusCode: 400 });
+      await expect(connectionManager.fetchOriginImage(S3_URL, imageRequest)).rejects.toMatchObject({
+        title: 'Invalid content type',
+        errorType: 'INVALID_FORMAT',
+        statusCode: 400,
+        verboseDescription: `Origin '${S3_URL}' does not serve image content. Content-Type: ${contentType}`
+      });
       expect(object.Body.transformToByteArray).not.toHaveBeenCalled();
+      expect(object.Body[Symbol.asyncIterator]).not.toHaveBeenCalled();
       expect(object.Body.destroy).toHaveBeenCalled();
     });
 
@@ -351,7 +426,19 @@ describe('ConnectionManager', () => {
       await expect(connectionManager.fetchOriginImage(S3_URL, imageRequest))
         .rejects.toMatchObject({ errorType: 'InvalidContentType', statusCode: 415 });
       expect(object.Body.transformToByteArray).not.toHaveBeenCalled();
+      expect(object.Body[Symbol.asyncIterator]).not.toHaveBeenCalled();
       expect(object.Body.destroy).toHaveBeenCalled();
+    });
+
+    it('puts the S3 URL without its query string in the unsupported image type error', async () => {
+      mockS3Send.mockResolvedValue(s3Object('image/bmp'));
+
+      await expect(connectionManager.fetchOriginImage(`${S3_URL}?X-Amz-Signature=abc`, imageRequest))
+        .rejects.toMatchObject({
+          errorType: 'InvalidContentType',
+          statusCode: 415,
+          verboseDescription: `S3 origin '${S3_URL}' returned unsupported Content-Type 'image/bmp'.`
+        });
     });
 
     it('rejects an empty body with ImageNotFound (404)', async () => {
@@ -373,6 +460,173 @@ describe('ConnectionManager', () => {
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({ originType: 's3', sizeBytes: JPEG.length });
       logSpy.mockRestore();
+    });
+  });
+  describe('origin body size limit', () => {
+    const LIMIT = 10;
+    const TOO_LARGE = { statusCode: 502, errorType: 'OriginImageTooLarge' };
+    let limited: ConnectionManager;
+
+    beforeEach(() => {
+      limited = new ConnectionManager(undefined, LIMIT);
+    });
+
+    it('accepts a small body with the default limit', async () => {
+      const body = jpegOfLength(64);
+      mockFetch.mockResolvedValue(httpResponse('image/jpeg', body));
+
+      await new ConnectionManager().fetchOriginImage(HTTP_URL, imageRequest);
+
+      expect(imageRequest.sourceImage?.buffer.length).toBe(64);
+    });
+
+    describe('HTTP', () => {
+      it.each([
+        ['under the limit', 4],
+        ['exactly the limit', LIMIT],
+      ])('rejects a declared length over the limit before reading a body %s', async (_label, actual) => {
+        const response = httpResponse('image/jpeg', jpegOfLength(actual), 200, { 'content-length': String(LIMIT * 2) });
+        mockFetch.mockResolvedValue(response);
+
+        await expect(limited.fetchOriginImage(HTTP_URL, imageRequest)).rejects.toMatchObject(TOO_LARGE);
+        expect(response.body.getReader).not.toHaveBeenCalled();
+        expect(response.body.cancel).toHaveBeenCalled();
+      });
+
+      it('rejects a declared length over the limit with 502, not 500, when the body is shorter', async () => {
+        const response = httpResponse('image/jpeg', jpegOfLength(10), 200, { 'content-length': '20' });
+        mockFetch.mockResolvedValue(response);
+
+        await expect(limited.fetchOriginImage(HTTP_URL, imageRequest)).rejects.toMatchObject(TOO_LARGE);
+      });
+
+      it('returns a body whose declared and actual length equal the limit', async () => {
+        const body = jpegOfLength(LIMIT);
+        mockFetch.mockResolvedValue(httpResponse('image/jpeg', body, 200, { 'content-length': String(LIMIT) }));
+
+        await limited.fetchOriginImage(HTTP_URL, imageRequest);
+
+        expect(imageRequest.sourceImage?.buffer.equals(body)).toBe(true);
+      });
+
+      it.each([
+        ['understated', { 'content-length': '5' }],
+        ['equal to the limit but understated', { 'content-length': String(LIMIT) }],
+        ['absent', {}],
+        ['not an integer', { 'content-length': 'abc' }],
+      ])('cancels the read once the body passes the limit when the declared length is %s', async (_label, headers) => {
+        const response = httpResponse('image/jpeg', jpegOfLength(LIMIT + 5), 200, headers);
+        response.body = webBody(jpegOfLength(LIMIT + 5), 4);
+        mockFetch.mockResolvedValue(response);
+
+        await expect(limited.fetchOriginImage(HTTP_URL, imageRequest)).rejects.toMatchObject(TOO_LARGE);
+        const reader = response.body.getReader.mock.results[0].value;
+        expect(reader.cancel).toHaveBeenCalled();
+        // 4-byte chunks pass the 10-byte limit on the third read; the fourth chunk is never read.
+        expect(reader.read).toHaveBeenCalledTimes(3);
+      });
+
+      it.each(['1.5', '-1', 'abc'])('ignores an unusable declared length %p for a body under the limit', async (declared) => {
+        const body = jpegOfLength(8);
+        mockFetch.mockResolvedValue(httpResponse('image/jpeg', body, 200, { 'content-length': declared }));
+
+        await limited.fetchOriginImage(HTTP_URL, imageRequest);
+
+        expect(imageRequest.sourceImage?.buffer.equals(body)).toBe(true);
+      });
+
+      it('returns the same bytes for a chunked body under the limit', async () => {
+        const body = jpegOfLength(9);
+        const response = httpResponse('image/jpeg', body);
+        response.body = webBody(body, 2);
+        mockFetch.mockResolvedValue(response);
+
+        await limited.fetchOriginImage(HTTP_URL, imageRequest);
+
+        expect(imageRequest.sourceImage?.buffer.equals(body)).toBe(true);
+      });
+
+      it('treats a missing body as empty, which the short-body check rejects with 415', async () => {
+        const response: any = httpResponse('image/jpeg');
+        response.body = null;
+        mockFetch.mockResolvedValue(response);
+
+        await expect(limited.fetchOriginImage(HTTP_URL, imageRequest)).rejects.toMatchObject({ errorType: 'InvalidImage', statusCode: 415 });
+      });
+
+      it('maps any other read error to FetchError (500)', async () => {
+        const response = httpResponse('image/jpeg');
+        response.body.getReader.mockImplementation(() => ({
+          read: jest.fn().mockRejectedValue(new Error('socket hang up')),
+          cancel: jest.fn().mockResolvedValue(undefined),
+        }) as any);
+        mockFetch.mockResolvedValue(response);
+
+        await expect(limited.fetchOriginImage(HTTP_URL, imageRequest)).rejects.toMatchObject({ errorType: 'FetchError', statusCode: 500 });
+      });
+    });
+
+    describe('S3', () => {
+      beforeEach(() => {
+        (S3UrlHelper.isS3Url as jest.Mock).mockReturnValue(true);
+        (S3UrlHelper.parseS3Url as jest.Mock).mockReturnValue({ bucket: 'bucket', key: 'key.jpg' });
+      });
+
+      it('rejects a declared ContentLength over the limit and releases the unread body', async () => {
+        const object = { ContentType: 'image/jpeg', ContentLength: LIMIT * 2, Body: s3Body(jpegOfLength(4)) };
+        mockS3Send.mockResolvedValue(object);
+
+        await expect(limited.fetchOriginImage(S3_URL, imageRequest)).rejects.toMatchObject(TOO_LARGE);
+        expect(object.Body[Symbol.asyncIterator]).not.toHaveBeenCalled();
+        expect(object.Body.destroy).toHaveBeenCalled();
+      });
+
+      it('returns a body whose ContentLength and actual length equal the limit', async () => {
+        const body = jpegOfLength(LIMIT);
+        mockS3Send.mockResolvedValue({ ContentType: 'image/jpeg', ContentLength: LIMIT, Body: s3Body(body) });
+
+        await limited.fetchOriginImage(S3_URL, imageRequest);
+
+        expect(imageRequest.sourceImage?.buffer.equals(body)).toBe(true);
+      });
+
+      it.each([
+        ['understated', 5],
+        ['absent', undefined],
+      ])('destroys the stream once the body passes the limit when ContentLength is %s', async (_label, contentLength) => {
+        const object = { ContentType: 'image/jpeg', ContentLength: contentLength, Body: s3Body(jpegOfLength(LIMIT + 5), 4) };
+        mockS3Send.mockResolvedValue(object);
+
+        await expect(limited.fetchOriginImage(S3_URL, imageRequest)).rejects.toMatchObject(TOO_LARGE);
+        expect(object.Body.destroy).toHaveBeenCalled();
+      });
+
+      it('returns the same bytes for a chunked body under the limit', async () => {
+        const body = jpegOfLength(9);
+        mockS3Send.mockResolvedValue({ ContentType: 'image/jpeg', Body: s3Body(body, 2) });
+
+        await limited.fetchOriginImage(S3_URL, imageRequest);
+
+        expect(imageRequest.sourceImage?.buffer.equals(body)).toBe(true);
+      });
+
+      it('rejects a Buffer body over the limit and returns one at the limit', async () => {
+        mockS3Send.mockResolvedValueOnce({ ContentType: 'image/jpeg', Body: jpegOfLength(LIMIT + 1) });
+        await expect(limited.fetchOriginImage(S3_URL, imageRequest)).rejects.toMatchObject(TOO_LARGE);
+
+        const body = jpegOfLength(LIMIT);
+        mockS3Send.mockResolvedValueOnce({ ContentType: 'image/jpeg', Body: body });
+        await limited.fetchOriginImage(S3_URL, imageRequest);
+        expect(imageRequest.sourceImage?.buffer.equals(body)).toBe(true);
+      });
+
+      it('maps any other read error to FetchError (500)', async () => {
+        const body = s3Body(JPEG);
+        body[Symbol.asyncIterator].mockImplementation(async function* () { throw new Error('socket hang up'); });
+        mockS3Send.mockResolvedValue({ ContentType: 'image/jpeg', Body: body });
+
+        await expect(limited.fetchOriginImage(S3_URL, imageRequest)).rejects.toMatchObject({ errorType: 'FetchError', statusCode: 500 });
+      });
     });
   });
 });

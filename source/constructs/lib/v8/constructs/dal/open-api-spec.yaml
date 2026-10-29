@@ -2,7 +2,7 @@
 openapi: 3.0.3
 info:
   title: Dynamic Image Transformation Management API
-  version: 8.1.2
+  version: 8.1.3
   description: API for managing image transformation policies, origins, and mappings for the Dynamic Image Transformation service.
 tags:
   - name: Transformation Policies
@@ -674,6 +674,7 @@ components:
                 $ref: "#/components/schemas/Transformation"
             outputs:
               type: array
+              maxItems: 3
               items:
                 $ref: "#/components/schemas/OutputOptimization"
         isDefault:
@@ -716,6 +717,7 @@ components:
                 $ref: "#/components/schemas/Transformation"
             outputs:
               type: array
+              maxItems: 3
               items:
                 $ref: "#/components/schemas/OutputOptimization"
         isDefault:
@@ -750,6 +752,7 @@ components:
                 $ref: "#/components/schemas/Transformation"
             outputs:
               type: array
+              maxItems: 3
               items:
                 $ref: "#/components/schemas/OutputOptimization"
         isDefault:
@@ -809,6 +812,7 @@ components:
                 - type: string
                 - type: number
                 - type: array
+                  maxItems: 50
 
     OutputOptimization:
       type: object
@@ -824,7 +828,7 @@ components:
           oneOf:
             - type: string
             - type: array
-          description: Optimization-specific configuration value
+          description: Optimization-specific configuration value. An autosize list holds at most 20 widths, and a quality list holds the default quality plus at most 20 DPR rows
 
     # Origin schemas
     Origin:
@@ -856,6 +860,7 @@ components:
           description: Optional path prefix for the origin (must start with /, cannot be a file)
         originHeaders:
           type: object
+          maxProperties: 20
           additionalProperties:
             type: string
             minLength: 1
@@ -893,6 +898,7 @@ components:
           description: Optional path prefix for the origin (must start with /, cannot be a file)
         originHeaders:
           type: object
+          maxProperties: 20
           additionalProperties:
             type: string
             minLength: 1
@@ -921,6 +927,7 @@ components:
           description: Optional path prefix for the origin (must start with /, cannot be a file)
         originHeaders:
           type: object
+          maxProperties: 20
           additionalProperties:
             type: string
             minLength: 1

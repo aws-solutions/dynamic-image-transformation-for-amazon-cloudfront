@@ -7,7 +7,7 @@ import { EditApplicator } from './transformation-engine/edit-applicator';
 import { ErrorMapper } from './utils/error-mapping';
 import { ImageProcessingError } from './types';
 import { TransformationMapper } from './transformation-engine/transformation-mapper';
-import sharp from 'sharp';
+import sharp, { FormatEnum } from 'sharp';
 
 // process() no longer fetches: the request resolver attaches the source image before it runs.
 let stubbedSource: { buffer: Buffer; format?: string } | undefined;
@@ -307,6 +307,261 @@ describe('ImageProcessorService', () => {
 
       const result = await processWithSource(request);
       expect(result).toBeInstanceOf(Buffer);
+    });
+
+    describe('stripExif metadata', () => {
+      const XMP =
+        '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' +
+        '<rdf:Description xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmp:CreatorTool="Lightroom"/></rdf:RDF></x:xmpmeta>';
+      const DIT_SOFTWARE = 'Dynamic Image Transformation for Amazon CloudFront';
+      const exifText = (exif?: Buffer) => (exif ? exif.toString('latin1') : '');
+      let oriented: Buffer;
+      let noExif: Buffer;
+      let unoriented: Buffer;
+      let animated: Buffer;
+
+      // Sharp cannot write IPTC, so splice a Photoshop APP13 segment (8BIM 0x0404, dataset 2:120) in after SOI.
+      const withIptc = (jpeg: Buffer): Buffer => {
+        const caption = Buffer.from('caption');
+        const dataset = Buffer.concat([Buffer.from([0x1c, 0x02, 0x78, 0x00, caption.length]), caption]);
+        const padded = dataset.length % 2 ? Buffer.concat([dataset, Buffer.from([0])]) : dataset;
+        const size = Buffer.alloc(4);
+        size.writeUInt32BE(dataset.length);
+        const resource = Buffer.concat([Buffer.from('8BIM'), Buffer.from([0x04, 0x04, 0x00, 0x00]), size, padded]);
+        const body = Buffer.concat([Buffer.from('Photoshop 3.0\0'), resource]);
+        const length = Buffer.alloc(2);
+        length.writeUInt16BE(body.length + 2);
+        return Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xed]), length, body, jpeg.subarray(2)]);
+      };
+
+      // Sharp always writes an Orientation tag with EXIF, so splice in an APP1 EXIF segment holding only Make.
+      const withExifNoOrientation = (jpeg: Buffer): Buffer => {
+        const make = Buffer.from('Canon\0');
+        const tiff = Buffer.alloc(26);
+        tiff.write('II', 0);
+        tiff.writeUInt16LE(42, 2);
+        tiff.writeUInt32LE(8, 4);
+        tiff.writeUInt16LE(1, 8);
+        tiff.writeUInt16LE(0x010f, 10);
+        tiff.writeUInt16LE(2, 12);
+        tiff.writeUInt32LE(make.length, 14);
+        tiff.writeUInt32LE(26, 18);
+        const body = Buffer.concat([Buffer.from('Exif\0\0'), tiff, make]);
+        const length = Buffer.alloc(2);
+        length.writeUInt16BE(body.length + 2);
+        return Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xe1]), length, body, jpeg.subarray(2)]);
+      };
+
+      // 8.0.3-8.1.2 strip chain, used to prove pixels, size and orientation do not move.
+      const previousStripChain = (input: Buffer) =>
+        sharp(input).keepIccProfile().keepMetadata().keepIccProfile().withExif({ IFD0: { Software: DIT_SOFTWARE } });
+
+      const stripRequest = (transformations: ImageProcessingRequest['transformations']): ImageProcessingRequest => ({
+        requestId: 'test-strip-metadata',
+        timestamp: Date.now(),
+        origin: { url: 'https://example.com/image.jpg' },
+        transformations,
+        response: { headers: {} }
+      });
+
+      beforeAll(async () => {
+        const base = await sharp({ create: { width: 200, height: 100, channels: 3, background: { r: 200, g: 50, b: 50 } } })
+          .composite([{ input: { create: { width: 40, height: 40, channels: 3, background: 'blue' } }, left: 0, top: 0 }])
+          .jpeg()
+          .withMetadata({ orientation: 6 })
+          .withExif({ IFD0: { Make: 'Canon' } })
+          .withXmp(XMP)
+          .withIccProfile('p3')
+          .toBuffer();
+        oriented = withIptc(base);
+        noExif = await sharp({ create: { width: 200, height: 100, channels: 3, background: 'red' } })
+          .jpeg()
+          .withXmp(XMP)
+          .withIccProfile('p3')
+          .toBuffer();
+        unoriented = withExifNoOrientation(noExif);
+        const frames = await Promise.all(
+          ['red', 'green', 'blue'].map(background =>
+            sharp({ create: { width: 40, height: 20, channels: 3, background } }).raw().toBuffer()
+          )
+        );
+        animated = await sharp(Buffer.concat(frames), { raw: { width: 40, height: 60, channels: 3, pageHeight: 20 } })
+          .webp({ delay: [100, 200, 300], loop: 2 })
+          .withMetadata({ orientation: 6 })
+          .withExif({ IFD0: { Make: 'Canon' } })
+          .withXmp(XMP)
+          .toBuffer();
+      });
+
+      it('removes EXIF tags, XMP and IPTC but keeps ICC and the orientation tag', async () => {
+        expect((await sharp(oriented).metadata()).iptc).toBeDefined();
+        stubSource(oriented);
+
+        const metadata = await sharp(await processWithSource(stripRequest([{ type: 'stripExif', value: true, source: 'url' }]))).metadata();
+
+        expect(metadata.xmp).toBeUndefined();
+        expect(metadata.iptc).toBeUndefined();
+        expect(metadata.icc).toBeDefined();
+        expect(metadata.orientation).toBe(6);
+        expect(exifText(metadata.exif)).not.toContain('Canon');
+        expect(exifText(metadata.exif)).not.toContain(DIT_SOFTWARE);
+      });
+
+      it('does not change pixels, size or orientation compared with the previous strip chain', async () => {
+        stubSource(oriented);
+        const output = await processWithSource(
+          stripRequest([
+            { type: 'stripExif', value: true, source: 'url' },
+            { type: 'resize', value: { width: 100, height: 50 }, source: 'url' }
+          ])
+        );
+        const previous = await previousStripChain(oriented).resize({ width: 100, height: 50 }).jpeg().toBuffer();
+        const metadata = await sharp(output).metadata();
+
+        expect([metadata.width, metadata.height, metadata.orientation]).toEqual([100, 50, 6]);
+        expect((await sharp(output).raw().toBuffer()).equals(await sharp(previous).raw().toBuffer())).toBe(true);
+      });
+
+      it.each(['webp', 'png', 'avif', 'tiff'])(
+        "matches the previous strip chain's format, size and orientation for %s output",
+        async format => {
+          stubSource(oriented);
+          const output = await processWithSource(
+            stripRequest([
+              { type: 'stripExif', value: true, source: 'url' },
+              { type: 'format', value: format, source: 'url' }
+            ])
+          );
+          const previous = await previousStripChain(oriented).toFormat(format as keyof FormatEnum).toBuffer();
+          const [metadata, previousMetadata] = await Promise.all([sharp(output).metadata(), sharp(previous).metadata()]);
+
+          expect([metadata.format, metadata.width, metadata.height, metadata.orientation]).toEqual([
+            previousMetadata.format,
+            previousMetadata.width,
+            previousMetadata.height,
+            previousMetadata.orientation
+          ]);
+          expect(metadata.xmp).toBeUndefined();
+        }
+      );
+
+      it('writes no EXIF when the source has none', async () => {
+        const sourceMetadata = await sharp(noExif).metadata();
+        expect(sourceMetadata.exif).toBeUndefined();
+        expect(sourceMetadata.orientation).toBeUndefined();
+        stubSource(noExif);
+
+        const metadata = await sharp(await processWithSource(stripRequest([{ type: 'stripExif', value: true, source: 'url' }]))).metadata();
+
+        expect(metadata.exif).toBeUndefined();
+        expect(metadata.orientation).toBeUndefined();
+        expect(metadata.xmp).toBeUndefined();
+        expect(metadata.icc).toBeDefined();
+      });
+
+      it('combines with stripIcc without bringing the original EXIF back', async () => {
+        stubSource(oriented);
+
+        const metadata = await sharp(
+          await processWithSource(
+            stripRequest([
+              { type: 'stripExif', value: true, source: 'url' },
+              { type: 'stripIcc', value: true, source: 'url' }
+            ])
+          )
+        ).metadata();
+
+        expect(metadata.xmp).toBeUndefined();
+        expect(metadata.iptc).toBeUndefined();
+        expect(metadata.icc).toBeDefined();
+        expect(metadata.space).toBe('srgb');
+        expect(metadata.orientation).toBe(6);
+        expect(exifText(metadata.exif)).not.toContain('Canon');
+      });
+
+      it('combines with stripIcc without bringing the original EXIF back when the source has no orientation tag', async () => {
+        const sourceMetadata = await sharp(unoriented).metadata();
+        expect(exifText(sourceMetadata.exif)).toContain('Canon');
+        expect(sourceMetadata.orientation).toBeUndefined();
+        stubSource(unoriented);
+
+        const metadata = await sharp(
+          await processWithSource(
+            stripRequest([
+              { type: 'stripExif', value: true, source: 'url' },
+              { type: 'stripIcc', value: true, source: 'url' }
+            ])
+          )
+        ).metadata();
+
+        expect(metadata.exif).toBeUndefined();
+        expect(metadata.orientation).toBeUndefined();
+        expect(metadata.xmp).toBeUndefined();
+        expect(metadata.space).toBe('srgb');
+      });
+
+      it('keeps the source EXIF when only stripIcc is set', async () => {
+        stubSource(oriented);
+
+        const metadata = await sharp(await processWithSource(stripRequest([{ type: 'stripIcc', value: true, source: 'url' }]))).metadata();
+
+        expect(exifText(metadata.exif)).toContain('Canon');
+        expect(metadata.orientation).toBe(6);
+      });
+
+      it('leaves the instance byte-identical when stripExif is not set', async () => {
+        const options = { failOnError: true, animated: false };
+        const output = await service['instantiateSharpImage'](oriented, {}, options, 6).toBuffer();
+        const expected = await sharp(oriented, { limitInputPixels: 50000000, ...options })
+          .keepIccProfile()
+          .keepMetadata()
+          .toBuffer();
+
+        expect(output.equals(expected)).toBe(true);
+      });
+
+      it('keeps all source metadata through a resize when stripExif is not set', async () => {
+        stubSource(oriented);
+
+        const metadata = await sharp(
+          await processWithSource(stripRequest([{ type: 'resize', value: { width: 100 }, source: 'url' }]))
+        ).metadata();
+
+        expect(exifText(metadata.exif)).toContain('Canon');
+        expect(metadata.xmp).toBeDefined();
+        expect(metadata.iptc).toBeDefined();
+        expect(metadata.orientation).toBe(6);
+      });
+
+      it('auto-orients once with rotate: null', async () => {
+        stubSource(oriented);
+
+        const metadata = await sharp(
+          await processWithSource(
+            stripRequest([
+              { type: 'stripExif', value: true, source: 'url' },
+              { type: 'rotate', value: null, source: 'url' }
+            ])
+          )
+        ).metadata();
+
+        expect([metadata.width, metadata.height, metadata.orientation]).toEqual([100, 200, 1]);
+        expect(metadata.xmp).toBeUndefined();
+      });
+
+      it('keeps frames, timing and the orientation tag on animated input', async () => {
+        stubSource(animated, 'webp');
+
+        const output = await processWithSource(stripRequest([{ type: 'stripExif', value: true, source: 'url' }]));
+        const metadata = await sharp(output, { animated: true }).metadata();
+
+        expect(metadata.pages).toBe(3);
+        expect(metadata.delay).toEqual([100, 200, 300]);
+        expect(metadata.loop).toBe(2);
+        expect(metadata.orientation).toBe(6);
+        expect(metadata.xmp).toBeUndefined();
+        expect(exifText(metadata.exif)).not.toContain('Canon');
+      });
     });
   });
 
@@ -738,4 +993,22 @@ describe('ImageProcessorService', () => {
     });
   });
 
+});
+
+describe('ImageProcessorService overlay budget', () => {
+  it('passes the primary image size to the edit step so the overlay fetch shares its limit', async () => {
+    const spy = jest.spyOn(EditApplicator, 'applyEdits');
+    const request = {
+      requestId: 'overlay-budget',
+      timestamp: Date.now(),
+      origin: { url: 'https://example.com/image.jpg' },
+      transformations: [{ type: 'resize', value: { width: 50 }, source: 'url' }],
+      response: { headers: {} },
+      sourceImage: { buffer: TEST_JPEG_BUFFER, contentType: 'image/jpeg', format: 'jpeg', fetchDurationMs: 1 }
+    } as unknown as ImageProcessingRequest;
+
+    await ImageProcessorService.getInstance().process(request);
+
+    expect(spy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), TEST_JPEG_BUFFER.length);
+  });
 });

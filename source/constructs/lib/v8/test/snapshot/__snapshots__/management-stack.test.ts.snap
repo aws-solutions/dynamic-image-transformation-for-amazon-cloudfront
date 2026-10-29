@@ -599,7 +599,7 @@ Temporary Password: <strong>{####}</strong>
         "Environment": {
           "Variables": {
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.2",
+            "SOLUTION_VERSION": "v8.1.3",
           },
         },
         "Handler": "index.handler",
@@ -949,6 +949,9 @@ Temporary Password: <strong>{####}</strong>
         },
       },
       "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
         "Code": {
           "S3Bucket": "Omitted to remove snapshot dependency on bucket",
           "S3Key": "Omitted to remove snapshot dependency on hash",
@@ -964,6 +967,7 @@ Temporary Password: <strong>{####}</strong>
             "Ref": "AdminUIDeploymentAwsCliLayer7F18FF6D",
           },
         ],
+        "MemorySize": 1024,
         "Role": {
           "Fn::GetAtt": [
             "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
@@ -1177,7 +1181,7 @@ Temporary Password: <strong>{####}</strong>
             "POWERTOOLS_LOGGER_LOG_EVENT": "false",
             "POWERTOOLS_LOGGER_LOG_LEVEL": "INFO",
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.2",
+            "SOLUTION_VERSION": "v8.1.3",
           },
         },
         "Handler": "index.handler",
@@ -2244,7 +2248,7 @@ Temporary Password: <strong>{####}</strong>
         "Environment": {
           "Variables": {
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.2",
+            "SOLUTION_VERSION": "v8.1.3",
           },
         },
         "Handler": "index.handler",

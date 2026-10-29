@@ -9,6 +9,8 @@ import { S3UrlHelper } from '../../../utils/s3-url-helper';
 import { UrlValidator } from '../../../utils/url-validator';
 import { OriginFetcher } from '../../image-processing/origin-fetcher';
 import { ImageProcessingError } from '../../image-processing/types';
+import { urlWithoutQuery } from '../../../utils/url-without-query';
+import { ORIGIN_BODY_LIMIT_BYTES, assertDeclaredLength, readNodeStreamWithLimit, readWebStreamWithLimit } from '../../../utils/origin-body-limit';
 
 /**
  * Fetches the origin image once: the same GET validates the connection and content type
@@ -19,7 +21,10 @@ export class ConnectionManager {
   private static readonly USER_AGENT = 'DIT-v8-ImageProcessor/1.0';
   private readonly s3Client = new S3Client({ ...getOptions(), followRegionRedirects: true });
 
-  constructor(private readonly originFetcher: OriginFetcher = new OriginFetcher()) {}
+  constructor(
+    private readonly originFetcher: OriginFetcher = new OriginFetcher(),
+    private readonly maxBodyBytes: number = ORIGIN_BODY_LIMIT_BYTES
+  ) {}
 
   async fetchOriginImage(url: string, imageRequest: ImageProcessingRequest, originHeaders?: Record<string, string>): Promise<void> {
     const start = Date.now();
@@ -51,9 +56,11 @@ export class ConnectionManager {
     imageRequest.sourceImage = { buffer, contentType, format: mediaType?.replace('image/', ''), fetchDurationMs };
   }
 
-  private validateContentType(contentType: string | undefined): void {
+  private validateContentType(contentType: string | undefined, url: string): void {
     if (!contentType?.split(';')[0].trim().startsWith('image/')) {
-      throw new ConnectionError('Invalid content type', `Origin does not serve image content. Content-Type: ${contentType}`, 400, 'INVALID_FORMAT');
+      // Sanitized: an origin override header can carry userinfo or query tokens into the URL.
+      const origin = urlWithoutQuery(url);
+      throw new ConnectionError('Invalid content type', `Origin '${origin}' does not serve image content. Content-Type: ${contentType}`, 400, 'INVALID_FORMAT');
     }
   }
 
@@ -88,9 +95,11 @@ export class ConnectionManager {
     }
 
     const contentType = response.ContentType;
+    let declaredLength: number | undefined;
     try {
-      this.validateContentType(contentType);
+      this.validateContentType(contentType, url);
       this.originFetcher.assertAllowedContentType(contentType, url, 's3');
+      declaredLength = assertDeclaredLength(response.ContentLength, this.maxBodyBytes, url);
     } catch (error) {
       // Release the pooled socket when we reject a response without reading its body.
       (response.Body as any)?.destroy?.();
@@ -102,9 +111,16 @@ export class ConnectionManager {
     }
     try {
       const body = response.Body as any;
-      const buffer = Buffer.isBuffer(body) ? body : Buffer.from(await body.transformToByteArray());
+      let buffer: Buffer;
+      if (Buffer.isBuffer(body)) {
+        assertDeclaredLength(body.length, this.maxBodyBytes, url);
+        buffer = body;
+      } else {
+        buffer = await readNodeStreamWithLimit(body, this.maxBodyBytes, url, declaredLength);
+      }
       return { buffer, contentType: contentType! };
     } catch (error: any) {
+      if (error instanceof ImageProcessingError) throw error;
       throw new ImageProcessingError(500, 'FetchError', 'Failed to fetch image', `Unexpected error reading S3 body for '${url}': ${error?.name} - ${error?.message}`);
     }
   }
@@ -137,19 +153,21 @@ export class ConnectionManager {
       try {
         this.checkStatus(response, url);
         const contentType = response.headers.get('content-type') ?? undefined;
-        this.validateContentType(contentType);
+        this.validateContentType(contentType, url);
         this.originFetcher.assertAllowedContentType(contentType, url, 'http');
+        const declaredLength = assertDeclaredLength(response.headers.get('content-length'), this.maxBodyBytes, url);
 
-        let arrayBuffer: ArrayBuffer;
+        let buffer: Buffer;
         try {
-          arrayBuffer = await response.arrayBuffer();
+          buffer = await readWebStreamWithLimit(response.body, this.maxBodyBytes, url, declaredLength);
         } catch (error: any) {
           if (error?.name === 'AbortError') {
             throw this.timeoutError(url);
           }
+          if (error instanceof ImageProcessingError) throw error;
           throw new ImageProcessingError(500, 'FetchError', 'Failed to fetch image', `Unexpected error reading body from '${url}': ${error?.name} - ${error?.message}`);
         }
-        return { buffer: Buffer.from(arrayBuffer), contentType: contentType! };
+        return { buffer, contentType: contentType! };
       } catch (error) {
         // Release the socket when we reject a response without reading its body.
         response.body?.cancel().catch(() => {});

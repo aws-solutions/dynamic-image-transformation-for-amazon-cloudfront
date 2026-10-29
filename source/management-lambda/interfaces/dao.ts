@@ -1,7 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { AllowedDataModelEntities, AllowedDBEntities } from "./types";
+import { AllowedDataModelEntities, AllowedDBEntities, DBEntityType } from "./types";
+
+/**
+ * Natural-key fields of a stored item, read for the uniqueness check
+ */
+export interface KeyRecord {
+  PK: string;
+  GSI1PK: DBEntityType;
+  GSI1SK: string;
+  mappingName?: string;
+}
 
 /**
  * Generic DAO interface
@@ -44,6 +54,19 @@ export interface DAO<T extends AllowedDBEntities, K extends AllowedDataModelEnti
    * @returns {Promise<void>} Promise of void
    */
   delete(id: string): Promise<void>;
+
+  /**
+   * Get the natural-key fields of every stored item of this entity type, across all pages
+   * @returns {Promise<KeyRecord[]>} Promise of key records
+   */
+  getKeyRecords(): Promise<KeyRecord[]>;
+
+  /**
+   * Get the natural-key fields of one item with a strongly consistent base-table read
+   * @param {string} id - Entity id
+   * @returns {Promise<KeyRecord | null>} Promise of the key record, or null when the item does not exist
+   */
+  getKeyRecord(id: string): Promise<KeyRecord | null>;
 
   /**
    * Convert Data Model entity to DDB entity

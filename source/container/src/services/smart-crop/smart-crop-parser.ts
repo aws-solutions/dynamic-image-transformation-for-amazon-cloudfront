@@ -204,6 +204,7 @@ export class SmartCropParser {
     return { type: 'label', labelName: input };
   }
 
+  // Not capped at 2 like the zod schema: stored policies may hold duplicate priorities and must keep serving.
   private static parsePriorities(input: unknown): ConfigurableConstraintType[] {
     if (!Array.isArray(input)) {
       throw new SmartCropValidationError('priorities must be an array');

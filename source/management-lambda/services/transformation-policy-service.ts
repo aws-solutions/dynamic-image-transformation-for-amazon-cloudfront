@@ -9,13 +9,26 @@ import {
   validateTransformationPolicyCreate,
   validateTransformationPolicyUpdate,
 } from "../../data-models";
+import { normalizeName } from "../common";
 import { TransformationPolicyDAO } from "../dao";
 import { DBTransformationPolicy } from "../interfaces";
-import { BaseService } from "./base-service";
+import { BaseService, UniqueKey } from "./base-service";
 
 export class TransformationPolicyService extends BaseService<DBTransformationPolicy, TransformationPolicy> {
   constructor(tableName?: string, ddbDocClient?: DynamoDBDocumentClient) {
     super(new TransformationPolicyDAO(tableName, ddbDocClient));
+  }
+
+  protected getUniqueKeys(policy: TransformationPolicy): UniqueKey[] {
+    return [
+      {
+        field: "policyName",
+        value: policy.policyName,
+        normalize: normalizeName,
+        storedValue: (record) => record.GSI1SK,
+        label: "A policy named",
+      },
+    ];
   }
 
   protected validateUpdateRequest(updateRequest: unknown): TransformationPolicyUpdate {

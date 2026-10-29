@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export { DAO } from "./dao";
+export { DAO, type KeyRecord } from "./dao";
 export { Service } from "./service";
 export {
   DBEntityType,

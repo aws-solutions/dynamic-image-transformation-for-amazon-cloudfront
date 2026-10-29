@@ -300,3 +300,62 @@ describe('Origin Schema Validation', () => {
     });
   });
 });
+
+describe('originHeaders limit (max 20 headers)', () => {
+  const base = { originName: 'Test Origin', originDomain: 'example.com' };
+  const headers = (n: number, value = 'v') =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`x-h${i}`, value]));
+  const issueJSON = (r: { error?: { issues: unknown[] } }) => JSON.stringify(r.error?.issues ?? []);
+
+  it('accepts 20 headers on create and update', () => {
+    expect(validateOriginCreate({ ...base, originHeaders: headers(20) }).success).toBe(true);
+    expect(validateOriginUpdate({ originHeaders: headers(20) }).success).toBe(true);
+  });
+
+  it('rejects 21 headers on create and update with the limit message', () => {
+    for (const r of [
+      validateOriginCreate({ ...base, originHeaders: headers(21) }),
+      validateOriginUpdate({ originHeaders: headers(21) }),
+    ]) {
+      expect(r.success).toBe(false);
+      expect(r.error?.issues).toHaveLength(1);
+      expect(r.error?.issues[0].message).toBe('At most 20 origin headers');
+    }
+  });
+
+  it('bounds the issues for 100,000 invalid headers', () => {
+    const r = validateOriginCreate({ ...base, originHeaders: headers(100_000, '') });
+    expect(r.success).toBe(false);
+    expect(issueJSON(r).length).toBeLessThan(10_000);
+  });
+
+  it.each([
+    ['a bad header name', { 'bad name': 'v' }, 'Invalid header name'],
+    ['a bad header value', { 'x-h': 'bad\nvalue' }, 'Invalid header value'],
+  ])('reports %s within the limit', (_, originHeaders, message) => {
+    const r = validateOriginCreate({ ...base, originHeaders });
+    expect(r.success).toBe(false);
+    expect(issueJSON(r)).toContain(message);
+  });
+
+  it('accepts null on update, which clears the headers', () => {
+    expect(validateOriginUpdate({ originHeaders: null }).success).toBe(true);
+  });
+
+  it.each([
+    ['null on create', null],
+    ['an array on create', ['x-h']],
+    ['a string on create', 'x-h'],
+  ])('reports invalid_type for %s', (_, originHeaders) => {
+    const r = validateOriginCreate({ ...base, originHeaders });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues).toHaveLength(1);
+    expect(r.error?.issues[0].code).toBe('invalid_type');
+  });
+
+  it('reports invalid_type for a string on update', () => {
+    const r = validateOriginUpdate({ originHeaders: 'x-h' });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0].code).toBe('invalid_type');
+  });
+});

@@ -113,25 +113,21 @@ describe('ImageProcessorService Integration Tests', () => {
   });
 
   describe('Metadata Preservation', () => {
-    test('should replace EXIF with DIT software tag when stripping', async () => {
-      // First get original EXIF size
-      const originalRequest = createImageRequest();
-      const originalResult = await fetchAndProcess(originalRequest);
-      const originalMetadata = await sharp(originalResult).metadata();
-      const originalExifSize = originalMetadata.exif?.length || 0;
-      
-      // Then test with EXIF stripping
+    test('should remove all EXIF tags except orientation when stripping', async () => {
       const transformations: Transformation[] = [
         { type: 'stripExif', value: true, source: 'url' }
       ];
       const request = createImageRequest(transformations);
       const result = await fetchAndProcess(request);
       
+      // The fixture's EXIF (Make, Model, Software, DateTime) reads as Orientation 1; only that tag survives.
       const metadata = await sharp(result).metadata();
-      expect(metadata.exif).toBeDefined();
-      expect(Buffer.isBuffer(metadata.exif)).toBe(true);
-      // EXIF should be significantly smaller after stripping
-      expect(metadata.exif.length).toBeLessThan(originalExifSize);
+      const exif = metadata.exif?.toString('latin1') ?? '';
+      expect(metadata.orientation).toBe(1);
+      expect(exif).not.toContain('Test Camera');
+      expect(exif).not.toContain('Test Model');
+      expect(exif).not.toContain('Test Software');
+      expect(exif).not.toContain('Dynamic Image Transformation for Amazon CloudFront');
     });
 
     test('should preserve EXIF data when not stripping', async () => {

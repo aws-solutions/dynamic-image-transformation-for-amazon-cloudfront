@@ -27,7 +27,7 @@ const originPathSchema = z
     /^\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*[^.]$/,
     "Path must start with /, be more than just '/', and cannot be a file"
   );
-const originHeadersSchema = z.record(
+const originHeadersRecordSchema = z.record(
   z
     .string()
     .min(1)
@@ -39,6 +39,14 @@ const originHeadersSchema = z.record(
     .max(1000)
     .regex(/^[a-zA-Z0-9 ._:;,/=+-]+$/, "Invalid header value")
 );
+// A record checks no key count before parsing its entries, so the count is checked first.
+const originHeadersSchema = z
+  .unknown()
+  .refine(
+    (val) => typeof val !== "object" || val === null || Array.isArray(val) || Object.keys(val).length <= 20,
+    "At most 20 origin headers"
+  )
+  .pipe(originHeadersRecordSchema);
 
 /**
  * Zod schema for Origin entity

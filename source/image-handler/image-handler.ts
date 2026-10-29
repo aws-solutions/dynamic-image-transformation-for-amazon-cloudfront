@@ -40,23 +40,20 @@ export class ImageHandler {
   // eslint-disable-next-line @typescript-eslint/ban-types
   private async instantiateSharpImage(originalImage: Buffer, edits: ImageEdits, options: Object): Promise<Sharp> {
     try {
-      await sharp(originalImage, options).metadata(); // validation
-      // Default behavior: keep all metadata and ICC profile
-      let image = sharp(originalImage, options).keepIccProfile().keepMetadata();
+      const { orientation } = await sharp(originalImage, options).metadata(); // validation
+      // Keep the ICC profile on every path; Sharp would otherwise convert to sRGB.
+      const image = sharp(originalImage, options).keepIccProfile();
 
       if (edits?.stripExif === true) {
-        // Removes all EXIF by inserting minimal EXIF tag. Leaves ICC untouched.
-        image.keepIccProfile().withExif({
-          IFD0: {
-            Software: 'Dynamic Image Transformation for Amazon CloudFront'
-          }
-        });
-        delete edits.stripExif;
+        // Keep only ICC and the orientation tag: keepMetadata() bits cannot be cleared, and pixels are not rotated.
+        if (orientation) image.withExif({ IFD0: { Orientation: String(orientation) } });
+      } else {
+        image.keepMetadata();
       }
 
       if (edits?.stripIcc === true) {
-        // Strips ICC by defaulting to sRGB color space, while keeping EXIF untouched.
-        image.keepExif().withIccProfile('srgb');
+        // Replaces the ICC with sRGB. EXIF is left to the branch above: keepExif() here would copy back the source EXIF.
+        image.withIccProfile("srgb");
         delete edits.stripIcc;
       }
 

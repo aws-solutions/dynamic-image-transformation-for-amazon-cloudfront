@@ -10,6 +10,9 @@ const logger = new Logger();
 
 interface CustomResourceEvent {
     RequestType: 'Create' | 'Update' | 'Delete';
+    RequestId?: string;
+    LogicalResourceId?: string;
+    PhysicalResourceId?: string;
     ResourceProperties: {
         DistributionId: string;
         ResponseHeadersPolicyId: string;
@@ -74,24 +77,39 @@ const removeCSPPolicy = async (event: CustomResourceEvent) => {
     const cfClient = new CloudFrontClient(getOptions());
     const distributionId = event.ResourceProperties.DistributionId;
     
-    const getConfigResponse = await cfClient.send(
-        new GetDistributionConfigCommand({ Id: distributionId })
-    );
-    
-    const config = getConfigResponse.DistributionConfig!;
-    const etag = getConfigResponse.ETag!;
-    
-    delete config.DefaultCacheBehavior!.ResponseHeadersPolicyId;
-    
-    await cfClient.send(
-        new UpdateDistributionCommand({
-            Id: distributionId,
-            DistributionConfig: config,
-            IfMatch: etag
-        })
-    );
+    try {
+        const getConfigResponse = await cfClient.send(
+            new GetDistributionConfigCommand({ Id: distributionId })
+        );
+
+        const config = getConfigResponse.DistributionConfig!;
+        const etag = getConfigResponse.ETag!;
+
+        delete config.DefaultCacheBehavior!.ResponseHeadersPolicyId;
+
+        await cfClient.send(
+            new UpdateDistributionCommand({
+                Id: distributionId,
+                DistributionConfig: config,
+                IfMatch: etag
+            })
+        );
+    } catch (error) {
+        if ((error as Error).name !== 'NoSuchDistribution') {
+            throw error;
+        }
+        // warn, with the CloudFormation ids: this is the only trace if a delete passes that should not have.
+        logger.warn('Distribution already deleted, nothing to remove', {
+            distributionId,
+            requestId: event.RequestId,
+            logicalResourceId: event.LogicalResourceId,
+            physicalResourceId: event.PhysicalResourceId
+        });
+        return {};
+    }
     
     logger.info('Successfully removed CSP policy');
     
-    return { PhysicalResourceId: 'csp-updater' };
+    // No PhysicalResourceId: Delete must keep the ID CloudFormation sent, which is not 'csp-updater' after a cancelled create.
+    return {};
 };

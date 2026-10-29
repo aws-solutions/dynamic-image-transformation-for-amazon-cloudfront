@@ -529,7 +529,7 @@ exports[`ImageProcessingStack Snapshot Test 1`] = `
               },
               {
                 "Name": "SOLUTION_VERSION",
-                "Value": "v8.1.2",
+                "Value": "v8.1.3",
               },
               {
                 "Name": "DDB_TABLE_NAME",
@@ -554,6 +554,16 @@ exports[`ImageProcessingStack Snapshot Test 1`] = `
                     "EcsConfigMapping",
                     "small",
                     "limitInputPixels",
+                  ],
+                },
+              },
+              {
+                "Name": "DIT_TASK_MEMORY_MIB",
+                "Value": {
+                  "Fn::FindInMap": [
+                    "EcsConfigMapping",
+                    "small",
+                    "memory",
                   ],
                 },
               },
@@ -1933,7 +1943,7 @@ async function handler(event) {
               ],
             },
             "SOLUTION_ID": "SO0023",
-            "SOLUTION_VERSION": "v8.1.2",
+            "SOLUTION_VERSION": "v8.1.3",
           },
         },
         "Handler": "index.handler",

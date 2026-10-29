@@ -18,4 +18,5 @@ export {
   REDACTED_HEADER_VALUE,
 } from "./utils";
 export { logger } from "./logger";
+export { normalizeHostPattern, normalizeName, normalizePathPattern } from "./normalize";
 export { PaginationTokenService } from "./pagination-token-service";
