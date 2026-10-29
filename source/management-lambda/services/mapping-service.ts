@@ -10,10 +10,10 @@ import {
   validateMappingCreate,
   validateMappingUpdate,
 } from "../../data-models";
+import { BadRequestError, normalizeHostPattern, normalizeName, normalizePathPattern } from "../common";
 import { MappingDAO } from "../dao";
-import { DBMapping } from "../interfaces";
-import { BaseService } from "./base-service";
-import { BadRequestError } from "../common";
+import { DBEntityType, DBMapping, KeyRecord } from "../interfaces";
+import { BaseService, UniqueKey } from "./base-service";
 
 export class MappingService extends BaseService<DBMapping, Mapping> {
   constructor(tableName?: string, ddbDocClient?: DynamoDBDocumentClient) {
@@ -24,15 +24,43 @@ export class MappingService extends BaseService<DBMapping, Mapping> {
     const validatedId = this.validateId(id);
     const validatedRequest = this.validateUpdateRequest(updateRequest);
 
-    const entity = await this.buildUpdatedEntity(validatedId, validatedRequest);
+    const { entity, existing } = await this.buildUpdatedEntity(validatedId, validatedRequest);
 
     const result = validateMapping(entity);
     if (!result.success) {
       throw new BadRequestError(result.error.issues[0].message);
     }
 
+    await this.assertUnique(entity, existing);
     await this.saveEntity(entity);
     return entity;
+  }
+
+  protected getUniqueKeys(mapping: Mapping): UniqueKey[] {
+    const patternIn = (type: DBEntityType) => (record: KeyRecord) => record.GSI1PK === type ? record.GSI1SK : undefined;
+    return [
+      {
+        field: "mappingName",
+        value: mapping.mappingName,
+        normalize: normalizeName,
+        storedValue: (record) => record.mappingName,
+        label: "A mapping named",
+      },
+      {
+        field: "pathPattern",
+        value: mapping.pathPattern,
+        normalize: normalizePathPattern,
+        storedValue: patternIn(DBEntityType.PATH_MAPPING),
+        label: "A path mapping with pattern",
+      },
+      {
+        field: "hostHeaderPattern",
+        value: mapping.hostHeaderPattern,
+        normalize: normalizeHostPattern,
+        storedValue: patternIn(DBEntityType.HOST_HEADER_MAPPING),
+        label: "A host header mapping with pattern",
+      },
+    ];
   }
 
   protected validateUpdateRequest(updateRequest: unknown): MappingUpdate {

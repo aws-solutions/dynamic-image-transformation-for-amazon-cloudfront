@@ -8,6 +8,9 @@ import { ImageProcessingError } from '../types';
 import { SharpUtils } from '../utils/sharp-utils';
 import { SmartCropService } from '../../smart-crop/smart-crop.service';
 import { ContentModerationService } from '../../content-moderation/content-moderation.service';
+import { CacheRegistry } from '../../cache/cache-registry';
+import { ORIGIN_BODY_LIMIT_BYTES } from '../../../utils/origin-body-limit';
+import sharp from 'sharp';
 
 jest.mock('../utils/sharp-utils');
 jest.mock('../../smart-crop/smart-crop.service');
@@ -326,6 +329,68 @@ describe('EditApplicator', () => {
 
       expect(mockContentModerationExecute).toHaveBeenCalled();
       expect(mockImage.toFormat).toHaveBeenCalledWith('webp', {});
+    });
+  });
+  describe('watermark overlay shares the origin body budget with the primary image', () => {
+    const OVERLAY_URL = 'https://overlay.example.com/logo.png';
+    const watermark = (): ImageEdits => ({ composite: { source: 'overlay.example.com/logo.png', offSetArray: [0, 0, 0, undefined, undefined] } } as any);
+    let overlayPng: Buffer;
+
+    beforeAll(async () => {
+      overlayPng = await sharp({ create: { width: 2, height: 2, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } }).png().toBuffer();
+    });
+
+    beforeEach(() => {
+      jest.spyOn(CacheRegistry, 'getInstance').mockReturnValue({
+        getOriginCache: () => ({ getContents: jest.fn().mockResolvedValue([{ originDomain: 'overlay.example.com' }]) }),
+      } as any);
+    });
+
+    const imageWithComposite = () => {
+      const image = createMockSharp();
+      image.composite = jest.fn().mockReturnThis();
+      return image;
+    };
+
+    it('fetches the overlay with the limit left after the primary and applies the composite', async () => {
+      mockOriginFetcher.fetchImage.mockResolvedValue({ buffer: overlayPng, metadata: { size: overlayPng.length, format: 'png' } });
+      const image = imageWithComposite();
+
+      await EditApplicator.applyEdits(image, watermark(), mockOriginFetcher as any, 1000);
+
+      expect(mockOriginFetcher.fetchImage).toHaveBeenCalledWith(OVERLAY_URL, undefined, undefined, ORIGIN_BODY_LIMIT_BYTES - 1000);
+      expect(image.composite).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['exactly at', ORIGIN_BODY_LIMIT_BYTES],
+      ['over', ORIGIN_BODY_LIMIT_BYTES + 1],
+    ])('gives the overlay a zero budget when the primary is %s the limit', async (_label, primaryBytes) => {
+      mockOriginFetcher.fetchImage.mockRejectedValue(new ImageProcessingError(502, 'OriginImageTooLarge', 'Origin image exceeds the maximum size'));
+      const image = imageWithComposite();
+
+      await expect(EditApplicator.applyEdits(image, watermark(), mockOriginFetcher as any, primaryBytes))
+        .rejects.toMatchObject({ statusCode: 502, errorType: 'OverlayFetchError' });
+      expect(mockOriginFetcher.fetchImage).toHaveBeenCalledWith(OVERLAY_URL, undefined, undefined, 0);
+      expect(image.composite).not.toHaveBeenCalled();
+    });
+
+    it('rejects with OverlayFetchError (502) when the overlay does not fit in the remaining budget', async () => {
+      const verbose = "Origin 'https://overlay.example.com/w.png' body of 2000 bytes exceeds the 1000 byte limit.";
+      mockOriginFetcher.fetchImage.mockRejectedValue(new ImageProcessingError(502, 'OriginImageTooLarge', 'Origin image exceeds the maximum size', verbose));
+      const image = imageWithComposite();
+
+      await expect(EditApplicator.applyEdits(image, watermark(), mockOriginFetcher as any, 1000))
+        .rejects.toMatchObject({ statusCode: 502, errorType: 'OverlayFetchError', verboseDescription: verbose });
+      expect(image.composite).not.toHaveBeenCalled();
+    });
+
+    it('passes the full limit when no primary size is given', async () => {
+      mockOriginFetcher.fetchImage.mockResolvedValue({ buffer: overlayPng, metadata: { size: overlayPng.length, format: 'png' } });
+
+      await EditApplicator.applyEdits(imageWithComposite(), watermark(), mockOriginFetcher as any);
+
+      expect(mockOriginFetcher.fetchImage).toHaveBeenCalledWith(OVERLAY_URL, undefined, undefined, ORIGIN_BODY_LIMIT_BYTES);
     });
   });
 });

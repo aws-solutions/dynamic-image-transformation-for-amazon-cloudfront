@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Bucket, IBucket } from "aws-cdk-lib/aws-s3";
-import { Aspects } from "aws-cdk-lib";
+import { Aspects, Aws, Fn } from "aws-cdk-lib";
+import { HeadersFrameOption } from "aws-cdk-lib/aws-cloudfront";
 import { Construct } from "constructs";
 import { CloudFrontToS3 } from "@aws-solutions-constructs/aws-cloudfront-s3";
 
@@ -46,6 +47,13 @@ export class FrontEndConstruct extends Construct {
         ],
       },
       insertHttpSecurityHeaders: false,
+      // Forbid framing to block clickjacking; the name must be unique per stack because CloudFront names are account-wide.
+      responseHeadersPolicyProps: {
+        responseHeadersPolicyName: `DIT-DemoUI-Headers-${Fn.select(2, Fn.split("/", Aws.STACK_ID))}`,
+        securityHeadersBehavior: {
+          frameOptions: { frameOption: HeadersFrameOption.DENY, override: true },
+        },
+      },
     });
 
     // S3 bucket does not require access logging, calls are logged by CloudFront

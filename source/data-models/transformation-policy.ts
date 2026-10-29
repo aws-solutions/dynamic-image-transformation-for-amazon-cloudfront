@@ -8,6 +8,11 @@ const SMART_CROP_MAX_LABELS = 50;
 const SMART_CROP_MAX_LABEL_LENGTH = 100;
 const SMART_CROP_MAX_CUSTOM_MODEL_ARN_LENGTH = 1000;
 const SMART_CROP_CUSTOM_MODEL_ARN_PATTERN = /^arn:aws:rekognition:[a-z0-9-]+:\d{12}:project\/[^/]+\/version\/[^/]+\/\d+$/;
+// List caps (CVE-2023-54404) only help if they run before elements parse: use .max() (zod 4.6+ checks it first)
+// or a precheck wrapper, never a length .refine(), which runs after every element and reports each failure.
+const CONTENT_MODERATION_MAX_LABELS = 100;
+const CONTENT_MODERATION_MAX_LABEL_LENGTH = 100;
+const POLICY_MAX_JSON_LENGTH = 10000;
 
 const policyIdSchema = z.uuid({ version: "v4" });
 const policyNameSchema = z
@@ -159,9 +164,10 @@ export const transformationSchemas = {
         ]),
         z.string().min(1),
       ]).optional(),
+      // Capped here only: the container parser keeps accepting stored policies with duplicate priorities.
       priorities: z.array(z.enum(['aspectRatio', 'padding'], {
         message: "Only 'aspectRatio' and 'padding' are configurable priorities. targetInclusion and gravity are applied automatically.",
-      })).optional(),
+      })).max(2, "At most 2 priorities").optional(),
       retainText: z.boolean().optional(),
       retainLogo: z.boolean().optional(),
       fallback: z.enum(['cover', 'contain', 'fill', 'inside', 'outside', 'no-crop']).optional(),
@@ -181,7 +187,10 @@ export const transformationSchemas = {
     z.strictObject({
       minConfidence: z.number().min(0).max(100).optional(),
       blur: z.number().min(0.3).max(1000).optional(),
-      moderationLabels: z.array(z.string().min(1)).optional(),
+      moderationLabels: z
+        .array(z.string().min(1).max(CONTENT_MODERATION_MAX_LABEL_LENGTH, "Moderation label too long (max 100 characters)"))
+        .max(CONTENT_MODERATION_MAX_LABELS, "At most 100 moderation labels")
+        .optional(),
     }),
   ]),
   stripExif: z.boolean(),
@@ -190,20 +199,30 @@ export const transformationSchemas = {
 };
 
 const outputSchemas = {
+  // A tuple's rest checks no length before parsing its rows, so the row count is checked first.
   quality: z
-    .tuple([
-      transformationSchemas.quality, // default quality, when no client hints found or as static value
-    ])
-    .rest(
-      z.tuple([
-        z.number().min(0), // min dpr
-        z.number().min(0), // max dpr
-        z.int().min(1).max(100), // quality
-      ])
-    )
-    .refine((arr) => arr.length >= 1, "Must have default quality"),
+    .array(z.unknown())
+    .max(21, "At most 20 quality DPR rows")
+    .pipe(
+      z
+        .tuple([
+          transformationSchemas.quality, // default quality, when no client hints found or as static value
+        ])
+        .rest(
+          z.tuple([
+            z.number().min(0), // min dpr
+            z.number().min(0), // max dpr
+            z.int().min(1).max(100), // quality
+          ])
+        )
+        .refine((arr) => arr.length >= 1, "Must have default quality")
+    ),
   format: z.enum(["auto", ...transformationSchemas.format.options]),
-  autosize: z.array(z.int().positive()).min(1, "Must have at least one element as derivative width to support"),
+  // .max() must stay a size check, not a refine; see the list-cap note at the top of the file.
+  autosize: z
+    .array(z.int().positive())
+    .min(1, "Must have at least one element as derivative width to support")
+    .max(20, "At most 20 autosize widths"),
 };
 
 const fallbackSchemas = {
@@ -214,7 +233,7 @@ const fallbackSchemas = {
 
 const conditionSchema = z.strictObject({
   field: z.string(),
-  value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
+  value: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()])).max(50, "At most 50 condition values")]),
 });
 
 // Policy schema union of above value schemas
@@ -358,6 +377,7 @@ const policySchema = z
           }),
         ])
       )
+      .max(3, "At most 3 output optimizations")
       .refine((outputs) => {
         const types = outputs.map((output) => output.type);
         return new Set(types).size === types.length;
@@ -366,12 +386,27 @@ const policySchema = z
   })
   .refine((val) => {
     const jsonString = JSON.stringify(val);
-    return jsonString.length <= 10000;
+    return jsonString.length <= POLICY_MAX_JSON_LENGTH;
   }, "Policy too large (max 10KB)")
   .refine(
     (val) => (val.transformations && val.transformations.length > 0) || (val.outputs && val.outputs.length > 0),
     "Policy must have at least one transformation or output optimization"
   );
+
+// The size refine above runs only after every field parses, so check the input first to stop an oversized
+// policy collecting one issue per element; unmeasurable values fall through to the inner schema's error.
+const policyJSONSchema = z
+  .unknown()
+  .refine((val) => {
+    let jsonString: string | undefined;
+    try {
+      jsonString = JSON.stringify(val);
+    } catch {
+      return true;
+    }
+    return jsonString === undefined || jsonString.length <= POLICY_MAX_JSON_LENGTH;
+  }, "Policy too large (max 10KB)")
+  .pipe(policySchema);
 
 /**
  * Zod schema for TransformationPolicy entity
@@ -381,7 +416,7 @@ const TransformationPolicySchema = z.strictObject({
   policyId: policyIdSchema,
   policyName: policyNameSchema,
   description: descriptionSchema.optional(),
-  policyJSON: policySchema,
+  policyJSON: policyJSONSchema,
   isDefault: z.boolean(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime().optional(),
@@ -394,7 +429,7 @@ const TransformationPolicySchema = z.strictObject({
 const PolicyCreateSchema = z.strictObject({
   policyName: policyNameSchema,
   description: descriptionSchema.optional(),
-  policyJSON: policySchema,
+  policyJSON: policyJSONSchema,
   isDefault: z.boolean().default(false),
 });
 
@@ -406,7 +441,7 @@ const PolicyUpdateSchema = z
   .strictObject({
     policyName: policyNameSchema.optional(),
     description: descriptionSchema.nullable().optional(),
-    policyJSON: policySchema.optional(),
+    policyJSON: policyJSONSchema.optional(),
     isDefault: z.boolean().optional(),
   })
   .refine(

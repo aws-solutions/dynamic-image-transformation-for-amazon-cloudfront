@@ -5,11 +5,12 @@ import { BadRequestError, NotFoundError } from "../../common";
 import { OriginService } from "../../services";
 import {
   mockDynamoDBCommands,
-  mockOrigin,
+  mockGSI1Partitions,
   mockOriginCreateRequest,
   mockOriginDDB,
   mockOriginRedacted,
   mockOriginUpdateRequest,
+  mockOtherOriginDDB,
   mockUUIDV4,
 } from "../mocks";
 
@@ -22,6 +23,8 @@ describe("OriginService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // create/update now read the ORIGIN partition for the uniqueness check; default to an empty table
+    mockDynamoDBCommands.query.mockResolvedValue({ Items: [] });
     originService = new OriginService(TABLE_NAME);
   });
 
@@ -145,8 +148,11 @@ describe("OriginService", () => {
       mockDynamoDBCommands.get.mockResolvedValue({ Item: mockOriginDDB });
       mockDynamoDBCommands.put.mockResolvedValue({});
 
+      const listed = (await originService.list()).items[0];
+      // the create below reuses mockOrigin's name, so empty the table before the uniqueness check reads it
+      mockDynamoDBCommands.query.mockResolvedValue({ Items: [] });
       const results = [
-        (await originService.list()).items[0],
+        listed,
         await originService.get(mockUUIDV4),
         await originService.create(mockOriginCreateRequest),
         await originService.update(mockUUIDV4, mockOriginUpdateRequest),
@@ -213,6 +219,103 @@ describe("OriginService", () => {
       const result = await originService.get(mockUUIDV4);
 
       expect(result.originHeaders).toBeUndefined();
+    });
+  });
+
+  describe("name uniqueness", () => {
+    beforeEach(() => {
+      mockDynamoDBCommands.get.mockResolvedValue({ Item: mockOriginDDB });
+      mockDynamoDBCommands.put.mockResolvedValue({});
+    });
+
+    it.each(["taken-origin", "Taken-ORIGIN"])(
+      "rejects creating an origin named %s when taken-origin exists",
+      async (name) => {
+        mockGSI1Partitions({ ORIGIN: [mockOtherOriginDDB("taken-origin")] });
+
+        const create = originService.create({ ...mockOriginCreateRequest, originName: name });
+
+        await expect(create).rejects.toThrow(BadRequestError);
+        await expect(create).rejects.toThrow(`An origin named "${name}" already exists`);
+        expect(mockDynamoDBCommands.put).not.toHaveBeenCalled();
+      }
+    );
+
+    it("queries only the ORIGIN partition, following every page", async () => {
+      mockDynamoDBCommands.query
+        .mockResolvedValueOnce({
+          Items: [mockOtherOriginDDB("page-one", "11111111-1111-4111-8111-111111111111")],
+          LastEvaluatedKey: { PK: "x" },
+        })
+        .mockResolvedValueOnce({ Items: [mockOtherOriginDDB("page-two")] });
+      // consistent read that confirms the clash
+      mockDynamoDBCommands.get.mockResolvedValueOnce({ Item: mockOtherOriginDDB("page-two") });
+
+      await expect(originService.create({ ...mockOriginCreateRequest, originName: "PAGE-TWO" })).rejects.toThrow(
+        BadRequestError
+      );
+      expect(mockDynamoDBCommands.query).toHaveBeenCalledTimes(2);
+      expect(mockDynamoDBCommands.query.mock.calls[1][0].ExclusiveStartKey).toEqual({ PK: "x" });
+      expect(mockDynamoDBCommands.query.mock.calls[0][0].ExpressionAttributeValues).toEqual({ ":gsi1pk": "ORIGIN" });
+    });
+
+    it("accepts a name the index still lists after its holder was deleted or renamed", async () => {
+      mockGSI1Partitions({ ORIGIN: [mockOtherOriginDDB("taken-origin")] });
+      // consistent base-table read of the stale holder: first deleted, then renamed away
+      mockDynamoDBCommands.get
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: mockOtherOriginDDB("renamed-origin") });
+
+      await originService.create({ ...mockOriginCreateRequest, originName: "taken-origin" });
+      await originService.create({ ...mockOriginCreateRequest, originName: "taken-origin" });
+
+      expect(mockDynamoDBCommands.put).toHaveBeenCalledTimes(2);
+      expect(mockDynamoDBCommands.get).toHaveBeenCalledWith(expect.objectContaining({ ConsistentRead: true }));
+    });
+
+    it("accepts an origin on the same domain with a different name", async () => {
+      mockGSI1Partitions({ ORIGIN: [mockOtherOriginDDB("taken-origin")] });
+
+      await originService.create({ ...mockOriginCreateRequest, originName: "another-origin" });
+
+      expect(mockDynamoDBCommands.put).toHaveBeenCalled();
+    });
+
+    it.each(["taken-origin", "TAKEN-origin"])(
+      "rejects renaming an origin to %s when taken-origin exists",
+      async (name) => {
+        mockGSI1Partitions({ ORIGIN: [mockOriginDDB, mockOtherOriginDDB("taken-origin")] });
+
+        await expect(originService.update(mockUUIDV4, { originName: name })).rejects.toThrow(
+          `An origin named "${name}" already exists`
+        );
+        expect(mockDynamoDBCommands.put).not.toHaveBeenCalled();
+      }
+    );
+
+    it("lets an existing duplicate be edited when its name is unchanged", async () => {
+      mockGSI1Partitions({ ORIGIN: [mockOriginDDB, mockOtherOriginDDB("example-origin")] });
+
+      await originService.update(mockUUIDV4, { originDomain: "changed.example.com" });
+      await originService.update(mockUUIDV4, { originName: "example-origin" });
+
+      expect(mockDynamoDBCommands.put).toHaveBeenCalledTimes(2);
+    });
+
+    it("lets an origin change the casing of its own name", async () => {
+      mockGSI1Partitions({ ORIGIN: [mockOriginDDB] });
+
+      await originService.update(mockUUIDV4, { originName: "Example-Origin" });
+
+      expect(mockDynamoDBCommands.put).toHaveBeenCalled();
+    });
+
+    it("accepts renaming to an unused name", async () => {
+      mockGSI1Partitions({ ORIGIN: [mockOriginDDB, mockOtherOriginDDB("taken-origin")] });
+
+      await originService.update(mockUUIDV4, { originName: "fresh-origin" });
+
+      expect(mockDynamoDBCommands.put).toHaveBeenCalled();
     });
   });
 

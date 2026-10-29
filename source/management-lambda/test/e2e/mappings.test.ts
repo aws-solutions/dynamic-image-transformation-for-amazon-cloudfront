@@ -9,12 +9,32 @@ import {
   mockPathMappingUpdateRequest,
   mockTransformationPolicyCreateRequest,
 } from "../mocks";
-import { createAuthHeaders } from "./utils";
+import { createAuthHeaders, withUniqueMappingKeys, withUniqueOriginName, withUniquePolicyName } from "./utils";
 
 const mockUUIDv4 = "550e8400-e29b-41d4-a716-446655440000"; // valida UUIDv4
 const { API_URL, TEST_ACCESS_TOKEN } = process.env;
 if (!API_URL || !TEST_ACCESS_TOKEN) {
   throw new Error("API_URL and TEST_ACCESS_TOKEN must be set in environment");
+}
+
+// Each create reads both mapping partitions for the duplicate check, so an unbounded burst of
+// creates throttles on the GSI1 hot key. Create in small batches and retry 429s.
+async function postInBatches(mappings: MappingCreate[], batchSize = 10): Promise<void> {
+  const post = async (mapping: MappingCreate): Promise<number> => {
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch(API_URL + "/mappings", {
+        method: "POST",
+        headers: createAuthHeaders(TEST_ACCESS_TOKEN!),
+        body: JSON.stringify(mapping),
+      });
+      if (response.status !== 429 || attempt === 5) return response.status;
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+    }
+  };
+  for (let i = 0; i < mappings.length; i += batchSize) {
+    const statuses = await Promise.all(mappings.slice(i, i + batchSize).map(post));
+    expect(statuses.every((status) => status === 201)).toBe(true);
+  }
 }
 
 describe("Mappings API", () => {
@@ -35,7 +55,11 @@ describe("Mappings API", () => {
       const response = await fetch(API_URL + "/mappings", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify({ ...mockPathMappingCreateRequest, originId: mockUUIDv4, policyId: mockUUIDv4 }),
+        body: JSON.stringify({
+          ...withUniqueMappingKeys(mockPathMappingCreateRequest),
+          originId: mockUUIDv4,
+          policyId: mockUUIDv4,
+        }),
       });
 
       expect(response.status).toBe(404);
@@ -49,14 +73,18 @@ describe("Mappings API", () => {
       const createOriginResponse = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(withUniqueOriginName(mockOriginCreateRequest)),
       });
       const origin = (await createOriginResponse.json()) as Origin;
 
       const response = await fetch(API_URL + "/mappings", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify({ ...mockPathMappingCreateRequest, originId: origin.originId, policyId: mockUUIDv4 }),
+        body: JSON.stringify({
+          ...withUniqueMappingKeys(mockPathMappingCreateRequest),
+          originId: origin.originId,
+          policyId: mockUUIDv4,
+        }),
       });
 
       expect(response.status).toBe(404);
@@ -70,7 +98,7 @@ describe("Mappings API", () => {
       const createPolicyResponse = await fetch(API_URL + "/policies", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockTransformationPolicyCreateRequest),
+        body: JSON.stringify(withUniquePolicyName(mockTransformationPolicyCreateRequest)),
       });
       const policy = (await createPolicyResponse.json()) as TransformationPolicy;
 
@@ -78,7 +106,7 @@ describe("Mappings API", () => {
       const response = await fetch(API_URL + "/mappings", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify({ ...mockPathMappingCreateRequest, originId: policy.policyId }),
+        body: JSON.stringify({ ...withUniqueMappingKeys(mockPathMappingCreateRequest), originId: policy.policyId }),
       });
 
       expect(response.status).toBe(404);
@@ -92,7 +120,7 @@ describe("Mappings API", () => {
       const createOriginResponse = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(withUniqueOriginName(mockOriginCreateRequest)),
       });
       const origin = (await createOriginResponse.json()) as Origin;
 
@@ -100,7 +128,11 @@ describe("Mappings API", () => {
       const response = await fetch(API_URL + "/mappings", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify({ ...mockPathMappingCreateRequest, originId: origin.originId, policyId: origin.originId }),
+        body: JSON.stringify({
+          ...withUniqueMappingKeys(mockPathMappingCreateRequest),
+          originId: origin.originId,
+          policyId: origin.originId,
+        }),
       });
 
       expect(response.status).toBe(404);
@@ -114,7 +146,7 @@ describe("Mappings API", () => {
       const createOriginResponse = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(withUniqueOriginName(mockOriginCreateRequest)),
       });
       const origin = (await createOriginResponse.json()) as Origin;
 
@@ -122,19 +154,20 @@ describe("Mappings API", () => {
       const createPolicyResponse = await fetch(API_URL + "/policies", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockTransformationPolicyCreateRequest),
+        body: JSON.stringify(withUniquePolicyName(mockTransformationPolicyCreateRequest)),
       });
       const policy = (await createPolicyResponse.json()) as TransformationPolicy;
 
+      const mappingRequest = withUniqueMappingKeys(mockPathMappingCreateRequest);
       const createMappingResponse = await fetch(API_URL + "/mappings", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify({ ...mockPathMappingCreateRequest, originId: origin.originId, policyId: policy.policyId }),
+        body: JSON.stringify({ ...mappingRequest, originId: origin.originId, policyId: policy.policyId }),
       });
       const responseBody = await createMappingResponse.json();
       expect(createMappingResponse.status).toBe(201);
       expect(responseBody).toMatchObject({
-        ...mockPathMappingCreateRequest,
+        ...mappingRequest,
         originId: origin.originId,
         policyId: policy.policyId,
       });
@@ -173,14 +206,14 @@ describe("Mappings API", () => {
       const createOriginResponse = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(withUniqueOriginName(mockOriginCreateRequest)),
       });
       const origin = (await createOriginResponse.json()) as Origin;
 
       const createPolicyResponse = await fetch(API_URL + "/policies", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockTransformationPolicyCreateRequest),
+        body: JSON.stringify(withUniquePolicyName(mockTransformationPolicyCreateRequest)),
       });
       const policy = (await createPolicyResponse.json()) as TransformationPolicy;
 
@@ -204,15 +237,7 @@ describe("Mappings API", () => {
 
       const allMappings = [...pathMappings, ...hostMappings];
 
-      await Promise.all(
-        allMappings.map((mapping) =>
-          fetch(API_URL + "/mappings", {
-            method: "POST",
-            headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-            body: JSON.stringify(mapping),
-          })
-        )
-      );
+      await postInBatches(allMappings);
 
       // Get first page
       const firstPageResponse = await fetch(API_URL + "/mappings", {
@@ -240,8 +265,9 @@ describe("Mappings API", () => {
       expect(intersection).toHaveLength(0);
       expect(secondPageBody.nextToken).toBeUndefined();
 
-      // Add few more host header mappings and trigger paginated response on that too
-      const newHostMappings: MappingCreate[] = Array.from({ length: 50 }, (_, i) => ({
+      // Add few more host header mappings and trigger paginated response on that too.
+      // Indexes start past the first 500 so these are new mappings, not duplicates the API would reject.
+      const newHostMappings: MappingCreate[] = Array.from({ length: 50 }, (_, j) => j + 500).map((i) => ({
         mappingName: `Test Host Mapping ${i + 2}`.padEnd(100, "C"),
         description: `Large host mapping for pagination testing ${i}`.padEnd(500, "D"),
         hostHeaderPattern: `${"x".repeat(60)}.${("test" + i).padEnd(60, "y")}.${("host" + i).padEnd(60, "z")}.com`, // Multiple segments under 63 chars each
@@ -249,15 +275,7 @@ describe("Mappings API", () => {
         policyId: policy.policyId,
       }));
 
-      await Promise.all(
-        newHostMappings.map((mapping) =>
-          fetch(API_URL + "/mappings", {
-            method: "POST",
-            headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-            body: JSON.stringify(mapping),
-          })
-        )
-      );
+      await postInBatches(newHostMappings);
 
       // Get first page again
       const newFirstPageResponse = await fetch(API_URL + "/mappings", {
@@ -281,7 +299,7 @@ describe("Mappings API", () => {
       const newIntersection = newFirstPageIds.filter((id: string) => newSecondPageIds.includes(id));
       expect(newIntersection).toHaveLength(0);
       expect(secondPageBody.nextToken).toBeUndefined();
-    }, 30000);
+    }, 300000);
 
     test("GET specified mapping successfully", async () => {
       if (mappings.length === 0) {
@@ -567,7 +585,7 @@ describe("Mappings API", () => {
       const createOriginResponse = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(withUniqueOriginName(mockOriginCreateRequest)),
       });
       const origin = (await createOriginResponse.json()) as Origin;
 

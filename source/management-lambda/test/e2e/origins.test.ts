@@ -9,7 +9,7 @@ import {
   mockOriginUpdateRequest,
   mockPathMappingCreateRequest,
 } from "../mocks";
-import { createAuthHeaders } from "./utils";
+import { createAuthHeaders, withUniqueMappingKeys, withUniqueOriginName } from "./utils";
 import { DynamoDBClient } from "./dynamodb-client";
 
 const { API_URL, TEST_ACCESS_TOKEN, TABLE_NAME, CURRENT_STACK_REGION } = process.env;
@@ -20,6 +20,8 @@ if (!API_URL || !TEST_ACCESS_TOKEN) {
 describe("Origins API", () => {
   describe("/origins", () => {
     let origins: Origin[] = [];
+    const originRequest = withUniqueOriginName(mockOriginCreateRequest);
+    const originRequestRedacted = { ...originRequest, originHeaders: mockOriginCreateRequestRedacted.originHeaders };
 
     test("GET origins successfully with empty list", async () => {
       const response = await fetch(API_URL + "/origins", {
@@ -47,12 +49,12 @@ describe("Origins API", () => {
       const response = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(originRequest),
       });
       const responseBody = await response.json();
       expect(response.status).toBe(201);
       // originHeaders values are write-only — the response echoes the names with redacted values.
-      expect(responseBody).toMatchObject(mockOriginCreateRequestRedacted);
+      expect(responseBody).toMatchObject(originRequestRedacted);
       origins.push(responseBody as Origin);
     });
 
@@ -64,7 +66,7 @@ describe("Origins API", () => {
       const responseBody = (await response.json()) as PaginatedOriginResponse;
 
       expect(response.status).toBe(200);
-      expect(responseBody.items.pop()).toMatchObject(mockOriginCreateRequestRedacted);
+      expect(responseBody.items.pop()).toMatchObject(originRequestRedacted);
       expect(responseBody.nextToken).toBeUndefined();
     });
 
@@ -123,7 +125,7 @@ describe("Origins API", () => {
       });
       const responseBody = await response.json();
       expect(response.status).toBe(200);
-      expect(responseBody).toMatchObject(mockOriginCreateRequestRedacted);
+      expect(responseBody).toMatchObject(originRequestRedacted);
     });
 
     test("UPDATE specified origin successfully", async () => {
@@ -236,7 +238,7 @@ describe("Origins API", () => {
       const originCreateResponse = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(withUniqueOriginName(mockOriginCreateRequest)),
       });
       const originResponseBody = (await originCreateResponse.json()) as Origin;
 
@@ -244,8 +246,10 @@ describe("Origins API", () => {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
         body: JSON.stringify({
-          mappingName: mockPathMappingCreateRequest.mappingName,
-          pathPattern: mockPathMappingCreateRequest.pathPattern,
+          ...withUniqueMappingKeys({
+            mappingName: mockPathMappingCreateRequest.mappingName,
+            pathPattern: mockPathMappingCreateRequest.pathPattern,
+          }),
           originId: originResponseBody.originId,
         }),
       });

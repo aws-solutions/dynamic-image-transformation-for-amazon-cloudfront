@@ -9,10 +9,10 @@ import {
   validateOriginCreate,
   validateOriginUpdate,
 } from "../../data-models";
-import { redactOriginHeaders } from "../common";
+import { normalizeName, redactOriginHeaders } from "../common";
 import { OriginDAO } from "../dao";
 import { DBOrigin } from "../interfaces";
-import { BaseService } from "./base-service";
+import { BaseService, UniqueKey } from "./base-service";
 
 /**
  * Origin CRUD service.
@@ -46,6 +46,18 @@ export class OriginService extends BaseService<DBOrigin, Origin> {
 
   async update(id: unknown, updateRequest: unknown): Promise<Origin> {
     return redactOriginHeaders(await super.update(id, updateRequest));
+  }
+
+  protected getUniqueKeys(origin: Origin): UniqueKey[] {
+    return [
+      {
+        field: "originName",
+        value: origin.originName,
+        normalize: normalizeName,
+        storedValue: (record) => record.GSI1SK,
+        label: "An origin named",
+      },
+    ];
   }
 
   protected validateUpdateRequest(updateRequest: unknown): OriginUpdate {

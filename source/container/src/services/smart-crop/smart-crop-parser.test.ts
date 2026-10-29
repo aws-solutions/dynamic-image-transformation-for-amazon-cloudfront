@@ -202,6 +202,11 @@ describe('SmartCropParser', () => {
       expect(result.priorities).toEqual(['aspectRatio']);
     });
 
+    it('should accept stored duplicate priorities beyond the policy schema limit', () => {
+      const result = SmartCropParser.parse({ priorities: ['padding', 'padding', 'aspectRatio'] });
+      expect(result.priorities).toEqual(['padding', 'padding', 'aspectRatio']);
+    });
+
     it('should reject targetInclusion in priorities', () => {
       expect(() => SmartCropParser.parse({ priorities: ['targetInclusion', 'aspectRatio'] })).toThrow(SmartCropValidationError);
     });

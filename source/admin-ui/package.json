@@ -20,7 +20,7 @@
     "aws-amplify": "^6.15.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "zod": "^4.1.5",
+    "zod": "^4.6.6",
     "react-router": "^8.3.0"
   },
   "devDependencies": {
@@ -33,7 +33,7 @@
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
     "@vitejs/plugin-react": "^4.7.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "cross-env": "^10.0.0",
     "eslint": "^9.33.0",
     "eslint-config-prettier": "^10.1.8",
@@ -47,8 +47,8 @@
     "prettier": "^3.6.2",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.1",
-    "vite": "^6.4.3",
-    "vitest": "^4.1.11"
+    "vite": "^6.4.4",
+    "vitest": "^4.1.12"
   },
   "scripts": {
     "dev": "cross-env VITE_USE_MSW=true vite",
@@ -76,7 +76,7 @@
     "flatted": "3.4.2",
     "yaml@1": "1.10.3",
     "diff@4": "4.0.4",
-    "handlebars": "4.7.9",
+    "handlebars": "4.7.10",
     "picomatch@2": "2.3.2",
     "picomatch@4": "4.0.4",
     "brace-expansion@1": "1.1.21",

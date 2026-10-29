@@ -14,7 +14,7 @@ import { z } from "zod";
 import { getOptions } from "../../solution-utils/get-options";
 import { logger } from "../common";
 import { PaginationTokenService } from "../common/pagination-token-service";
-import { AllowedDataModelEntities, AllowedDBEntities, DAO, DBEntityType } from "../interfaces";
+import { AllowedDataModelEntities, AllowedDBEntities, DAO, DBEntityType, KeyRecord } from "../interfaces";
 
 /**
  * Base DAO class that provides common DynamoDB operations
@@ -172,6 +172,48 @@ export abstract class BaseDAO<T extends AllowedDBEntities, K extends AllowedData
         ConditionExpression: "attribute_exists(PK)", // Ensure item exists
       })
     );
+  }
+
+  async getKeyRecords(): Promise<KeyRecord[]> {
+    return this.queryKeyRecords(this.entityType);
+  }
+
+  // Reads every page and skips zod validation: an item that fails validation still holds its key.
+  protected async queryKeyRecords(entityType: DBEntityType): Promise<KeyRecord[]> {
+    const records: KeyRecord[] = [];
+    let exclusiveStartKey: Record<string, any> | undefined;
+    do {
+      const data = await this.ddbDocClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: "GSI1",
+          KeyConditionExpression: "GSI1PK = :gsi1pk",
+          ExpressionAttributeValues: { ":gsi1pk": entityType },
+          ProjectionExpression: "PK, GSI1PK, GSI1SK, #data.mappingName",
+          ExpressionAttributeNames: { "#data": "Data" },
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+      data.Items?.forEach((item) =>
+        records.push({ PK: item.PK, GSI1PK: item.GSI1PK, GSI1SK: item.GSI1SK, mappingName: item.Data?.mappingName })
+      );
+      exclusiveStartKey = data.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+    return records;
+  }
+
+  async getKeyRecord(id: string): Promise<KeyRecord | null> {
+    const { Item: item } = await this.ddbDocClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { PK: id },
+        ConsistentRead: true,
+        ProjectionExpression: "PK, GSI1PK, GSI1SK, #data.mappingName",
+        ExpressionAttributeNames: { "#data": "Data" },
+      })
+    );
+    if (!item) return null;
+    return { PK: item.PK, GSI1PK: item.GSI1PK, GSI1SK: item.GSI1SK, mappingName: item.Data?.mappingName };
   }
 
   /**

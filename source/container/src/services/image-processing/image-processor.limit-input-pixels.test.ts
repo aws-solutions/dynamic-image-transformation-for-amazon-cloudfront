@@ -100,4 +100,64 @@ describe('ImageProcessorService LIMIT_INPUT_PIXELS', () => {
 
     expect(lastDecodeLimit()).not.toBe(1000000000);
   });
+
+  describe('alpha check on a negotiated format', () => {
+    let alphaPng: Buffer;
+    const statsResults: Promise<unknown>[] = [];
+    let statsSpy: jest.SpyInstance;
+
+    beforeAll(async () => {
+      alphaPng = await jest
+        .requireActual('sharp')({
+          create: { width: 100, height: 100, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 0.5 } }
+        })
+        .png()
+        .toBuffer();
+    });
+
+    beforeEach(() => {
+      statsResults.length = 0;
+      const proto = Object.getPrototypeOf(jest.requireActual('sharp')());
+      const original = proto.stats;
+      statsSpy = jest.spyOn(proto, 'stats').mockImplementation(function (this: unknown, ...args: unknown[]) {
+        const result = original.apply(this, args);
+        // Attach a handler now so a rejection isn't reported as unhandled before the test asserts on it.
+        result.catch(() => undefined);
+        statsResults.push(result);
+        return result;
+      });
+    });
+
+    afterEach(() => statsSpy.mockRestore());
+
+    const alphaRequest = (buffer: Buffer): ImageProcessingRequest => ({
+      requestId: 'test-limit-alpha',
+      timestamp: Date.now(),
+      origin: { url: 'https://example.com/image.png' },
+      transformations: [{ type: 'format', value: 'jpeg', source: 'auto', negotiated: true }],
+      response: { headers: {} },
+      sourceImage: { buffer, contentType: 'image/png', format: 'png', fetchDurationMs: 1 }
+    });
+
+    const expectTooLarge = async (buffer: Buffer) => {
+      process.env.LIMIT_INPUT_PIXELS = '1000';
+
+      await expect(service.process(alphaRequest(buffer))).rejects.toMatchObject({
+        name: 'ImageProcessingError',
+        statusCode: 400,
+        errorType: 'BadRequest',
+        message: 'The input image is too large to process. Please provide a smaller image.'
+      });
+      expect(statsResults).toHaveLength(1);
+      await expect(statsResults[0]).rejects.toThrow('Input image exceeds pixel limit');
+    };
+
+    it('rejects an over-limit source before stats() decodes it', async () => {
+      await expectTooLarge(alphaPng);
+    });
+
+    it('rejects a truncated over-limit source as too large rather than as a decode failure', async () => {
+      await expectTooLarge(alphaPng.subarray(0, Math.floor(alphaPng.length / 2)));
+    });
+  });
 });

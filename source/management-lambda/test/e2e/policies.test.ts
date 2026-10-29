@@ -9,7 +9,7 @@ import {
   mockTransformationPolicyCreateRequest,
   mockTransformationPolicyUpdateRequest,
 } from "../mocks";
-import { createAuthHeaders } from "./utils";
+import { createAuthHeaders, withUniqueMappingKeys, withUniqueOriginName, withUniquePolicyName } from "./utils";
 
 const { API_URL, TEST_ACCESS_TOKEN } = process.env;
 if (!API_URL || !TEST_ACCESS_TOKEN) {
@@ -19,6 +19,7 @@ if (!API_URL || !TEST_ACCESS_TOKEN) {
 describe("Policies API", () => {
   describe("/policies", () => {
     let policies: TransformationPolicy[] = [];
+    const policyRequest = withUniquePolicyName(mockTransformationPolicyCreateRequest);
 
     test("GET policies successfully with list", async () => {
       const response = await fetch(API_URL + "/policies", {
@@ -36,11 +37,11 @@ describe("Policies API", () => {
       const response = await fetch(API_URL + "/policies", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockTransformationPolicyCreateRequest),
+        body: JSON.stringify(policyRequest),
       });
       expect(response.status).toBe(201);
       const responseBody = await response.json();
-      expect(responseBody).toMatchObject(mockTransformationPolicyCreateRequest);
+      expect(responseBody).toMatchObject(policyRequest);
       policies.push(responseBody as TransformationPolicy);
     });
 
@@ -55,7 +56,7 @@ describe("Policies API", () => {
       expect(responseBody).toHaveProperty("items");
       expect(Array.isArray(responseBody.items)).toBe(true);
       expect(responseBody.items).toEqual(
-        expect.arrayContaining([expect.objectContaining(mockTransformationPolicyCreateRequest)])
+        expect.arrayContaining([expect.objectContaining(policyRequest)])
       );
       expect(responseBody.nextToken).toBeUndefined();
     });
@@ -115,15 +116,16 @@ describe("Policies API", () => {
       });
       const responseBody = await response.json();
       expect(response.status).toBe(200);
-      expect(responseBody).toMatchObject(mockTransformationPolicyCreateRequest);
+      expect(responseBody).toMatchObject(policyRequest);
     });
 
     test("UPDATE specified policy successfully", async () => {
       // Create policy to use
+      const updatePolicyRequest = withUniquePolicyName(mockTransformationPolicyCreateRequest);
       const policyCreate = await fetch(API_URL + "/policies", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockTransformationPolicyCreateRequest),
+        body: JSON.stringify(updatePolicyRequest),
       });
       const policy = (await policyCreate.json()) as TransformationPolicy;
 
@@ -137,7 +139,7 @@ describe("Policies API", () => {
       expect(response.status).toBe(200);
       // match original fields retained with update
       expect(responseBody).toMatchObject({
-        ...mockTransformationPolicyCreateRequest,
+        ...updatePolicyRequest,
         ...mockTransformationPolicyUpdateRequest,
       });
     });
@@ -155,7 +157,7 @@ describe("Policies API", () => {
       const policyCreateResponse = await fetch(API_URL + "/policies", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockTransformationPolicyCreateRequest),
+        body: JSON.stringify(withUniquePolicyName(mockTransformationPolicyCreateRequest)),
       });
       const policyResponseBody = (await policyCreateResponse.json()) as TransformationPolicy;
 
@@ -163,7 +165,7 @@ describe("Policies API", () => {
       const originCreateResponse = await fetch(API_URL + "/origins", {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
-        body: JSON.stringify(mockOriginCreateRequest),
+        body: JSON.stringify(withUniqueOriginName(mockOriginCreateRequest)),
       });
       const originResponseBody = (await originCreateResponse.json()) as Origin;
 
@@ -172,7 +174,7 @@ describe("Policies API", () => {
         method: "POST",
         headers: createAuthHeaders(TEST_ACCESS_TOKEN),
         body: JSON.stringify({
-          ...mockHostHeaderMappingCreateRequest,
+          ...withUniqueMappingKeys(mockHostHeaderMappingCreateRequest),
           policyId: policyResponseBody.policyId,
           originId: originResponseBody.originId,
         }),

@@ -1,15 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import { ErrorCodes, NotFoundError } from "../../common";
 import { MappingDAO } from "../../dao";
-import { NotFoundError, ErrorCodes } from "../../common";
 import { DBEntityType } from "../../interfaces";
 import {
+  mockDynamoDBCommands,
   mockHostHeaderMapping,
   mockHostHeaderMappingDDB,
   mockPathMapping,
   mockPathMappingDDB,
-  mockDynamoDBCommands,
   mockSecretsManagerCommands,
   mockUUIDV4,
   mockUUIDV4_2,
@@ -324,5 +324,37 @@ describe("MappingDAO", () => {
       expect(result.items[1]).toEqual(mockHostHeaderMappingDDB);
       expect(result.nextToken).toBeUndefined();
     });
+  });
+});
+
+describe("MappingDAO getKeyRecords", () => {
+  it("reads every page of both mapping partitions without validating items", async () => {
+    jest.clearAllMocks();
+    const pages: Record<string, any[]> = {
+      PATH_MAPPING: [
+        {
+          Items: [{ PK: "p1", GSI1PK: "PATH_MAPPING", GSI1SK: "/a/*", Data: { mappingName: "A" } }],
+          LastEvaluatedKey: { PK: "p1" },
+        },
+        { Items: [{ PK: "p2", GSI1PK: "PATH_MAPPING", GSI1SK: "/b/*", Data: { mappingName: "B" } }] },
+      ],
+      HOST_HEADER_MAPPING: [{ Items: [{ PK: "h1", GSI1PK: "HOST_HEADER_MAPPING", GSI1SK: "example.com" }] }],
+    };
+    mockDynamoDBCommands.query.mockImplementation(async (input: any) =>
+      pages[input.ExpressionAttributeValues[":gsi1pk"]].shift()
+    );
+
+    const records = await new MappingDAO("test-table").getKeyRecords();
+
+    expect(records).toEqual([
+      { PK: "p1", GSI1PK: "PATH_MAPPING", GSI1SK: "/a/*", mappingName: "A" },
+      { PK: "p2", GSI1PK: "PATH_MAPPING", GSI1SK: "/b/*", mappingName: "B" },
+      { PK: "h1", GSI1PK: "HOST_HEADER_MAPPING", GSI1SK: "example.com", mappingName: undefined },
+    ]);
+    const pathCalls = mockDynamoDBCommands.query.mock.calls.filter(
+      ([input]) => input.ExpressionAttributeValues[":gsi1pk"] === "PATH_MAPPING"
+    );
+    expect(pathCalls[1][0].ExclusiveStartKey).toEqual({ PK: "p1" });
+    expect(pathCalls[0][0].IndexName).toBe("GSI1");
   });
 });

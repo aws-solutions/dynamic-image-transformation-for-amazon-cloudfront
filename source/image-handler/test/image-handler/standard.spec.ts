@@ -87,8 +87,8 @@ describe("instantiateSharpImage", () => {
     const outputBuffer = await result.toBuffer();
     const metadata = await sharp(outputBuffer).metadata();
 
-    // Assert - stripExif should be removed from edits after processing
-    expect(edits.stripExif).toBeUndefined();
+    // Assert - stripExif stays on edits so a re-instantiated single-page GIF still strips
+    expect(edits.stripExif).toBe(true);
     // ICC should be preserved
     expect(metadata).toHaveProperty("icc");
   });
